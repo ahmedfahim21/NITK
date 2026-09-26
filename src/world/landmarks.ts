@@ -112,18 +112,25 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
     lh.position.set(lx, base, lz);
     const white = toon(0xf7f5ee);
     const red = toon(0xc0392b);
-    const H = 30;
+    // Concrete cylinder, 41 m, painted in dark red and white bands.
+    const H = 41;
     const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 3.4, H, 16), white);
     tower.position.y = H / 2;
     lh.add(tower);
-    for (const y of [H * 0.33, H * 0.66]) {
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(3.4 - (y / H) * 1.1 + 0.03, 3.4 - (y / H) * 1.1 + 0.05, 2.2, 16), red);
-      band.position.y = y;
+    const stripe = toon(0x9e2b25);
+    const bands = 8;
+    for (let k = 0; k < bands; k += 2) {
+      const y0 = (k / bands) * H;
+      const y1 = ((k + 1) / bands) * H;
+      const r0 = 3.4 - (y0 / H) * 1.1 + 0.04;
+      const r1 = 3.4 - (y1 / H) * 1.1 + 0.04;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, y1 - y0, 16), stripe);
+      band.position.y = (y0 + y1) / 2;
       lh.add(band);
     }
     // Slit windows spiralling up the stair.
     for (let k = 0; k < 6; k++) {
-      const y = 5 + k * 4;
+      const y = 6 + k * 5.6;
       const r = 3.4 - (y / H) * 1.1;
       const a = k * 1.3;
       const win = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.2, 0.2), toon(0x2c3e50, { glow: 0xffcf80 }));

@@ -43,6 +43,10 @@ The map square is set in `src/area.json`: 13.0005–13.0205 N, 74.7815–74.8060
 - **Time of day.** Morning, noon, Arabian-Sea sunset and night, with lit windows, street-lamp pools and stars.
 - **HUD.** A rotating minimap, a full map with click-to-teleport and place search, floating building labels, and a "you are near" banner.
 
+## Game design
+
+The plan is a *Bully*-style college game, but safe: missions are ordinary NITK challenges. See [`docs/GAME_BIBLE.md`](docs/GAME_BIBLE.md) for the research (hostels, clubs, fests, food spots, lore) and the mission campaign.
+
 ## Controls
 
 | | |

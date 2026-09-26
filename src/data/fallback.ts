@@ -478,7 +478,7 @@ bpx(400, 64, 446, 96, { building: "yes", "building:levels": "2", name: "Indoor S
 // Hostel quarter along Mega Mess Road (south of Fresher's Street).
 {
   const hostel = { building: "dormitory", "building:levels": "4" };
-  bpx(214, 224, 262, 240, { ...hostel, name: "Hostel Block 4" });
+  bpx(214, 224, 262, 240, { ...hostel, name: "Satpura (Block 4)" });
   bldg(
     Ip([
       [242, 250],
@@ -502,8 +502,8 @@ bpx(400, 64, 446, 96, { building: "yes", "building:levels": "2", name: "Indoor S
     hostel
   );
   bpx(262, 290, 300, 304, hostel);
-  bpx(302, 262, 344, 278, { ...hostel, name: "Mega Tower 1", "building:levels": "11" });
-  bpx(312, 312, 346, 328, { ...hostel, name: "Mega Tower 2", "building:levels": "11" });
+  bpx(302, 262, 344, 278, { ...hostel, name: "Everest (Mega Tower 1)", "building:levels": "11" });
+  bpx(312, 312, 346, 328, { ...hostel, name: "Himalaya (Mega Tower 2)", "building:levels": "11" });
   bpx(200, 300, 244, 316, hostel);
   bpx(206, 324, 240, 342, hostel);
   bpx(160, 330, 200, 346, hostel);
@@ -519,7 +519,7 @@ bpx(400, 64, 446, 96, { building: "yes", "building:levels": "2", name: "Indoor S
     hostel
   );
   bpx(284, 340, 320, 356, hostel);
-  bpx(284, 364, 320, 380, { ...hostel, name: "Mega Tower 3", "building:levels": "11" });
+  bpx(284, 364, 320, 380, { ...hostel, name: "Kailash (Mega Tower 3)", "building:levels": "11" });
   bpx(186, 360, 226, 376, hostel);
   bpx(300, 222, 346, 236, { building: "university", "building:levels": "2" });
   bpx(356, 224, 372, 250, { building: "yes", "building:levels": "1" });
@@ -618,7 +618,7 @@ way(box(-360, 120, -60, 330), { natural: "wood" }, true);
   const n = I(0, 470)[1];
   const e = shore(n) + 62;
   way(rect(e, n, 70, 60, 20), { natural: "scrub", name: "Lighthouse Hill" }, true);
-  node([e, n], { man_made: "lighthouse", name: "Surathkal Lighthouse", height: "30" });
+  node([e, n], { man_made: "lighthouse", name: "Surathkal Lighthouse", height: "41" });
   way(
     [
       I(-300, 520),
