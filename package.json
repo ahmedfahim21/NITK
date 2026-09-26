@@ -1,0 +1,22 @@
+{
+  "name": "nitk-world",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Walkable 3D NITK Surathkal campus built from OpenStreetMap",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "osm:fetch": "node scripts/fetch-osm.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0"
+  }
+}
