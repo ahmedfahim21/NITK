@@ -112,6 +112,8 @@ Chapter 1, **Srinivasnagar**, follows the real first-year order: reporting, the 
 | **Roll Call** | Prof. Hegde, weekdays 8 – 9:05 AM | The first WO110 lecture in LHC-C: a proxy for Rohan, or not; classes start |
 | **Maggi in the Rain** | Rohan, 3 – 8 PM | The monsoon hits. Beat the shutters to Nescafe |
 | **The Sunset Rule** | Prakash, 4:30 – 6:30 PM | The lighthouse hill before the sun hits the sea. Chapter finale |
+| **Monsoon Fever** | Rohan, weekdays 9 AM – 5 PM | Walk him to the Health Care Centre before the OPD shuts; Dr. Hebbar's verdict |
+| **The Reading Room** | Ravi, 6 – 10 PM, after 4 missions | Pick the block's extra daily (Deccan Herald, Udayavani, The Hindu); first word of Crescendo |
 
 Chapter 2, **Recruitments**, is a few weeks later, in the post-monsoon. Club stalls stand in an arc in front of the Students' Activity Centre:
 
@@ -128,6 +130,25 @@ Chapter 2, **Recruitments**, is a few weeks later, in the post-monsoon. Club sta
 | **Not Me But You** | Arjun (NSS), weekends 6 – 10 AM | The NSS/Rotaract clean-up on NITK Beach before the tide |
 | **CP League** | Ananya (WebClub), 5 – 9 PM | The Algorithms SIG's STL and complexity session at a CCC lab PC |
 | **Night Canteen Run** | Raju anna, 9 – 10:45 PM | Three hot orders to three blocks in four minutes |
+| **Quiz Night** | Farhan (LSD), 6 – 9 PM | The open quiz prelims in LHC-D: KREC, NH66, Engineer, Incident, Crescendo |
+| **Wright Flight** | Keerthi (FARC), 4 – 6:30 PM, no rain | Build a balsa glider, two throws on the Main Ground; the sea breeze helps |
+| **Expose** | Arnav (Photography), 4:30 – 6 PM, no rain | Four golden-hour frames before the light goes, for the SAC foyer wall |
+| **Pitch Deck** | Vikram, weekdays 10 AM – 5 PM, after 4 missions | Incub8 at NITK-STEP: one idea, three judges' questions, ₹500 seed money |
+| **Underpass** | Isha (Artists' Forum), weekends 7 – 11 AM, no rain | Paint from the Co-op, a mural on the NH66 underpass to the beach |
+| **Musical Night** | Dev (Music Club), 5 – 7 PM, after 3 missions | Roadie the amp, drums and mic stands from SJA to the SAC stage by 7:30 |
+
+### Campus jobs
+
+Like Bully's odd jobs: small paid errands, once a day each, in their hours. They never complete; the journal lists them with **Now**, **Later**, **Done** or **Locked**.
+
+| Job | Giver, hours | Pay | What happens |
+|---|---|---|---|
+| **News Wagon** | Nikhil (Press Club), weekdays 7 – 8:45 AM | ₹80 | Pin the wall magazine on four notice boards before class |
+| **Xerox Run** | Manju, 3 – 7 PM | ₹120 | Notes from LHC-C to the xerox counter, copies to all three blocks, in four minutes |
+| **Puncture Repair** | Babu, 8 AM – 8 PM | ₹60 + tips | Three flats: patch a thorn, pump a leaky valve |
+| **Mess Supply** | Mr. Kotian, 6 – 8:30 AM | ₹90 + breakfast | Two vegetable crates from the Main Gate to the Mega Mess kitchen |
+| **Library Shelving** | Mrs. Pai, 3 – 7 PM | ₹70 | Four returns back on the shelves; three shushes and you're out |
+| **Friday Films** | Tanvi (Films Club), Fridays 5:30 – 7 PM | ₹100 | Projector from SJA, set up the Friday screening at SAC |
 
 ### Courses
 
@@ -240,7 +261,7 @@ src/
   fx/                toon materials, cel/ink pass, sky, time-of-day presets
   player.ts          walker, cyclist, drone, camera
   ui/hud.ts          minimap, map, labels, objective blips
-  game/              the game: mission runner (index.ts), chapter1.ts, chapter2.ts,
+  game/              the game: mission runner (index.ts), chapter1.ts, chapter2.ts, jobs.ts,
                      minigames, club stalls, journal, cast, crowd, cycles,
                      rain/beacon/bees, UI, save state,
                      audio (buses), music (sequencer + tracks), ambience
