@@ -217,8 +217,14 @@ export function buildGround(map: CampusMap): GroundRig {
     let c = AREA_COLOUR[a.kind];
     if (a.kind === "pitch" && a.sport && COURT_SPORTS.test(a.sport)) c = a.sport.includes("tennis") ? 0x3f7f9f : 0xb8603f;
     if (a.kind === "pitch" && a.sport === "cricket") c = 0x78b84f;
+    // NITK's grounds are bare laterite earth, not turf (virtual tour: the
+    // main ground, the lower ground, the clay tennis court); the basketball
+    // courts are grey concrete.
+    const earth = a.kind === "pitch" && (/^(ground|dirt|compacted|clay|earth|sand)$/.test(a.tags?.surface ?? "") || a.sport === "tennis");
+    if (earth) c = 0xc4803f;
+    if (a.kind === "pitch" && a.tags?.surface === "concrete") c = 0x8e9196;
     paint(g, new THREE.Color(c));
-    const green = VEGETATED.has(a.kind) && !(a.kind === "pitch" && a.sport && COURT_SPORTS.test(a.sport));
+    const green = VEGETATED.has(a.kind) && !earth && a.tags?.surface !== "concrete" && !(a.kind === "pitch" && a.sport && COURT_SPORTS.test(a.sport));
     (green ? landGeos : plainGeos).push(g);
   }
 

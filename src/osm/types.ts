@@ -67,7 +67,7 @@ export type Area = {
   kind: AreaKind;
   name?: string;
   sport?: string;
-  /** Selected raw tags (amenity, theatre:type) for landmark matching. */
+  /** Selected raw tags: amenity and theatre:type (landmarks), surface and lit (grounds). */
   tags?: Tags;
   /** What grows there, for wooded areas. */
   leaf?: "palm" | "needle" | "broad";
