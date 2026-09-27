@@ -135,7 +135,8 @@ export class Game {
       const s = this.places.get(k);
       return [s.x, s.z] as [number, number];
     });
-    this.crowd = new Crowd(map, world.grid, hangouts, 160);
+    // A campus, not a bazaar: a few dozen walkers plus the knots at the hangouts.
+    this.crowd = new Crowd(map, world.grid, hangouts, 70);
     this.riders = new Riders(map, 6);
     const racks = (["karavali", "aravali", "lhc", "library"] as PlaceKey[]).map((k) => {
       const s = this.places.get(k);
@@ -734,6 +735,9 @@ export class Game {
 
     // Clock.
     const holding = ui.busy || this.cutscene;
+    // Free roaming runs the clock at 2 game minutes a second (a day in about
+    // 12 minutes); a mission slows it to 1 so its deadlines stay fair.
+    st.timeScale = this.active ? 1 : 2;
     if (!holding) st.minutes += dt * st.timeScale;
     if (st.minutes >= 1440) {
       st.minutes -= 1440;

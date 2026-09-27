@@ -109,7 +109,7 @@ const CSS = `
 #titlecard .hint span { display: inline-flex; align-items: center; gap: 5px; }
 body.talking #help, body.talking #controls { display: none; }
 body.titling #title, body.titling #clock, body.titling #minimap-wrap, body.titling #help, body.titling #controls, body.titling #stats, body.titling #fps { visibility: hidden; }
-@media (max-width: 700px) { #stats { top: 72px; width: 190px; } #tracker { top: 196px; width: 220px; } #toasts { top: 150px; } #dialogue .txt { font-size: 16px; } }
+@media (max-width: 700px) { #prompt { bottom: 380px; } #stats { top: 72px; width: 190px; } #tracker { top: 196px; width: 220px; } #toasts { top: 150px; } #dialogue .txt { font-size: 16px; } }
 `;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, id?: string, cls?: string, parent?: HTMLElement): HTMLElementTagNameMap[K] {

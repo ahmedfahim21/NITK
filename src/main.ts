@@ -287,8 +287,61 @@ async function main() {
   const clockTime = clockEl.querySelector(".time") as HTMLDivElement;
   const clockDay = clockEl.querySelector(".day") as HTMLDivElement;
   const strip = clockEl.querySelector(".strip") as HTMLDivElement;
+  const face = clockEl.querySelector(".face") as HTMLCanvasElement;
+  const faceCtx = face.getContext("2d")!;
+  /** The analog face: twelve ticks, hour and minute hands, curfew and class marks on the rim. */
+  const drawFace = (minutes: number, marks: [number, string][], late: boolean) => {
+    const ctx = faceCtx;
+    const S = face.width;
+    const c = S / 2;
+    const R = c - 4;
+    ctx.clearRect(0, 0, S, S);
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.strokeStyle = "rgba(255,255,255,0.22)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(c, c, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Today's marks on the rim (by hour on the 12-hour dial), in gold.
+    for (const [t] of marks) {
+      const a = ((t / 60) % 12) / 12 * Math.PI * 2 - Math.PI / 2;
+      ctx.strokeStyle = "#f2b84b";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(c, c, R - 3, a - 0.13, a + 0.13);
+      ctx.stroke();
+    }
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const long = k % 3 === 0;
+      ctx.strokeStyle = long ? "rgba(243,238,228,0.9)" : "rgba(243,238,228,0.45)";
+      ctx.lineWidth = long ? 4 : 2.5;
+      ctx.beginPath();
+      ctx.moveTo(c + Math.sin(a) * (R - (long ? 16 : 11)), c - Math.cos(a) * (R - (long ? 16 : 11)));
+      ctx.lineTo(c + Math.sin(a) * (R - 6), c - Math.cos(a) * (R - 6));
+      ctx.stroke();
+    }
+    const hand = (angle: number, len: number, width: number, colour: string) => {
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(c - Math.sin(angle) * 8, c + Math.cos(angle) * 8);
+      ctx.lineTo(c + Math.sin(angle) * len, c - Math.cos(angle) * len);
+      ctx.stroke();
+    };
+    const h = (minutes / 60) % 12;
+    hand((h / 12) * Math.PI * 2, R * 0.5, 7, late ? "#ef6a57" : "#f3eee4");
+    hand(((minutes % 60) / 60) * Math.PI * 2, R * 0.78, 4.5, "#f3eee4");
+    ctx.fillStyle = "#f2b84b";
+    ctx.beginPath();
+    ctx.arc(c, c, 6, 0, Math.PI * 2);
+    ctx.fill();
+  };
   let stripKey: string | null = null;
   let lastClock = "";
+  let lastFace = "";
   const updateClock = () => {
     const st = game?.state;
     if (!st) {
@@ -314,6 +367,10 @@ async function main() {
       strip.innerHTML = `<i></i>${marks.map(([t, l]) => `<b class="${m >= t && m < t + 60 ? "now" : ""}" style="left:${(t / 1440) * 100}%" data-l="${l}"></b>`).join("")}`;
     }
     (strip.firstElementChild as HTMLElement).style.width = `${(st.minutes / 1440) * 100}%`;
+    if (text !== lastFace) {
+      lastFace = text;
+      drawFace(st.minutes, marks, story && afterCurfew(st.minutes));
+    }
     clockEl.classList.toggle("curfew", story && afterCurfew(st.minutes));
   };
 

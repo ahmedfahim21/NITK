@@ -45,8 +45,8 @@ export class GameState {
   completed = new Set<string>();
   flags: Record<string, string | number | boolean> = {};
   raining = false;
-  /** Game minutes per real second. */
-  timeScale = 1;
+  /** Game minutes per real second (set by the game: 2 roaming, 1 on a mission). */
+  timeScale = 2;
   paused = false;
 
   get hour() {
