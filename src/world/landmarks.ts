@@ -408,9 +408,12 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
   }
 
   /* ---------------- façade pieces, from photographs ---------------- */
-  // Mega Hostel towers: a blue-glass stair core stands proud of each front.
+  // Mega Hostel towers and the EEE/IT blocks (virtual tour): a blue-glass
+  // stair core stands proud of each front; the EEE block's porch is a green
+  // portal frame.
   for (const b of map.buildings) {
-    if (!b.name || !/^Mega Hostel/i.test(b.name)) continue;
+    if (!b.name || !/^Mega Hostel|Electrical and Electronics|Information Technology/i.test(b.name)) continue;
+    const eee = !/^Mega Hostel/i.test(b.name);
     const f = frontOf(map, b);
     const w = Math.min(8, f.width * 0.3);
     const h = b.height + 1.2;
@@ -418,13 +421,24 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
     const core = new THREE.Mesh(new THREE.BoxGeometry(w, h, 1.6), toon(0xffffff, { map: curtainWall(5, floors * 2), glow: 0x9fd0ff, emissiveMap: curtainWall(5, floors * 2) }));
     core.position.set(f.x + f.nx * 0.7, h / 2, f.z + f.nz * 0.7);
     core.rotation.y = Math.atan2(f.nx, f.nz);
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(w + 3, 0.35, 3), toon(0xc8976f));
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(w + 3, 0.35, 3), toon(eee ? 0x5f9e3a : 0xc8976f));
     canopy.position.set(f.x + f.nx * 2, 3.2, f.z + f.nz * 2);
     canopy.rotation.y = core.rotation.y;
     shadows(core);
     group.add(core, canopy);
     attach(b.id, core);
     attach(b.id, canopy);
+    if (eee) {
+      for (const side of [-1, 1]) {
+        const off = side * ((w + 3) / 2 - 0.3);
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.2, 0.4), toon(0x5f9e3a));
+        leg.position.set(f.x + f.nx * 3.2 - f.nz * off, 1.6, f.z + f.nz * 3.2 + f.nx * off);
+        shadows(leg);
+        group.add(leg);
+        attach(b.id, leg);
+        grid.stampDisc(leg.position.x, leg.position.z, 0.3, SOLID, 3.4);
+      }
+    }
   }
   // Chemical Engineering: a curved canopy on round piers, the blue nameboard on its fascia.
   {
@@ -593,6 +607,19 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
               inner.add(col);
               blocks.push([px + cx, pz + cz, 0.6, 0.6, 4]);
             }
+            if (side < 0) {
+              // The U. Srinivas Mallya statue (virtual tour, "U Srinivas
+              // Mallya Statue"): the founder, in bronze, on a white pedestal.
+              const bronze = toon(0x6b4a2c);
+              const ped = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.3, 1.4), white);
+              ped.position.set(px, 0.5 + 0.65, pz);
+              const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 1.5, 10), bronze);
+              body.position.set(px, 1.8 + 0.75, pz);
+              const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), bronze);
+              head.position.set(px, 1.8 + 1.72, pz);
+              inner.add(ped, body, head);
+              blocks.push([px, pz, 1.6, 1.6, 3.6]);
+            }
             const beam = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.6, 5.6), yellow);
             beam.position.set(px, 4.2, pz);
             const roof = new THREE.Mesh(new THREE.ConeGeometry(4.4, 1.9, 4), terracotta);
@@ -610,6 +637,16 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
             const coping = new THREE.Mesh(new THREE.BoxGeometry(len, 0.14, 0.42), toon(0xa8453a));
             coping.position.set(mid, 0.87, inward * 1.6);
             inner.add(rail, coping);
+            // The name in red letters on a white plinth wall, facing NH66
+            // (virtual tour, "Highway").
+            // Read from the highway, the first half is on the viewer's left.
+            const leftSide = inward > 0 ? 1 : -1;
+            const name = signBoard([side === leftSide ? "NATIONAL INSTITUTE OF TECHNOLOGY" : "KARNATAKA, SURATHKAL"], len, 0.9, { bg: "#f4f1e8", fg: "#b3261e" });
+            name.position.set(mid, 0.45, inward * 1.6 - inward * 0.3);
+            if (inward > 0) name.rotation.y = Math.PI;
+            const nameWall = new THREE.Mesh(new THREE.BoxGeometry(len, 0.9, 0.25), white);
+            nameWall.position.set(mid, 0.45, inward * 1.6 - inward * 0.16);
+            inner.add(nameWall, name);
             blocks.push([mid, inward * 1.6, len, 0.5, 1]);
             for (let d = 0; d <= len; d += 6) {
               const x = x0 + side * d;
@@ -765,6 +802,69 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
       }
     }
     spots.push({ name: a.name ?? "Open-air theatre", x: sx, z: sz });
+  }
+
+  // Floodlight masts at the corners of lit grounds and the pool (virtual
+  // tour: the main ground, the basketball courts, the swimming pool), and
+  // stepped green-and-yellow seating along the basketball courts.
+  {
+    const mastGeo = new THREE.CylinderGeometry(0.16, 0.3, 18, 6).translate(0, 9, 0);
+    const headGeo = new THREE.BoxGeometry(2.2, 1.2, 0.4).translate(0, 18.4, 0);
+    const masts: [number, number, number][] = [];
+    for (const a of map.areas) {
+      const lit = (a.kind === "pitch" && a.tags?.lit === "yes") || a.kind === "pool";
+      if (!lit) continue;
+      const box = orientedBox(a.outer);
+      if (box.len < 15) continue;
+      const c = Math.cos(box.angle);
+      const sn = Math.sin(box.angle);
+      for (const [su, sv] of [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ]) {
+        const u = su * (box.len / 2 + 3);
+        const v = sv * (box.wid / 2 + 3);
+        const x = box.cx + u * c - v * sn;
+        const z = box.cz + u * sn + v * c;
+        if (grid.get(x, z) & (SOLID | ROAD | WATER)) continue;
+        masts.push([x, z, Math.atan2(box.cx - x, box.cz - z)]);
+      }
+      if (a.sport === "basketball") {
+        const g = new THREE.Group();
+        g.position.set(box.cx, 0, box.cz);
+        g.rotation.y = -box.angle;
+        for (let i = 0; i < 4; i++) {
+          const step = new THREE.Mesh(new THREE.BoxGeometry(box.len * 0.8, 0.45 * (i + 1), 0.9), toon(i % 2 ? 0xe2c23a : 0x4f9a5e));
+          step.position.set(0, (0.45 * (i + 1)) / 2, box.wid / 2 + 1.2 + i * 0.9);
+          g.add(step);
+        }
+        shadows(g);
+        group.add(g);
+        g.updateMatrixWorld(true);
+        const w0 = new THREE.Vector3(-box.len * 0.4, 0, box.wid / 2 + 0.75).applyMatrix4(g.matrixWorld);
+        const w1 = new THREE.Vector3(box.len * 0.4, 0, box.wid / 2 + 0.75).applyMatrix4(g.matrixWorld);
+        const w2 = new THREE.Vector3(box.len * 0.4, 0, box.wid / 2 + 4.8).applyMatrix4(g.matrixWorld);
+        const w3 = new THREE.Vector3(-box.len * 0.4, 0, box.wid / 2 + 4.8).applyMatrix4(g.matrixWorld);
+        grid.fillPolygon([[[w0.x, w0.z], [w1.x, w1.z], [w2.x, w2.z], [w3.x, w3.z]]], SOLID, 1.8);
+      }
+    }
+    if (masts.length) {
+      const poles = new THREE.InstancedMesh(mastGeo, toon(0x9aa1a6), masts.length);
+      const heads = new THREE.InstancedMesh(headGeo, toon(0xe8ecef, { glow: 0xfff4d0 }), masts.length);
+      const m = new THREE.Matrix4();
+      masts.forEach(([x, z, yaw], i) => {
+        m.makeRotationY(yaw).setPosition(x, groundHeight(x, z), z);
+        poles.setMatrixAt(i, m);
+        heads.setMatrixAt(i, m);
+        grid.stampDisc(x, z, 0.4, SOLID, 19);
+      });
+      poles.castShadow = true;
+      poles.computeBoundingSphere();
+      heads.computeBoundingSphere();
+      group.add(poles, heads);
+    }
   }
 
   // Pool: bright water with lane ropes.

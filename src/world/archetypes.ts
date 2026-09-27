@@ -16,6 +16,8 @@
  * - LHC-A: exposed laterite with white window frames.
  * - Library, LHC-D, CRF, CIDS, SJA: white render with lavender-grey bands.
  * - Chemical Engineering: cream and mauve, curved entrance canopy.
+ * - EEE/IT and the International Hostel: saturated yellow, blue-glass stair
+ *   strips, green portal porch.
  */
 import type { Building, CampusMap } from "../osm/types";
 import type { FacadeStyle } from "./textures";
@@ -29,6 +31,9 @@ const LOOKS: [RegExp, Look][] = [
   [/^Department of Chemical Engineering$/i, { style: "modern", colour: "#f4e7d2" }],
   [/Central Library|E-Library|Central Research Facility|Lecture Hall Complex D|Inter-Disciplinary/i, { style: "modern", colour: "#ffffff" }],
   [/^Silver Jubilee Auditorium$/i, { style: "modern", colour: "#f4f2ee" }],
+  // The tour's EEE/IT blocks and the International Hostel: saturated yellow.
+  [/Electrical and Electronics|Information Technology/i, { style: "academic", colour: "#e4cf55" }],
+  [/^International Students Hostel$/i, { style: "hostel", colour: "#e8d35e" }],
 ];
 
 /** Hostel khakis, from the tour's 7th Block and girls' blocks. */
