@@ -27,6 +27,7 @@ export type PlaceKey =
   | "lhc"
   | "library"
   | "sja"
+  | "sac"
   | "mainGround"
   | "lighthouse"
   | "lighthouseView"
@@ -232,7 +233,24 @@ const RESOLVERS: Record<PlaceKey, Resolver> = {
     const b = byName(ctx, /jubilee|auditorium/i);
     return b ? { ...doorOf(ctx, b), name: "Silver Jubilee Auditorium" } : null;
   },
+  sac(ctx) {
+    const a = ctx.map.areas.find((q) => q.tags?.amenity === "theatre" || (q.name && /activity cent/i.test(q.name)));
+    if (a) {
+      const [x, z] = centroid(a.outer);
+      const box = orientedBox(a.outer);
+      // Stand on the open side of the bowl (away from the tiers), facing the stage.
+      const s = free(ctx, x - Math.cos(box.angle) * (box.len / 2 + 10), z - Math.sin(box.angle) * (box.len / 2 + 10), "Students' Activity Centre");
+      return { ...s, face: Math.atan2(x - s.x, z - s.z) };
+    }
+    const sja = get(ctx, "sja");
+    return { ...sja, name: "Students' Activity Centre" };
+  },
   mainGround(ctx) {
+    const named = ctx.map.areas.find((q) => q.name && /main ground 1/i.test(q.name));
+    if (named) {
+      const [x, z] = centroid(named.outer);
+      return free(ctx, x, z, named.name!);
+    }
     const a = ctx.map.areas.filter((q) => (q.kind === "pitch" || q.kind === "track") && q.name && /ground/i.test(q.name)).sort((p, q) => {
       const pa = orientedBox(p.outer);
       const qa = orientedBox(q.outer);

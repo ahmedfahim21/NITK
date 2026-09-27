@@ -379,8 +379,34 @@ export class GameUI {
         if (e.key === "Enter" && render()) finish(true);
       });
       render();
-      setTimeout(() => input.focus(), 30);
+      // Swallow the key press that closed the last dialogue line.
+      input.readOnly = true;
+      setTimeout(() => {
+        input.value = "";
+        input.readOnly = false;
+        input.focus();
+        render();
+      }, 350);
     });
+  }
+
+  /** A blank overlay card for minigames; call closeOverlay() when done. */
+  openOverlay(width = 560): HTMLDivElement {
+    this.busy = true;
+    document.body.classList.add("talking");
+    this.overlay.classList.add("on");
+    const card = el("div", undefined, "card plate");
+    card.style.width = `min(${width}px, calc(100vw - 32px))`;
+    this.overlay.replaceChildren(card);
+    return card;
+  }
+
+  closeOverlay() {
+    this.overlay.classList.remove("on");
+    this.overlay.replaceChildren();
+    this.busy = false;
+    this.lastClosed = performance.now();
+    document.body.classList.remove("talking");
   }
 
   titleCard(opts: { title: string; blurb: string; hasSave: boolean }): Promise<"new" | "continue"> {

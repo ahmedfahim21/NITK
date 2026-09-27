@@ -396,6 +396,59 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
     }
   }
 
+  // Open-air theatres (the Students' Activity Centre): laterite tiers round a stage.
+  for (const a of map.areas) {
+    if (a.tags?.amenity !== "theatre") continue;
+    const box = orientedBox(a.outer);
+    const R = Math.min(box.len, box.wid) / 2;
+    if (R < 6) continue;
+    const g = new THREE.Group();
+    // The stage sits at one end of the long axis; seats wrap round it.
+    const c = Math.cos(box.angle);
+    const sn = Math.sin(box.angle);
+    const sx = box.cx - c * (box.len / 2 - R);
+    const sz = box.cz - sn * (box.len / 2 - R);
+    g.position.set(sx, 0, sz);
+    g.rotation.y = -box.angle;
+    const tiers = Math.max(4, Math.min(9, Math.floor(R / 1.6)));
+    const r0 = R * 0.38;
+    const d = (R - r0) / tiers;
+    const stone = toon(0xa65a3f);
+    const lip = toon(0xe9dfca);
+    for (let i = 0; i < tiers; i++) {
+      const inner = r0 + i * d;
+      const outer = inner + d;
+      const h = 0.42 * (i + 1);
+      const shape = new THREE.Shape();
+      shape.absarc(0, 0, outer, -Math.PI / 2, Math.PI / 2, false);
+      shape.absarc(0, 0, inner, Math.PI / 2, -Math.PI / 2, true);
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 24 });
+      geo.rotateX(-Math.PI / 2);
+      const tier = new THREE.Mesh(geo, i % 2 ? stone : toon(0xb46a4c));
+      g.add(tier);
+      const edge = new THREE.Mesh(new THREE.TorusGeometry(inner + 0.05, 0.05, 3, 24, Math.PI), lip);
+      edge.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
+      edge.position.y = h;
+      g.add(edge);
+    }
+    const stage = new THREE.Mesh(new THREE.CylinderGeometry(r0 * 0.85, r0 * 0.85, 0.7, 28, 1, false, Math.PI, Math.PI), toon(0xd8cbb0));
+    stage.position.y = 0.35;
+    g.add(stage);
+    shadows(g);
+    group.add(g);
+    // Seats are solid; the stage and the open side are walkable.
+    g.updateMatrixWorld(true);
+    for (let i = 0; i < tiers; i++) {
+      const rr = r0 + (i + 0.5) * d;
+      for (let k = 0; k <= 16; k++) {
+        const t = -Math.PI / 2 + (k / 16) * Math.PI;
+        const w = new THREE.Vector3(Math.cos(t) * rr, 0, -Math.sin(t) * rr).applyMatrix4(g.matrixWorld);
+        grid.stampDisc(w.x, w.z, d * 0.6, SOLID, 0.42 * (i + 1));
+      }
+    }
+    spots.push({ name: a.name ?? "Open-air theatre", x: sx, z: sz });
+  }
+
   // Pool: bright water with lane ropes.
   for (const a of map.areas) {
     if (a.kind !== "pool") continue;

@@ -27,7 +27,7 @@ export type SaveData = {
 const KEY = "nitk-fresher-save-v1";
 
 export class GameState {
-  /** Day 0 is Monday 4 August, the first day of the odd semester. */
+  /** Day 0 is Monday 3 August 2026, the first day of the odd semester. */
   day = 0;
   /** Minutes since midnight. */
   minutes = 7 * 60 + 40;
@@ -64,8 +64,8 @@ export class GameState {
   }
 
   dateText(): string {
-    const date = 4 + this.day;
-    return `${DAYS[this.weekday]}, ${date} August`;
+    const d = new Date(2026, 7, 3 + this.day);
+    return `${DAYS[this.weekday]}, ${d.getDate()} ${d.toLocaleString("en-GB", { month: "long" })}`;
   }
 
   period(): TimeOfDay {

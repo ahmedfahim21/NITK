@@ -262,6 +262,47 @@ export class Crowd {
     return out.sort((p, q) => p.d - q.d);
   }
 
+  /**
+   * A run of about `len` metres along the path graph from the node nearest
+   * (x, z), heading away from (ax, az). For chases.
+   */
+  fleePath(x: number, z: number, ax: number, az: number, len: number): [number, number][] {
+    if (!this.nodes.length) return [];
+    let at = 0;
+    let bd = Infinity;
+    this.nodes.forEach((n, i) => {
+      const d = Math.hypot(n.x - x, n.z - z);
+      if (d < bd && n.edges.length) {
+        bd = d;
+        at = i;
+      }
+    });
+    const out: [number, number][] = [[this.nodes[at].x, this.nodes[at].z]];
+    let prevEdge = -1;
+    let total = 0;
+    while (total < len) {
+      const node = this.nodes[at];
+      const opts = node.edges.filter((e) => e !== prevEdge);
+      if (!opts.length) break;
+      // Prefer edges that lead away from the chaser, with some randomness.
+      opts.sort((p, q) => this.away(p, at, ax, az) - this.away(q, at, ax, az));
+      const e = opts[Math.floor(this.rand() * Math.min(2, opts.length))];
+      const edge = this.edges[e];
+      const next = edge.a === at ? edge.b : edge.a;
+      total += edge.len;
+      prevEdge = e;
+      at = next;
+      out.push([this.nodes[at].x, this.nodes[at].z]);
+    }
+    return out;
+  }
+
+  private away(e: number, from: number, ax: number, az: number) {
+    const edge = this.edges[e];
+    const n = this.nodes[edge.a === from ? edge.b : edge.a];
+    return -Math.hypot(n.x - ax, n.z - az);
+  }
+
   /** Makes a student stop and turn to face (x, z). */
   startle(i: number, x: number, z: number) {
     const a = this.agents[i];

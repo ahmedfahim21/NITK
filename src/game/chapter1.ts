@@ -10,6 +10,7 @@ import type { CastId } from "./cast";
 import type { PlaceKey } from "./places";
 import type { Game } from "./index";
 import { sfx } from "./audio";
+import { hhmm, wait } from "./util";
 
 export type Mission = {
   id: string;
@@ -27,10 +28,6 @@ export type Mission = {
 
 const CH = "Chapter 1 · Srinivasnagar";
 
-const hhmm = (m: number) => {
-  const h = Math.floor(m / 60);
-  return `${((h + 11) % 12) + 1}:${String(Math.floor(m % 60)).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-};
 
 export const CHAPTER1: Mission[] = [
   /* ------------------------------------------------------------ */
@@ -42,7 +39,7 @@ export const CHAPTER1: Mission[] = [
     reward: { rep: { Karavali: 5 } },
     async run(g) {
       g.setRain(true);
-      g.ui.showBanner("CHAPTER 1", "Srinivasnagar · Monday, 4 August", "chapter", 4200);
+      g.ui.showBanner("CHAPTER 1", "Srinivasnagar · Monday, 3 August", "chapter", 4200);
       sfx.chapter();
       g.put("prakash", "busStop", 2.5, 1.5);
       g.put("shetty", "academicSection", 0, 0);
@@ -293,13 +290,7 @@ export const CHAPTER1: Mission[] = [
       return true;
     },
     async after(g) {
-      sfx.chapter();
-      g.ui.showBanner("CHAPTER 1 COMPLETE", "Coming next · Chapter 2: Recruitments", "chapter", 6000);
       g.hide("rohan", "prakash", "ananya", "vikram");
     },
   },
 ];
-
-function wait(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}

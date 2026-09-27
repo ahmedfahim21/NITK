@@ -20,19 +20,31 @@ import { Beacon, Rain, Swarm } from "./fx";
 import { Cast, type CastId } from "./cast";
 import { sfx, setRainSound, unlockAudio } from "./audio";
 import { CHAPTER1, type Mission } from "./chapter1";
+import { CHAPTER2 } from "./chapter2";
+import { buildStalls, CLUBS, type StallRig } from "./stalls";
+import { openJournal } from "./journal";
 import { QUIZ } from "./quiz";
+import { wait } from "./util";
 
 type Target = Spot | PlaceKey | CastId;
 
+export const MISSIONS: Mission[] = [...CHAPTER1, ...CHAPTER2];
+
+export const CHAPTERS: { name: string; next: string }[] = [
+  { name: "Chapter 1 · Srinivasnagar", next: "Chapter 2: Recruitments" },
+  { name: "Chapter 2 · Recruitments", next: "Chapter 3: Engineer — coming soon" },
+];
+
 type Nav = {
-  get: () => { x: number; z: number };
+  /** One or more targets; arriving at any resolves with its index. */
+  get: () => { x: number; z: number }[];
   radius: number;
   objective: string;
   /** Real seconds left, or undefined. */
   timer?: number;
   /** Game-clock deadline (minutes). */
   clockBy?: number;
-  resolve: (ok: boolean) => void;
+  resolve: (hit: number) => void;
 };
 
 type Interactable = {
@@ -120,9 +132,14 @@ export class Game {
   }
 
   /** Walk (or ride) to a target. Resolves false if a timer or deadline runs out. */
-  goTo(target: Target, objective: string, opts: { radius?: number; timeLimit?: number; clockBy?: number } = {}): Promise<boolean> {
+  async goTo(target: Target, objective: string, opts: { radius?: number; timeLimit?: number; clockBy?: number } = {}): Promise<boolean> {
+    return (await this.goToAny([target], objective, opts)) >= 0;
+  }
+
+  /** Go to whichever of several targets; resolves with its index, or -1 on timeout. */
+  goToAny(targets: Target[], objective: string, opts: { radius?: number; timeLimit?: number; clockBy?: number } = {}): Promise<number> {
     return new Promise((resolve) => {
-      const get = () => this.spot(target);
+      const get = () => targets.map((t) => this.spot(t));
       this.nav = { get, radius: opts.radius ?? 4, objective, timer: opts.timeLimit, clockBy: opts.clockBy, resolve };
     });
   }
@@ -180,6 +197,42 @@ export class Game {
     this.parkCycle(x, z, this.player.facing);
   }
 
+  private stalls: StallRig | null = null;
+
+  /** Recruitment-week stalls, built once when Chapter 2 is running. */
+  ensureStalls() {
+    if (this.stalls) return;
+    const sac = this.places.get("sac");
+    this.stalls = buildStalls(sac.x, sac.z, sac.face ?? 0, this.world.grid);
+    this.group.add(this.stalls.group);
+    // A senior behind every table (Meera and Sid staff their own).
+    const skins = [0x8d5524, 0xa0623a, 0xc68642, 0xe0ac69, 0x9c6a44];
+    CLUBS.forEach((club, i) => {
+      if (club.id === "stargazing" || club.id === "lug") return;
+      const sp = this.stalls!.spots.get(`${club.id}:senior`)!;
+      const e = this.cast.extra(`${club.name} senior`, {
+        skin: skins[i % skins.length],
+        shirt: parseInt(club.colour.slice(1), 16),
+        pants: 0x2d3436,
+        shoe: 0xe8e8e8,
+        hair: 0x1a1512,
+        bag: null,
+        longHair: i % 3 === 1,
+      });
+      e.place(sp.x, sp.z, sp.face);
+    });
+  }
+
+  stallSpot(id: string): Spot {
+    this.ensureStalls();
+    const s = this.stalls!.spots.get(id)!;
+    return { x: s.x, z: s.z, name: id, face: s.face };
+  }
+
+  parkCycleAt(x: number, z: number, face: number) {
+    this.parkCycle(x, z, face);
+  }
+
   private parkCycle(x: number, z: number, face: number) {
     if (!this.cycle) return;
     this.group.add(this.cycle);
@@ -201,7 +254,7 @@ export class Game {
 
   private available(): Mission[] {
     if (this.active) return [];
-    return CHAPTER1.filter((m) => !this.state.completed.has(m.id) && m.requires.every((r) => this.state.completed.has(r)));
+    return MISSIONS.filter((m) => !this.state.completed.has(m.id) && m.requires.every((r) => this.state.completed.has(r)));
   }
 
   /** Put givers of available missions in place with their "!" markers. */
@@ -245,6 +298,13 @@ export class Game {
       this.ui.showBanner("MISSION PASSED", bits.join("  ·  "), "pass", 3600);
       await wait(3800);
       await m.after?.(this);
+      const chapter = MISSIONS.filter((q) => q.chapter === m.chapter);
+      if (chapter.every((q) => this.state.completed.has(q.id))) {
+        const meta = CHAPTERS.find((c) => c.name === m.chapter);
+        sfx.chapter();
+        this.ui.showBanner(`${m.chapter.split(" · ")[0].toUpperCase()} COMPLETE`, meta ? `Coming next · ${meta.next}` : "", "chapter", 6000);
+        await wait(6200);
+      }
     } else {
       sfx.missionFailed();
       this.ui.showBanner("MISSION FAILED", m.failHint ?? "Talk to them again to retry.", "fail", 3200);
@@ -260,8 +320,8 @@ export class Game {
   /** New game or continue. `?skipto=<missionId>` starts a new game just before that mission (for development). */
   async begin(fresh: boolean, savedPos?: [number, number]) {
     const skipto = new URLSearchParams(location.search).get("skipto");
-    if (skipto && CHAPTER1.some((m) => m.id === skipto)) {
-      for (const m of CHAPTER1) {
+    if (skipto && MISSIONS.some((m) => m.id === skipto)) {
+      for (const m of MISSIONS) {
         if (m.id === skipto) break;
         this.state.completed.add(m.id);
       }
@@ -271,7 +331,10 @@ export class Game {
       const k = this.places.get("karavali");
       this.player.place(k.x, k.z, 0);
       if (done.has("ch1-cycle")) this.giveCycle();
+      if (done.has("ch1-sunset")) this.ensureStalls();
       this.refreshGivers();
+      const auto = this.available().find((m) => !m.giver);
+      if (auto) void this.startMission(auto);
       return;
     }
     if (!fresh && savedPos) {
@@ -288,6 +351,7 @@ export class Game {
       const gate = this.places.get("mainGate");
       this.player.place(bus.x, bus.z, Math.atan2(gate.x - bus.x, gate.z - bus.z));
     }
+    if (this.state.completed.has("ch1-sunset")) this.ensureStalls();
     this.refreshGivers();
     const auto = this.available().find((m) => !m.giver);
     if (auto) void this.startMission(auto);
@@ -448,6 +512,8 @@ export class Game {
         if (this.player.riding) {
           const c = this.player.dismount();
           if (c) this.parkCycle(c.position.x, c.position.z, c.rotation.y);
+        } else if (this.state.flags.flatTyres) {
+          this.ui.toast("Both tyres are flat. Somebody's going to pay for this.", "#c0392b");
         } else if (this.cycle) {
           this.group.remove(this.cycle);
           this.player.facing = this.cycle.rotation.y;
@@ -550,27 +616,32 @@ export class Game {
     // Navigation objective.
     const nav = this.nav;
     if (nav) {
-      const tgt = nav.get();
+      const tgts = nav.get();
+      let best = 0;
+      let bd = Infinity;
+      tgts.forEach((t, i) => {
+        const d = Math.hypot(t.x - p.pos.x, t.z - p.pos.z);
+        if (d < bd) {
+          bd = d;
+          best = i;
+        }
+      });
+      const tgt = tgts[best];
       this.beacon.set(tgt.x, tgt.z);
-      const d = Math.hypot(tgt.x - p.pos.x, tgt.z - p.pos.z);
       if (nav.timer !== undefined && !holding) nav.timer -= dt;
       let timerShown = nav.timer;
-      if (nav.clockBy !== undefined) timerShown = Math.max(0, nav.clockBy - st.minutes) * (60 / Math.max(1, st.timeScale * 60));
-      ui.setObjective(this.active?.title ?? "", `${nav.objective} <span style="opacity:.6">(${Math.round(d)} m)</span>`, timerShown);
-      this.hud.markers = [{ x: tgt.x, z: tgt.z, color: "#ffd23f" }];
-      if (d < nav.radius && !p.drone) {
+      if (nav.clockBy !== undefined) timerShown = Math.max(0, nav.clockBy - st.minutes) / Math.max(0.01, st.timeScale);
+      ui.setObjective(this.active?.title ?? "", `${nav.objective} <span style="opacity:.6">(${Math.round(bd)} m)</span>`, timerShown);
+      this.hud.markers = tgts.map((t) => ({ x: t.x, z: t.z, color: "#ffd23f" }));
+      const done = (hit: number) => {
         this.nav = null;
         this.beacon.set(null);
         ui.setObjective(null);
         this.hud.markers = [];
-        nav.resolve(true);
-      } else if ((nav.timer !== undefined && nav.timer <= 0) || (nav.clockBy !== undefined && st.minutes >= nav.clockBy)) {
-        this.nav = null;
-        this.beacon.set(null);
-        ui.setObjective(null);
-        this.hud.markers = [];
-        nav.resolve(false);
-      }
+        nav.resolve(hit);
+      };
+      if (bd < nav.radius && !p.drone) done(best);
+      else if ((nav.timer !== undefined && nav.timer <= 0) || (nav.clockBy !== undefined && st.minutes >= nav.clockBy)) done(-1);
     } else {
       this.beacon.set(null);
       if (!this.active) {
@@ -616,6 +687,7 @@ export class Game {
     }
     ui.setPrompt(prompt);
     if (action && inp.hit("KeyE") && performance.now() - ui.lastClosed > 350) void action();
+    if (inp.hit("KeyJ") && !holding) void openJournal(this);
     if (p.riding && inp.hit("KeyB")) {
       sfx.bell();
       for (const n of this.crowd.near(p.pos.x, p.pos.z, 7)) this.crowd.startle(n.i, p.pos.x, p.pos.z);
@@ -713,9 +785,6 @@ export class Game {
   }
 }
 
-function wait(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 function pickQuiz(n: number) {
   const pool = [...QUIZ];

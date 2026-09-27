@@ -23,7 +23,7 @@ The map square is set in `src/area.json`: 13.0005–13.0205 N, 74.7815–74.8060
 
 ## The game
 
-Chapter 1, **Srinivasnagar**, is playable. It's your first days as a fresher, in August, during the monsoon. There are six missions:
+Chapters 1 and 2 are playable. Chapter 1, **Srinivasnagar**, covers your first days as a fresher, in August, during the monsoon. It has six missions:
 
 | Mission | Giver | What happens |
 |---|---|---|
@@ -33,6 +33,17 @@ Chapter 1, **Srinivasnagar**, is playable. It's your first days as a fresher, in
 | **Log in to IRIS** | Ananya (IRIS team) | A password minigame with escalating rules (the highway, the year KREC was founded, …) |
 | **Maggi in the Rain** | Rohan, after 3 PM | The monsoon hits. Beat the shutters to Nescafe |
 | **The Sunset Rule** | Prakash (senior), 4:30–6:30 PM | Reach the lighthouse hill before the sun hits the sea, and don't disturb the bees. Chapter finale |
+
+Chapter 2, **Recruitments**, follows. It's a month later, in September, and recruitment week has club stalls in an arc in front of the real Students' Activity Centre amphitheatre:
+
+| Mission | Giver | What happens |
+|---|---|---|
+| **Recruitment Week** | automatic | Visit the club stalls (WebClub, Star Gazing, LSD, Linux Users Group, Music, Photography, E-FOREA, SPICMACAY) and sign up for three |
+| **Come Back Next Year** | Ananya | Get politely rejected by IEEE, ACM, IE and IET; they go onto your "Next Year" list |
+| **Freshers Cup** | Phoenix captain, after 4 PM | A penalty-shootout minigame on Main Ground 1, Karavali vs Aravali |
+| **Flat Tyre** | Rohan | Kiran from Aravali let your tyres down on a Crescendo dare. Chase him across campus |
+| **sudo make me a coffee** | Sid (LUG), after 6 PM | A Linux terminal minigame: fix Rohan's dual-boot Wi-Fi, then get him out of vim |
+| **First Light** | Meera (Star Gazing), after 7:30 PM, no rain | Name constellations in the August sky (Saptarishi, Vrischika, Cassiopeia…) |
 
 The Bully-style systems:
 
@@ -46,6 +57,7 @@ The Bully-style systems:
 - **Students:** about 180 walk the real footpaths, hang out in groups at Nescafe, Nandini, LHC and the mess, pop umbrellas in the rain, chatter in English, Hindi, Kannada and Tulu, and complain when you barge through them.
 - **Cycles:** a few students ride the campus roads, racks stand outside the hostels, and you get your own roadster (E to ride, B for the bell).
 - **Weather:** monsoon rain, with its own lighting and sound.
+- **Journal (J):** your stats, respect with each group, the clubs you've joined, the Next Year list, and every mission by chapter.
 - **Saving:** progress saves to your browser automatically. The title screen offers Continue or New game.
 
 The research behind it (hostels, clubs, fests, lore) and the plan for later chapters are in [`docs/GAME_BIBLE.md`](docs/GAME_BIBLE.md).
@@ -54,6 +66,8 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 |---|---|
 | ![Arrival in the rain](docs/ch1-arrival.png) | ![Mission card](docs/ch1-wheels.png) |
 | ![IRIS password minigame](docs/ch1-iris.png) | ![Cycling at night](docs/cycling-night.png) |
+| ![Club stalls](docs/ch2-stall-row.png) | ![Penalty shootout](docs/ch2-penalties.png) |
+| ![Linux terminal](docs/ch2-terminal.png) | ![Journal](docs/journal.png) |
 
 **Dev shortcuts:**
 - `?autostart` skips the title screen.
@@ -90,6 +104,7 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 | `W A S D` | walk (`Shift` run, `Space` jump) |
 | `E` | talk, interact, get on or off your cycle |
 | `B` | cycle bell (students jump aside) |
+| `J` | journal |
 | drag / double-click | look around / lock the mouse |
 | `←` `→` / wheel | turn / zoom |
 | `M` | map, search and teleport |
@@ -110,8 +125,9 @@ src/
   fx/                toon materials, cel/ink pass, sky, time-of-day presets
   player.ts          walker, cyclist, drone, camera
   ui/hud.ts          minimap, map, labels, objective blips
-  game/              the game: mission runner (index.ts), chapter1.ts, cast,
-                     crowd, cycles, rain/beacon/bees, UI, audio, save state
+  game/              the game: mission runner (index.ts), chapter1.ts, chapter2.ts,
+                     minigames, club stalls, journal, cast, crowd, cycles,
+                     rain/beacon/bees, UI, audio, save state
 scripts/fetch-osm.mjs  snapshot the extract into public/data (also run by CI)
 ```
 

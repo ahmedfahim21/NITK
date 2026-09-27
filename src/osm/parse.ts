@@ -140,6 +140,8 @@ function areaKind(t: Tags): AreaKind | null {
   if (t.landuse === "commercial" || t.landuse === "retail") return "commercial";
   if (t.landuse === "construction" || t.landuse === "brownfield" || t.landuse === "industrial") return "dirt";
   if (t.amenity === "parking") return "parking";
+  // Open-air theatres (the Students' Activity Centre) are paved bowls.
+  if (t.amenity === "theatre" && !t.building) return "plaza";
   if ((t.highway === "pedestrian" && t.area === "yes") || t.place === "square" || t.amenity === "marketplace")
     return "plaza";
   return null;
@@ -229,6 +231,7 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
     const a: Area = { id, outer: clipped, holes: holes.map((h) => clipPolygon(h, bounds)).filter((h) => h.length >= 3), kind };
     if (t.name) a.name = t.name;
     if (t.sport) a.sport = t.sport;
+    if (t.amenity) a.tags = { amenity: t.amenity, ...(t["theatre:type"] ? { "theatre:type": t["theatre:type"] } : {}) };
     if (/coconut|palm|areca/i.test(t.trees ?? "")) a.leaf = "palm";
     else if (t.leaf_type === "needleleaved") a.leaf = "needle";
     areas.push(a);
@@ -304,6 +307,11 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
     if (closed) {
       const kind = areaKind(t);
       if (kind) pushArea(w.id, cleanRing(pts), [], t, kind);
+      else if (t.name) {
+        // Named places mapped as outlines (shelters, institutional areas): keep them findable.
+        const c = centroid(cleanRing(pts));
+        if (inBounds(c)) pois.push({ x: c[0], z: c[1], name: t.name, kind: t.amenity ?? t.landuse ?? t.man_made ?? "place", tags: t });
+      }
     }
   };
 

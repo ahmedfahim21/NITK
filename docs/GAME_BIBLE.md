@@ -148,7 +148,8 @@ The calendar is real: the odd semester runs July/Aug–Dec with **Engineer in Oc
 5. **Maggi in the Rain.** It's pouring (the coast gets >3000 mm a year). Get from LHC to Nescafe before it closes, dry-ish. *Umbrella physics, puddles, a rain-weather system.*
 6. **The Sunset Rule.** A senior tells you everyone goes to the beach at sunset. Reach lighthouse hill before the sun touches the sea, and avoid the bees.
 
-### Chapter 2: "Recruitments" (September)
+### Chapter 2: "Recruitments" (September): **built**
+*Built in `src/game/chapter2.ts` as Recruitment Week, Come Back Next Year, Freshers Cup (penalty shootout), Flat Tyre (a chase with an Aravali prankster), sudo make me a coffee (Linux terminal), and First Light (constellations). The Engineer chapter is next.*
 7. **Stall Crawl.** Club recruitment week: visit the non-exclusive stalls and pick up to three.
 8. **Come Back Next Year.** Try the exclusive clubs. IEEE, ACM, IE, ISTE, IET and Rotaract each politely turn you away, and each one leaves an entry in your "Next Year" journal.
 9. **Freshers Cup** (Phoenix). A football or cricket match on Main Ground for your block.
