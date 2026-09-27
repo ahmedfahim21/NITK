@@ -154,13 +154,21 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
   - pastel houses with Mangalore-tile hip roofs and black rooftop water tanks, and shopfronts with rolling shutters off campus
 
   Windows light up at night.
-- **Walk-in interiors.** The Main Building (enquiry desk, stair, office corridor), Central Library (stacks, reading tables, issue desk), SJA (stage and seating), Mega Mess (steel tables, serving counter), Night Canteen and LHC-A (classrooms round the courtyard) open up. Walk through the lit front door: the shell and roof cut away and the camera looks down into the room (`src/world/interiors.ts`).
+- **Walk-in interiors.** Fitted out from the virtual tour's inside shots where it has them:
+  - the Main Building lobby: square pillars with dark-wood capitals, teak wainscot, coloured-glass jali over the door, the "Think · Create · Engineer" display, enquiry desk, stair and office corridors
+  - LHC-A: classrooms round the courtyard with maroon pad chairs, whiteboard and projector screen, ceiling fans, grilled windows
+  - the Central Computer Centre, fitted like the Solve lab: workbenches with PCs and kits, maroon office chairs, glass partitions, blue posters, split ACs
+  - Central Library (stacks, reading tables, issue desk), SJA (stage and seating), Mega Mess (steel tables, serving counter) and the Night Canteen
+ Walk through the lit front door: the shell and roof cut away and the camera looks down into the room (`src/world/interiors.ts`).
 - **Landmarks.** These are matched by OSM name or tag, so they land wherever the real map puts them:
   - the lighthouse on its knoll, with a sweeping beam after dusk
   - the Main Building's olive entrance block: glass front between four yellow piers, three yellow arches over the porch, the blue fountains in front
   - the main gate on NH66: stone piers, security cabin and the curved black-granite trilingual name wall; inside it, two yellow pavilions with terracotta roofs and a balustrade with yellow ball finials
   - the front lawns from the gate to the Main Building: red-brick walks, croton beds, Ashoka rows
   - the SAC amphitheatre: green tiers, red stair flights, lavender stage under a canopy on yellow poles
+  - the U. Srinivas Mallya statue in the gate pavilion, and the institute's name in red on the NH66 frontage wall
+  - the EEE/IT blocks and International Hostel in saturated yellow, with glass stair strips and a green portal porch
+  - the grounds in bare laterite earth (the main grounds, the clay tennis court), grey concrete basketball courts with green-and-yellow seating, and floodlight masts on lit grounds and the pool
   - the square red-and-white lighthouse with its gallery, lantern and sweeping radar
   - Chemical Engineering's curved canopy
   - signage on the Central Library, SJA and Lecture Hall Complex
