@@ -44,7 +44,10 @@ export type PlaceKey =
   | "labDesk"
   | "lhcC"
   | "lhcD"
-  | "scienceBlock";
+  | "scienceBlock"
+  | "hcc"
+  | "underpass"
+  | "step";
 
 type Resolver = (ctx: Ctx) => Spot | null;
 type Ctx = { map: CampusMap; world: World; cache: Map<PlaceKey, Spot> };
@@ -343,6 +346,25 @@ const RESOLVERS: Record<PlaceKey, Resolver> = {
   // The Science Block: the Chemistry and Physics departments, where first-year labs run.
   scienceBlock(ctx) {
     return inside(ctx, /chemistry and physics|department of chemistry/i, 7, "Chemistry Lab, Science Block") ?? get(ctx, "lhc");
+  },
+  hcc(ctx) {
+    const b = byName(ctx, /health care cent/i);
+    if (b) return { ...doorOf(ctx, b), name: "Health Care Centre" };
+    return { ...get(ctx, "mainGround"), name: "Health Care Centre" };
+  },
+  underpass(ctx) {
+    // The NH66 underpass the Artists' Forum painted; OSM names its roads "Underpass".
+    const r = ctx.map.roads.find((q) => q.name && /underpass/i.test(q.name));
+    if (r) {
+      const m = r.pts[Math.floor(r.pts.length / 2)];
+      return free(ctx, m[0], m[1], "The NH66 underpass");
+    }
+    return { ...get(ctx, "mainGate"), name: "The NH66 underpass" };
+  },
+  step(ctx) {
+    const b = byName(ctx, /nitk step/i);
+    if (b) return { ...doorOf(ctx, b), name: "NITK-STEP" };
+    return { ...get(ctx, "computerCentre"), name: "NITK-STEP" };
   },
   beach(ctx) {
     const lm = ctx.world.places.find((q) => /nitk beach/i.test(q.name));

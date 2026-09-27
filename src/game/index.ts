@@ -21,6 +21,7 @@ import { Cast, type CastId } from "./cast";
 import { sfx, setRainSound, unlockAudio } from "./audio";
 import { CHAPTER1, type Mission } from "./chapter1";
 import { CHAPTER2 } from "./chapter2";
+import { JOBS } from "./jobs";
 import { buildStalls, CLUBS, type StallRig } from "./stalls";
 import { openJournal } from "./journal";
 import { attend, classNow, closeMissed, nextClassText, perks } from "./courses";
@@ -34,7 +35,7 @@ import { ROAD } from "../world/grid";
 
 type Target = Spot | PlaceKey | CastId;
 
-export const MISSIONS: Mission[] = [...CHAPTER1, ...CHAPTER2];
+export const MISSIONS: Mission[] = [...CHAPTER1, ...CHAPTER2, ...JOBS];
 
 export const CHAPTERS: { name: string; next: string }[] = [
   { name: "Chapter 1 · Srinivasnagar", next: "Chapter 2: Recruitments" },
@@ -341,7 +342,13 @@ export class Game {
     if (this.active || this.explore) return [];
     const st = this.state;
     const doneIn = (chapter: string) => MISSIONS.filter((q) => q.chapter === chapter && st.completed.has(q.id)).length;
-    return MISSIONS.filter((m) => !st.completed.has(m.id) && m.requires.every((r) => st.completed.has(r)) && doneIn(m.chapter) >= (m.needs ?? 0));
+    return MISSIONS.filter(
+      (m) =>
+        !st.completed.has(m.id) &&
+        !(m.repeat && st.flags[`job:${m.id}`] === st.day) &&
+        m.requires.every((r) => st.completed.has(r)) &&
+        doneIn(m.chapter) >= (m.needs ?? 0)
+    );
   }
 
   /** Unlocked and within the mission's hours: the giver is out. */
@@ -383,7 +390,16 @@ export class Game {
     this.cutscene = false;
     this.active = null;
     this.weatherLock = false;
-    if (ok) {
+    if (ok && m.repeat) {
+      // A job: paid, and back tomorrow.
+      this.state.flags[`job:${m.id}`] = this.state.day;
+      if (m.reward?.money) this.state.money += m.reward.money;
+      if (m.reward?.rep) for (const [f, n] of Object.entries(m.reward.rep)) this.state.addRep(f as Faction, n!);
+      sfx.missionPassed();
+      this.ui.showBanner("JOB DONE", m.reward?.money ? `+₹${m.reward.money}` : "", "pass", 2600);
+      await wait(2800);
+      await m.after?.(this);
+    } else if (ok) {
       this.state.completed.add(m.id);
       if (m.reward?.money) this.state.money += m.reward.money;
       if (m.reward?.rep) for (const [f, n] of Object.entries(m.reward.rep)) this.state.addRep(f as Faction, n!);
@@ -395,7 +411,7 @@ export class Game {
       this.ui.showBanner("MISSION PASSED", bits.join("  ·  "), "pass", 3600);
       await wait(3800);
       await m.after?.(this);
-      const chapter = MISSIONS.filter((q) => q.chapter === m.chapter);
+      const chapter = MISSIONS.filter((q) => q.chapter === m.chapter && !q.repeat);
       if (chapter.every((q) => this.state.completed.has(q.id))) {
         const meta = CHAPTERS.find((c) => c.name === m.chapter);
         sfx.chapter();

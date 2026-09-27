@@ -30,6 +30,8 @@ export type Mission = {
   /** When the giver is around (default 7 AM to curfew), and on which days. */
   hours?: [number, number];
   days?: "weekday" | "weekend";
+  /** A campus job: repeatable once a day, paid every time, never "completed". */
+  repeat?: boolean;
   /** Any other condition (the weather, money); returns what the giver says if it isn't met. */
   window?: (g: Game) => string | null;
   reward?: { money?: number; rep?: Partial<Record<Faction, number>> };
@@ -607,6 +609,87 @@ export const CHAPTER1: Mission[] = [
     },
     async after(g) {
       g.hide("rohan", "prakash", "ananya", "vikram");
+    },
+  },
+
+  /* ------------------------------------------------------------ */
+  {
+    id: "ch1-hcc",
+    title: "Monsoon Fever",
+    chapter: CH,
+    giver: "rohan",
+    where: "karavali",
+    requires: ["ch1-maggi"],
+    days: "weekday",
+    hours: [9 * 60, 17 * 60],
+    reward: { rep: { Karavali: 5 } },
+    failHint: "The HCC's OPD closed for lunch. Rohan's still sneezing; try again.",
+    async run(g) {
+      await g.say([
+        ["Rohan", "Bhai. The Maggi-in-the-rain was worth it. The fever is not. Everything is hot and also cold."],
+        ["Rohan", "The Health Care Centre, opposite the main ground. Walk me there? Before the OPD shuts for lunch?"],
+      ]);
+      g.hide("rohan");
+      const shut = Math.min(g.state.minutes + 45, 17 * 60);
+      if (!(await g.goTo("hcc", `Get Rohan to the Health Care Centre (before ${hhmm(shut)})`, { radius: 5, clockBy: shut }))) return false;
+      g.put("hebbar", "hcc", 0.8, -0.8);
+      g.put("rohan", "hcc", -0.8, 0.8);
+      await g.say([
+        ["Dr. Hebbar", "Name, roll number, hostel. Thank you. Open your mouth. Say 'aaa'. Yes. Monsoon fever. The whole of first year gets it by September."],
+      ]);
+      const pick = await g.choose("Dr. Hebbar", "Did he get drenched and then sit under a fan?", [
+        "Yes, straight after Maggi, under the Karavali fan",
+        "No, he was indoors all week",
+        "He walked in the rain on purpose. For vibes",
+      ]);
+      await g.say([
+        ["Dr. Hebbar", pick === 1 ? "Hm. Then someone is sneezing on him. Either way:" : "Of course. Every year. Either way:"],
+        ["Dr. Hebbar", "Paracetamol, three days. Plenty of water. Mess curd rice, not night-canteen egg roll. And a medical certificate for the attendance office, because I know what you're about to ask."],
+        ["Rohan", "…He knew what I was about to ask."],
+        ["Dr. Hebbar", "The HCC is open all day, and there's an ambulance at night: the number's on the back of your ID card. Next."],
+      ]);
+      g.state.flags["hcc:visited"] = true;
+      return true;
+    },
+    async after(g) {
+      g.hide("hebbar", "rohan");
+    },
+  },
+
+  /* ------------------------------------------------------------ */
+  {
+    id: "ch1-readingroom",
+    title: "The Reading Room",
+    chapter: CH,
+    giver: "ravi",
+    where: "karavali",
+    requires: ["ch1-mess"],
+    needs: 4,
+    hours: [18 * 60, 22 * 60],
+    reward: { rep: { Karavali: 5, Seniors: 3 } },
+    async run(g) {
+      await g.say([
+        ["Ravi", "Hostel Reading Room Committee. Every block has a reading room: newspapers, magazines, a carrom board with no striker, and chairs older than the institute."],
+        ["Ravi", "Your block gets to pick one extra daily. The committee votes on it, and the committee is… mostly me. Go and look at the rack first."],
+      ]);
+      const rooms = g.places.within(/karavali/i, 1, 17, 4, "The reading room");
+      const rack = rooms.length ? rooms[0] : g.places.get("karavali");
+      if (!(await g.goTo(rack, "Check the reading-room newspaper rack", { radius: 2.5 }))) return false;
+      await g.say([["", "The Hindu (two days old), the Times of India (crossword already done, in pen), Sportstar from July. A lizard, reading the editorial."]]);
+      const pick = await g.choose("Ravi", "Which daily should the block add?", [
+        "Deccan Herald: Bengaluru news and the Sunday puzzles",
+        "Udayavani: the Kannada daily everyone's Mangaluru friends read",
+        "Another copy of The Hindu, so the fights stop",
+      ]);
+      const paper = ["Deccan Herald", "Udayavani", "The Hindu"][pick];
+      g.state.flags["reading:paper"] = paper;
+      await g.say([
+        ["Ravi", pick === 1 ? `${paper}. Good. Half the mess staff will thank you, and you'll learn Kannada from the cinema page.` : `${paper}. Motion passed, one vote to none.`],
+        ["Ravi", "One more thing. The Reading Room Committee also runs Crescendo: the inter-hostel cultural fest. Songs, skits, the hostels trying to destroy each other with dance."],
+        ["Ravi", "It's months away. But Karavali lost last year, and we remember. Start practising something."],
+      ]);
+      g.state.flags["crescendo:teased"] = true;
+      return true;
     },
   },
 ];

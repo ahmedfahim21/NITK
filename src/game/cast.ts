@@ -24,7 +24,19 @@ export type CastId =
   | "divya"
   | "aditi"
   | "arjun"
-  | "raju";
+  | "raju"
+  | "nikhil"
+  | "manju"
+  | "babu"
+  | "kotian"
+  | "tanvi"
+  | "ravi"
+  | "farhan"
+  | "keerthi"
+  | "arnav"
+  | "dev"
+  | "hebbar"
+  | "isha";
 
 export type Def = { name: string; role: string; look: Look; scale?: number };
 
@@ -108,6 +120,66 @@ export const CAST: Record<CastId, Def> = {
     name: "Arjun",
     role: "NSS volunteer, 3rd-year Civil. Owns forty pairs of gloves",
     look: { skin: 0x8d5524, shirt: 0x2e86c1, pants: 0x2d3436, shoe: 0xe8e8e8, hair: 0x1a1512, bag: 0x27ae60 },
+  },
+  nikhil: {
+    name: "Nikhil",
+    role: "Press Club. Edits News Wagon, the fortnightly wall magazine. Owns a lot of pins",
+    look: { skin: 0xc68642, shirt: 0x2d3436, pants: 0x485460, shoe: 0xe8e8e8, hair: 0x1a1512, bag: 0x6d5d4b },
+  },
+  manju: {
+    name: "Manju",
+    role: "Runs the xerox counter at the shopping centre. Can photocopy a textbook in four minutes",
+    look: { skin: 0x8d5524, shirt: 0x16a085, pants: 0x2d3436, shoe: 0x1b1f2a, hair: 0x1a1512, bag: null },
+  },
+  babu: {
+    name: "Babu",
+    role: "Fixes cycles under the tree by the shopping centre. Has seen every kind of puncture",
+    look: { skin: 0x7a4a2a, shirt: 0x7f8c8d, pants: 0x3d3d3d, shoe: 0x1b1f2a, hair: 0x3a3a3a, bag: null },
+  },
+  kotian: {
+    name: "Mr. Kotian",
+    role: "Mega Mess manager. Counts the vegetables. Counts them again",
+    look: { skin: 0x9c6a44, shirt: 0xecf0f1, pants: 0x2d3436, shoe: 0x1b1f2a, hair: 0x6f6f6f, bag: null },
+  },
+  tanvi: {
+    name: "Tanvi",
+    role: "NITK Films Club. Screens a film at SAC every Friday of the semester",
+    look: { skin: 0xe0ac69, shirt: 0xc0392b, pants: 0x1e272e, shoe: 0xe8e8e8, hair: 0x241c16, bag: 0x2d3436, longHair: true },
+  },
+  ravi: {
+    name: "Ravi",
+    role: "Hostel Reading Room Committee, which also runs Crescendo",
+    look: { skin: 0xb07040, shirt: 0xf1c40f, pants: 0x34495e, shoe: 0xe8e8e8, hair: 0x1a1512, bag: null },
+  },
+  farhan: {
+    name: "Farhan",
+    role: "Literary, Stage and Debating Society. Quizmaster. Knows too much",
+    look: { skin: 0xc68642, shirt: 0x6c5ce7, pants: 0x2d3436, shoe: 0x1b1f2a, hair: 0x0f0c0a, bag: 0x2d3436 },
+  },
+  keerthi: {
+    name: "Keerthi",
+    role: "Flying and Robotics Club. Runs Wright Flight. Has balsa dust on everything",
+    look: { skin: 0xa0623a, shirt: 0x27ae60, pants: 0x485460, shoe: 0xe8e8e8, hair: 0x1a1512, bag: 0xe17055, longHair: true },
+  },
+  arnav: {
+    name: "Arnav",
+    role: "Photography Club. Organises Expose. Has opinions about golden hour",
+    look: { skin: 0xe0ac69, shirt: 0x1d3557, pants: 0x6d5d4b, shoe: 0x1b1f2a, hair: 0x241c16, bag: 0x2d3436 },
+  },
+  dev: {
+    name: "Dev",
+    role: "NITK Music Club. Bass player. Needs roadies for Musical Night",
+    look: { skin: 0x8d5524, shirt: 0x2d3436, pants: 0x1e272e, shoe: 0xe8e8e8, hair: 0x0f0c0a, bag: null },
+  },
+  hebbar: {
+    name: "Dr. Hebbar",
+    role: "Institute Medical Officer at the Health Care Centre, opposite the main ground",
+    look: { skin: 0x9c6a44, shirt: 0xf4f4f0, pants: 0x485460, shoe: 0x1b1f2a, hair: 0x4a4a4a, bag: null },
+  },
+  isha: {
+    name: "Isha",
+    role: "Artists' Forum. Painted half the underpass. Paint on her sandals, always",
+    look: { skin: 0xa0623a, shirt: 0xf4f4f0, pants: 0x2c3e8f, shoe: 0x6d5d4b, hair: 0x1a1512, bag: 0xe17055, longHair: true },
   },
   raju: {
     name: "Raju anna",
