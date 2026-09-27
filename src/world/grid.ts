@@ -130,6 +130,24 @@ export class Grid {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.flags[j * this.w + i] &= ~flag;
   }
 
+  /** Opens a disc back up: no longer solid, nothing on top (a doorway). */
+  carve(x: number, z: number, r: number) {
+    const i0 = Math.max(0, Math.floor((x - r - this.minX) / this.cell));
+    const i1 = Math.min(this.w - 1, Math.floor((x + r - this.minX) / this.cell));
+    const j0 = Math.max(0, Math.floor((z - r - this.minZ) / this.cell));
+    const j1 = Math.min(this.h - 1, Math.floor((z + r - this.minZ) / this.cell));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const cx = this.minX + (i + 0.5) * this.cell - x;
+        const cz = this.minZ + (j + 0.5) * this.cell - z;
+        if (cx * cx + cz * cz > r * r + this.cell * 0.25) continue;
+        const k = j * this.w + i;
+        this.flags[k] &= ~SOLID;
+        this.top[k] = 0;
+      }
+    }
+  }
+
   /** Nearest walkable spot, spiralling out. */
   nearestFree(x: number, z: number, maxR = 200): [number, number] {
     if (!this.blocked(x, z)) return [x, z];

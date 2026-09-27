@@ -15,6 +15,7 @@ import { buildTrees } from "./trees";
 import { buildProps } from "./props";
 import { clearMounds } from "./terrain";
 import { ModelLayer } from "./models";
+import { buildInteriors, interiorBuildings } from "./interiors";
 
 export type Place = { name: string; x: number; z: number; y: number; kind: string };
 
@@ -26,6 +27,8 @@ export type World = {
   stats: { buildings: number; roads: number; trees: number };
   /** Season visuals: land tint, sea state, foliage tint, summer blossoms. */
   setSeason(s: { grass: [number, number, number]; foliage: [number, number, number]; sea: number; blossom: boolean }): void;
+  /** The walk-in room the player is in (cutaway on), or null. */
+  interior(pos: THREE.Vector3): string | null;
   apply(p: Preset): void;
   update(t: number, cam?: THREE.Vector3): void;
 };
@@ -69,8 +72,11 @@ export function buildWorld(map: CampusMap): World {
       if (Math.hypot(c[0] - map.lighthouse[0], c[1] - map.lighthouse[1]) < 6 || bl.tags.man_made === "lighthouse") skip.add(bl.id);
     }
   }
+  // Walk-in buildings get walls and a doorway in the grid instead of a solid block.
+  const rooms = interiorBuildings(map);
+  const roomIds = new Set(rooms.map((r) => r.b.id));
   for (const bl of map.buildings) {
-    if (skip.has(bl.id)) continue;
+    if (skip.has(bl.id) || roomIds.has(bl.id)) continue;
     if (bl.minHeight >= 2.5) {
       grid.fillPolygon([bl.outer, ...bl.holes], 0, bl.height);
       continue;
@@ -80,12 +86,21 @@ export function buildWorld(map: CampusMap): World {
 
   const ground = buildGround(map);
   const roads = buildRoads(map);
-  const buildings = buildBuildings(map, skip);
+  const buildings = buildBuildings(map, new Set([...skip, ...roomIds]));
+  // Each walk-in building's shell is its own mesh so the cutaway can hide it.
+  const shells = new Map<number, THREE.Object3D>();
+  for (const { b: bl } of rooms) {
+    const shell = buildBuildings({ ...map, buildings: [bl] }, skip).group;
+    shell.name = `shell-${bl.id}`;
+    shells.set(bl.id, shell);
+    buildings.group.add(shell);
+  }
+  const interiors = buildInteriors(map, grid, shells, landmarks.attached);
   const models = new ModelLayer(map);
   void models.sync((k, err) => console.warn(`[models] ${k}:`, err));
   const trees = buildTrees(map, grid);
   const props = buildProps(map, roads.lamps, grid);
-  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, models.group);
+  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, models.group, interiors.group);
 
   let glow = 0;
 
@@ -132,6 +147,9 @@ export function buildWorld(map: CampusMap): World {
     setSeason(s) {
       ground.setSeason(s.grass, s.sea);
       trees.setSeason(s.foliage, s.blossom);
+    },
+    interior(pos) {
+      return interiors.update(pos);
     },
     apply(p) {
       glow = p.glow;
