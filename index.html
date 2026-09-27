@@ -36,6 +36,11 @@
       #controls .row { display: flex; gap: 4px; }
       #controls button { font: inherit; font-weight: 700; padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; cursor: pointer; }
       #controls button.on { background: var(--navy); color: #fff; }
+      #mix { display: none; flex-direction: column; gap: 4px; font-size: 12px; }
+      #mix.open { display: flex; }
+      #mix label { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; }
+      body.exploring #stats, body.exploring #tracker { display: none !important; }
+      body.exploring #help { left: auto; right: 14px; bottom: 190px; max-width: 300px; }
       #source { font-size: 11px; max-width: 240px; line-height: 1.35; }
       #source a { color: var(--navy); }
       #source .warn { color: #a4431f; font-weight: 700; }
@@ -81,7 +86,7 @@
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Shift</kbd> run · <kbd>E</kbd> talk / interact · drag to look</div>
       <div class="more">
         <div><kbd>Space</kbd> jump · <kbd>B</kbd> cycle bell · <kbd>J</kbd> journal · <kbd>M</kbd> map &amp; teleport · <kbd>F</kbd> drone view</div>
-        <div><kbd>T</kbd> skip time · <kbd>←</kbd><kbd>→</kbd> turn · wheel zoom · double-click locks mouse · <kbd>H</kbd> hide help</div>
+        <div><kbd>T</kbd> skip time · <kbd>N</kbd> next track · <kbd>I</kbd> workbench (explore) · <kbd>←</kbd><kbd>→</kbd> turn · wheel zoom · double-click locks mouse · <kbd>H</kbd> hide help</div>
       </div>
     </div>
     <div id="controls" class="panel">
@@ -90,6 +95,8 @@
         <button id="btn-drone" title="F">Drone</button>
         <button id="btn-map" title="M">Map</button>
       </div>
+      <div class="row" id="sound"></div>
+      <div id="mix"></div>
       <div id="source"></div>
     </div>
     <div id="map-overlay">

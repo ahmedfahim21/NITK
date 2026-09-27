@@ -75,6 +75,8 @@ export type Area = {
 
 export type Building = {
   id: number;
+  /** OSM element type, for links and override keys. */
+  osmType: "way" | "relation";
   outer: Pt[];
   holes: Pt[][];
   /** Wall top, metres above ground. */
@@ -89,6 +91,10 @@ export type Building = {
   roofColour?: string;
   /** Inside the NITK campus boundary. */
   campus: boolean;
+  /** Façade style forced by an override (see world/overrides.ts). */
+  style?: string;
+  /** Hidden by an override (e.g. replaced by a custom model). */
+  hidden?: boolean;
   area: number;
   tags: Tags;
 };

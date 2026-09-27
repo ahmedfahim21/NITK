@@ -123,7 +123,12 @@ export class GameUI {
     this.dialogue.addEventListener("click", () => this.advance?.());
   }
 
+  showStats(on: boolean) {
+    this.stats.style.display = on ? "block" : "none";
+  }
+
   setStats(s: StatsView) {
+    if (this.stats.style.display === "none") return;
     const bar = (v: number, c: string) => `<div class="bar"><i style="width:${Math.max(0, Math.min(100, v))}%;background:${c}"></i></div>`;
     const att = s.attendance;
     this.stats.innerHTML = `
@@ -409,32 +414,48 @@ export class GameUI {
     document.body.classList.remove("talking");
   }
 
-  titleCard(opts: { title: string; blurb: string; hasSave: boolean }): Promise<"new" | "continue"> {
+  titleCard(opts: { title: string; blurb: string; hasSave: boolean }): Promise<"new" | "continue" | "explore"> {
     return new Promise((resolve) => {
       this.titlecard.classList.add("on");
       this.titlecard.innerHTML = `<h1>${opts.title}</h1><p>${opts.blurb}</p>`;
       const row = el("div", undefined, undefined, this.titlecard);
-      row.style.display = "flex";
-      row.style.gap = "10px";
-      const go = (v: "new" | "continue") => {
+      row.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;justify-content:center";
+      const go = (v: "new" | "continue" | "explore") => {
         this.titlecard.classList.remove("on");
         resolve(v);
       };
+      const mode = (title: string, sub: string) => {
+        const box = el("div", undefined, undefined, row);
+        box.style.cssText = "display:flex;flex-direction:column;gap:8px;align-items:center;background:rgba(251,247,238,0.08);border:2px solid rgba(251,247,238,0.35);border-radius:12px;padding:14px 18px;min-width:220px";
+        const h = el("div", undefined, undefined, box);
+        h.style.cssText = "font-weight:900;font-size:20px;letter-spacing:.04em";
+        h.textContent = title;
+        const p = el("div", undefined, undefined, box);
+        p.style.cssText = "font-size:12px;opacity:.8;max-width:220px";
+        p.textContent = sub;
+        return box;
+      };
+      const story = mode("STORY MODE", "Your fresher year at NITK: missions, classes, clubs, chapters.");
       if (opts.hasSave) {
-        const c = el("button", undefined, undefined, row);
+        const c = el("button", undefined, undefined, story);
         c.textContent = "Continue";
         c.addEventListener("click", () => go("continue"));
-        const n = el("button", undefined, "ghost", row);
+        const n = el("button", undefined, "ghost", story);
         n.textContent = "New game";
         n.addEventListener("click", () => go("new"));
       } else {
-        const b = el("button", undefined, undefined, row);
+        const b = el("button", undefined, undefined, story);
         b.textContent = "Start Fresher Year";
         b.addEventListener("click", () => go("new"));
       }
+      const explore = mode("EXPLORE MODE", "Free roam the real campus. Inspect and edit buildings, drop in your own 3D models.");
+      const e = el("button", undefined, undefined, explore);
+      e.textContent = "Explore";
+      e.style.background = "#7bd389";
+      e.addEventListener("click", () => go("explore"));
       const hint = el("p", undefined, undefined, this.titlecard);
       hint.style.fontSize = "12px";
-      hint.textContent = "WASD walk · Shift run · E interact · M map · F drone · B cycle bell";
+      hint.textContent = "WASD walk · Shift run · E interact · M map · F drone · B cycle bell · N next track";
     });
   }
 }

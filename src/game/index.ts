@@ -25,6 +25,9 @@ import { buildStalls, CLUBS, type StallRig } from "./stalls";
 import { openJournal } from "./journal";
 import { QUIZ } from "./quiz";
 import { wait } from "./util";
+import { Ambience } from "./ambience";
+import type { Music, Mood } from "./music";
+import { ROAD } from "../world/grid";
 
 type Target = Spot | PlaceKey | CastId;
 
@@ -59,6 +62,9 @@ type Interactable = {
 
 export type GameHooks = {
   applyTime: (period: TimeOfDay, raining: boolean) => void;
+  music?: Music;
+  /** Explore mode: free roam with no missions, stat drain or saving. */
+  mode?: "story" | "explore";
 };
 
 export class Game {
@@ -86,6 +92,8 @@ export class Game {
   private beeTimer = 0;
   cutscene = false;
   private t = 0;
+  readonly explore: boolean;
+  readonly ambience: Ambience;
 
   constructor(
     readonly map: CampusMap,
@@ -100,6 +108,10 @@ export class Game {
   ) {
     this.state = state ?? new GameState();
     this.ui = ui ?? new GameUI();
+    this.explore = hooks.mode === "explore";
+    this.ambience = new Ambience(map);
+    if (this.explore) this.ui.showStats(false);
+    if (hooks.music) hooks.music.onTrack = (title) => this.ui.toast(`♪ ${title}`, "#6c5ce7");
     this.places = new Places(map, world);
 
     const hangouts = (["nescafe", "nandini", "lhc", "megaMess", "library"] as PlaceKey[]).map((k) => {
@@ -253,7 +265,7 @@ export class Game {
   /* ================= missions ================= */
 
   private available(): Mission[] {
-    if (this.active) return [];
+    if (this.active || this.explore) return [];
     return MISSIONS.filter((m) => !this.state.completed.has(m.id) && m.requires.every((r) => this.state.completed.has(r)));
   }
 
@@ -319,6 +331,14 @@ export class Game {
 
   /** New game or continue. `?skipto=<missionId>` starts a new game just before that mission (for development). */
   async begin(fresh: boolean, savedPos?: [number, number]) {
+    if (this.explore) {
+      const g = this.places.get("mainGate");
+      const [x, z] = this.world.grid.nearestFree(g.x + 8, g.z + 8);
+      this.player.place(x, z, 0);
+      this.giveCycle();
+      this.ui.toast("Explore mode: click a building to inspect it. E rides your cycle.", "#1e6f5c");
+      return;
+    }
     const skipto = new URLSearchParams(location.search).get("skipto");
     if (skipto && MISSIONS.some((m) => m.id === skipto)) {
       for (const m of MISSIONS) {
@@ -358,6 +378,7 @@ export class Game {
   }
 
   save() {
+    if (this.explore) return;
     this.state.save([this.player.pos.x, this.player.pos.z]);
   }
 
@@ -602,7 +623,7 @@ export class Game {
     this.crowd.night = period === "night";
 
     // Body.
-    if (!holding) {
+    if (!holding && !this.explore) {
       const running = p.speed > 5 && !p.riding;
       st.energy -= dt * (0.07 * st.timeScale + (running ? 0.35 : 0)) * (st.food < 10 ? 2 : 1);
       st.food -= dt * 0.09 * st.timeScale;
@@ -737,6 +758,26 @@ export class Game {
     this.cast.update(dt, p.pos, this.t);
     this.rain.update(dt, this.camera.position);
     this.beacon.update(this.t);
+
+    // Sound: the soundtrack follows the moment, ambience follows the place.
+    const music = this.hooks.music;
+    if (music) {
+      const racing = !!this.nav && (this.nav.timer !== undefined || this.nav.clockBy !== undefined);
+      const mood: Mood = racing ? "mission" : st.raining ? "rain" : period === "sunset" ? "sunset" : period === "night" ? "night" : "day";
+      music.setMood(mood);
+      if (inp.hit("KeyN")) music.next();
+    }
+    this.ambience.update(dt, {
+      x: p.pos.x,
+      z: p.pos.z,
+      hour: st.hour,
+      raining: st.raining,
+      crowd: this.crowd.near(p.pos.x, p.pos.z, 25).length,
+      speed: p.drone ? 0 : p.speed,
+      running: p.speed > 5.5,
+      riding: !!p.riding,
+      onRoad: (this.world.grid.get(p.pos.x, p.pos.z) & ROAD) !== 0,
+    });
 
     ui.setStats({
       clock: st.clockText(),

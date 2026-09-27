@@ -267,6 +267,12 @@ export class Player {
     }
   }
 
+  /** Set the drone camera distance and pitch (for framing a building). */
+  droneView(dist: number, pitch: number) {
+    this.droneDist = dist;
+    this.pitch = pitch;
+  }
+
   get speed() {
     return this.riding ? Math.abs(this.bikeSpeed) : Math.hypot(this.vel.x, this.vel.z);
   }

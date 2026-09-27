@@ -216,7 +216,7 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
 
   const roads: Road[] = [];
   const areas: Area[] = [];
-  const rawBuildings: { id: number; outer: Pt[]; holes: Pt[][]; tags: Tags }[] = [];
+  const rawBuildings: { id: number; osmType: "way" | "relation"; outer: Pt[]; holes: Pt[][]; tags: Tags }[] = [];
   const trees: Tree[] = [];
   const pois: Poi[] = [];
   const barriers: Barrier[] = [];
@@ -245,7 +245,7 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
     const closed = isClosed(w.geometry);
 
     if (t.building && t.building !== "no") {
-      if (closed) rawBuildings.push({ id: w.id, outer: cleanRing(pts), holes: [], tags: t });
+      if (closed) rawBuildings.push({ id: w.id, osmType: "way", outer: cleanRing(pts), holes: [], tags: t });
       return;
     }
     if (t["building:part"]) return;
@@ -323,7 +323,7 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
     for (const outer of outers) {
       const holes = inners.filter((h) => pointInPoly(h[0][0], h[0][1], outer));
       if (t.building && t.building !== "no") {
-        rawBuildings.push({ id: r.id, outer, holes, tags: t });
+        rawBuildings.push({ id: r.id, osmType: "relation", outer, holes, tags: t });
         continue;
       }
       if (t.natural === "coastline") continue;
@@ -379,6 +379,7 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
     if (t.man_made === "lighthouse" || t.building === "lighthouse") lighthouse = lighthouse ?? c;
     const out: Building = {
       id: b.id,
+      osmType: b.osmType,
       outer: b.outer,
       holes: b.holes,
       height,

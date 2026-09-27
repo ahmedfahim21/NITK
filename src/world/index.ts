@@ -14,6 +14,7 @@ import { buildLandmarks } from "./landmarks";
 import { buildTrees } from "./trees";
 import { buildProps } from "./props";
 import { clearMounds } from "./terrain";
+import { ModelLayer } from "./models";
 
 export type Place = { name: string; x: number; z: number; y: number; kind: string };
 
@@ -23,6 +24,10 @@ export type World = {
   places: Place[];
   spawn: { x: number; z: number; facing: number };
   stats: { buildings: number; roads: number; trees: number };
+  /** Rebuild building meshes and custom models after an override changes. */
+  rebuildBuildings(): Promise<void>;
+  /** Meshes that can be clicked to select a building. */
+  pickables(): THREE.Object3D[];
   apply(p: Preset): void;
   update(t: number, cam?: THREE.Vector3): void;
 };
@@ -77,10 +82,12 @@ export function buildWorld(map: CampusMap): World {
 
   const ground = buildGround(map);
   const roads = buildRoads(map);
-  const buildings = buildBuildings(map, skip);
+  let buildings = buildBuildings(map, skip);
+  const models = new ModelLayer(map);
+  void models.sync((k, err) => console.warn(`[models] ${k}:`, err));
   const trees = buildTrees(map, grid);
   const props = buildProps(map, roads.lamps, grid);
-  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group);
+  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, models.group);
 
   let glow = 0;
 
@@ -124,6 +131,16 @@ export function buildWorld(map: CampusMap): World {
     places,
     spawn: { x: sx, z: sz, facing },
     stats: { buildings: map.buildings.length, roads: map.roads.length, trees: trees.count },
+    async rebuildBuildings() {
+      group.remove(buildings.group);
+      buildings.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+      buildings = buildBuildings(map, skip);
+      group.add(buildings.group);
+      await models.sync((k, err) => console.warn(`[models] ${k}:`, err));
+    },
+    pickables() {
+      return [buildings.group, models.group, landmarks.group];
+    },
     apply(p) {
       glow = p.glow;
       ground.apply(p);

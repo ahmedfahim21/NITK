@@ -10,6 +10,10 @@ import { Hud } from "./ui/hud";
 import { Game } from "./game";
 import { GameState } from "./game/state";
 import { GameUI } from "./game/ui";
+import { Music } from "./game/music";
+import { mix, setMix, unlockAudio } from "./game/audio";
+import { Workbench } from "./editor/workbench";
+import { applyOverrides, loadOverrides } from "./world/overrides";
 import type { Preset } from "./fx/presets";
 
 /** The monsoon version of a preset: grey sky, weak sun, thick haze. */
@@ -45,6 +49,7 @@ async function main() {
   }
 
   const map = await loadCampus(progress);
+  applyOverrides(map, await loadOverrides());
   progress(`Building ${map.buildings.length} buildings and ${map.roads.length} roads…`);
   await nextFrame();
 
@@ -145,20 +150,75 @@ async function main() {
   window.addEventListener("resize", resize);
   resize();
 
+  /* ---- sound ---- */
+  const music = new Music();
+  window.addEventListener("pointerdown", unlockAudio);
+  window.addEventListener("keydown", unlockAudio);
+  const soundRow = document.getElementById("sound")!;
+  const musicBtn = document.createElement("button");
+  const renderMusicBtn = () => {
+    musicBtn.textContent = mix.musicOn ? "♪ Music on" : "♪ Music off";
+    musicBtn.classList.toggle("on", mix.musicOn);
+  };
+  musicBtn.addEventListener("click", () => {
+    setMix({ musicOn: !mix.musicOn });
+    renderMusicBtn();
+  });
+  renderMusicBtn();
+  const nextBtn = document.createElement("button");
+  nextBtn.textContent = "⏭";
+  nextBtn.title = "Next track (N)";
+  nextBtn.addEventListener("click", () => music.next());
+  const mixBtn = document.createElement("button");
+  mixBtn.textContent = "🔊";
+  mixBtn.title = "Volume";
+  const mixPanel = document.getElementById("mix")!;
+  mixBtn.addEventListener("click", () => mixPanel.classList.toggle("open"));
+  soundRow.append(musicBtn, nextBtn, mixBtn);
+  for (const key of ["master", "music", "sfx", "ambience"] as const) {
+    const row = document.createElement("label");
+    row.textContent = key === "sfx" ? "Effects" : key[0].toUpperCase() + key.slice(1);
+    const r = document.createElement("input");
+    r.type = "range";
+    r.min = "0";
+    r.max = "1";
+    r.step = "0.05";
+    r.value = String(mix[key]);
+    r.addEventListener("input", () => setMix({ [key]: Number(r.value) }));
+    row.appendChild(r);
+    mixPanel.appendChild(row);
+  }
+
   /* ---- the game ---- */
   const saved = GameState.load();
   const gameUi = new GameUI();
-  const startGame = (fresh: boolean) => {
-    if (fresh) GameState.clear();
-    const state = fresh || !saved ? new GameState() : saved.state;
-    game = new Game(map, world, player, input, hud, camera, { applyTime: (period, rain) => setTime(period, rain) }, state, gameUi);
+  let bench: Workbench | null = null;
+  const startGame = (mode: "new" | "continue" | "explore") => {
+    const fresh = mode !== "continue";
+    if (mode === "new") GameState.clear();
+    const state = mode === "continue" && saved ? saved.state : new GameState();
+    game = new Game(
+      map,
+      world,
+      player,
+      input,
+      hud,
+      camera,
+      { applyTime: (period, rain) => setTime(period, rain), music, mode: mode === "explore" ? "explore" : "story" },
+      state,
+      gameUi
+    );
     scene.add(game.group);
     void game.begin(fresh || !saved, saved?.pos);
-    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene } });
+    if (mode === "explore") {
+      bench = new Workbench(map, world, camera, canvas, player, scene, (m) => gameUi.toast(m, "#1d3557"));
+      document.body.classList.add("exploring");
+    }
+    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music, bench } });
   };
 
   // Expose for debugging and automated screenshots.
-  Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene } });
+  Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music } });
 
   const clock = new THREE.Clock();
   const fpsEl = document.getElementById("fps")!;
@@ -166,9 +226,9 @@ async function main() {
   let fpsT = 0;
   document.getElementById("loading")!.classList.add("done");
   if (params.has("explore")) {
-    // Free roam, no story.
+    startGame("explore");
   } else if (params.has("autostart")) {
-    startGame(true);
+    startGame("new");
   } else {
     const choice = await gameUi.titleCard({
       title: "NITK: FRESHER YEAR",
@@ -176,7 +236,7 @@ async function main() {
         "Monsoon, 2026. You've just got off the bus on NH66 with one suitcase and no idea where anything is. Four years at Surathkal start now: messes, classes, clubs, cycles, and the sunset from the lighthouse hill.",
       hasSave: !!saved,
     });
-    startGame(choice === "new");
+    startGame(choice);
   }
 
   renderer.setAnimationLoop(() => {
@@ -191,6 +251,7 @@ async function main() {
     }
     if (input.hit("KeyT")) skipTo(TIME_ORDER[(TIME_ORDER.indexOf(time) + 1) % TIME_ORDER.length]);
     if (input.hit("KeyH")) help.classList.toggle("hidden");
+    if (input.hit("KeyI") && bench) bench.toggle();
 
     if (!hud.isMapOpen) player.update(dt);
     if (game && !hud.isMapOpen) game.update(dt);

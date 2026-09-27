@@ -14,7 +14,10 @@ import { BAY_W, FLOOR_H, facade, mangaloreTiles, type FacadeStyle } from "./text
 const HOUSE_PAINT = [0xf3e3b3, 0xd8ecd0, 0xf6cfc4, 0xcfe0f0, 0xf7f1e5, 0xe6d6f0, 0xf5d6a8, 0xbfe3da, 0xffffff, 0xf1e0c5];
 const SHOP_PAINT = [0xffffff, 0xf2efe6, 0xe8f0f4, 0xf7e9cf, 0xf0e2e2];
 
+export const STYLES: FacadeStyle[] = ["academic", "hostel", "modern", "house", "shop", "plain", "industrial"];
+
 export function styleFor(b: Building): FacadeStyle {
+  if (b.style && (STYLES as string[]).includes(b.style)) return b.style as FacadeStyle;
   const name = b.name ?? "";
   const t = b.type;
   if (/hostel|block|tower|dorm|mess|girls|boys/i.test(name) || t === "dormitory") return "hostel";
@@ -229,7 +232,7 @@ export function buildBuildings(map: CampusMap, skip: Set<number>): BuildingRig {
   const tankGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.4, 10);
 
   for (const b of map.buildings) {
-    if (skip.has(b.id)) continue;
+    if (skip.has(b.id) || b.hidden) continue;
     const h = hash(b.id);
     const style = styleFor(b);
     const f = facade(style);

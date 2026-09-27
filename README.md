@@ -11,6 +11,38 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
+## Two modes
+
+- **Story Mode:** your fresher year, told in chapters of missions (below).
+- **Explore Mode:** free roam of the real campus, with the **Asset workbench** open. Click any building to see its OSM tags (with links to view or edit it on openstreetmap.org), change its height, façade, colours and roof, or drag a `.glb` model onto it. Edits save in your browser and export as `public/data/overrides.json`. The Coverage tab lists buildings still missing names, heights and roof shapes. See **[docs/ASSETS.md](docs/ASSETS.md)** for the full workflow.
+
+| | |
+|---|---|
+| ![Title](docs/title.png) | ![Asset workbench](docs/workbench.png) |
+
+## Sound
+
+Everything is synthesized in the browser; there are no audio files to download.
+
+- **Music:** seven tracks that follow the moment and crossfade as it changes:
+  - *Srinivasnagar* (the main theme)
+  - *Campus Days* (lo-fi)
+  - *Coastal Groove* (tabla theka and bansuri over a Mohanam drone)
+  - *Monsoon* (rain)
+  - *Lighthouse Hill* (sunset)
+  - *Night Canteen* (night)
+  - *Against the Clock* (timed missions and chases)
+
+  N or ⏭ skips a track, ♪ toggles the music, and 🔊 opens separate volume controls for master, music, effects and ambience. Add your own MP3s in `public/music/` (see `docs/ASSETS.md`).
+- **Ambience:** mixed from where you are and when:
+  - waves loudest on the real coastline
+  - NH66 traffic rumble and horns
+  - birds, busiest at dawn and dusk; crickets at night
+  - student chatter around the hangouts
+  - temple bells at dawn and dusk near the Sadashiva temple
+  - wind and monsoon rain
+  - footsteps that change on tarmac and in the wet, and the tick of your cycle's freewheel
+
 ## Where the campus comes from
 
 The OpenStreetMap extract **ships with the game** as `public/data/nitk-osm.json` (about 0.5 MB), so nothing is downloaded from OpenStreetMap at start-up.
@@ -72,7 +104,7 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 **Dev shortcuts:**
 - `?autostart` skips the title screen.
 - `?skipto=ch1-maggi` (any mission id) starts just before that mission.
-- `?explore` is free roam with no story.
+- `?explore` goes straight into Explore mode.
 - `window.nitk` exposes the game for debugging.
 
 ## What's in the world
@@ -105,6 +137,9 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 | `E` | talk, interact, get on or off your cycle |
 | `B` | cycle bell (students jump aside) |
 | `J` | journal |
+| `N` | next music track |
+| `I` | show/hide the asset workbench (Explore mode) |
+| click | select a building (Explore mode) |
 | drag / double-click | look around / lock the mouse |
 | `←` `→` / wheel | turn / zoom |
 | `M` | map, search and teleport |
@@ -127,7 +162,11 @@ src/
   ui/hud.ts          minimap, map, labels, objective blips
   game/              the game: mission runner (index.ts), chapter1.ts, chapter2.ts,
                      minigames, club stalls, journal, cast, crowd, cycles,
-                     rain/beacon/bees, UI, audio, save state
+                     rain/beacon/bees, UI, save state,
+                     audio (buses), music (sequencer + tracks), ambience
+  editor/            the asset workbench (Explore mode)
+  world/overrides.ts per-building overrides (public/data/overrides.json)
+  world/models.ts    custom .glb models on OSM footprints
 scripts/fetch-osm.mjs  snapshot the extract into public/data (also run by CI)
 ```
 
