@@ -93,6 +93,8 @@ export type Building = {
   campus: boolean;
   /** Façade style forced by an override (see world/overrides.ts). */
   style?: string;
+  /** Vertical fins between window bays, with the sunshade ledges making an egg-crate front. */
+  fins?: boolean;
   /** Hidden by an override (e.g. replaced by a custom model). */
   hidden?: boolean;
   area: number;

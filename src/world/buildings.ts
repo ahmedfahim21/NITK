@@ -13,10 +13,10 @@ import { BAY_W, FLOOR_H, facade, mangaloreTiles, type FacadeStyle } from "./text
 
 const HOUSE_PAINT = [0xf3e3b3, 0xd8ecd0, 0xf6cfc4, 0xcfe0f0, 0xf7f1e5, 0xe6d6f0, 0xf5d6a8, 0xbfe3da, 0xffffff, 0xf1e0c5];
 const SHOP_PAINT = [0xffffff, 0xf2efe6, 0xe8f0f4, 0xf7e9cf, 0xf0e2e2];
-/** The campus's pale-yellow and cream renders, as on the Main Building wings. */
-const ACADEMIC_PAINT = [0xecdfae, 0xf0e5c2, 0xe8dcb6, 0xf2ead2, 0xeadba6];
+/** The campus's khaki-yellow renders (Civil, ATB, AMD in the virtual tour), a few paler. */
+const ACADEMIC_PAINT = [0xd9cc88, 0xdfd296, 0xe4d9a6, 0xd6c67e, 0xebe1b8];
 /** Parapet caps by façade: the same render, the hostels' brick red, the megahostels' tan. */
-const PARAPET: Partial<Record<FacadeStyle, number>> = { hostel: 0xa4493a, megahostel: 0xc8976f, laterite: 0xe9e1d0, modern: 0xb8b3c9 };
+const PARAPET: Partial<Record<FacadeStyle, number>> = { megahostel: 0xc8976f, laterite: 0xe9e1d0, modern: 0xb8b3c9 };
 /** How far the academic blocks' sunshade ribbons stand out from the wall. */
 const LEDGE = 0.7;
 
@@ -184,6 +184,43 @@ function walls(buf: Buf, ring: Pt[], y0: number, y1: number, outward: number, co
   }
 }
 
+/** Vertical fins at every other bay line, as deep as the ledges. */
+function fins(buf: Buf, ring: Pt[], y0: number, y1: number, colour: THREE.Color, outward: number) {
+  const ccw = signedArea(ring) > 0 ? 1 : -1;
+  const s = ccw * outward;
+  const w = 0.22;
+  const side = colour.clone().multiplyScalar(0.88);
+  const uv = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1],
+  ];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (l < BAY_W * 2) continue;
+    const ux = (b[0] - a[0]) / l;
+    const uz = (b[1] - a[1]) / l;
+    const nx = uz * s;
+    const nz = -ux * s;
+    const bays = Math.max(1, Math.round(l / BAY_W));
+    const bw = l / bays;
+    for (let k = 2; k < bays - 1; k += 2) {
+      const cx = a[0] + ux * bw * k;
+      const cz = a[1] + uz * bw * k;
+      const p0 = [cx - ux * w, cz - uz * w];
+      const p1 = [cx + ux * w, cz + uz * w];
+      const q0 = [p0[0] + nx * LEDGE, p0[1] + nz * LEDGE];
+      const q1 = [p1[0] + nx * LEDGE, p1[1] + nz * LEDGE];
+      buf.quad([q0[0], y0, q0[1]], [q1[0], y0, q1[1]], [q1[0], y1, q1[1]], [q0[0], y1, q0[1]], [nx, 0, nz], uv, colour);
+      buf.quad([p0[0], y0, p0[1]], [q0[0], y0, q0[1]], [q0[0], y1, q0[1]], [p0[0], y1, p0[1]], [-ux, 0, -uz], uv, side);
+      buf.quad([q1[0], y0, q1[1]], [p1[0], y0, p1[1]], [p1[0], y1, p1[1]], [q1[0], y1, q1[1]], [ux, 0, uz], uv, side);
+    }
+  }
+}
+
 /** A thin slab of depth LEDGE running round a ring at height y (top face, front, soffit). */
 function ledges(buf: Buf, ring: Pt[], y: number, colour: THREE.Color, outward: number) {
   const ccw = signedArea(ring) > 0 ? 1 : -1;
@@ -293,12 +330,16 @@ export function buildBuildings(map: CampusMap, skip: Set<number>): BuildingRig {
     const u0 = (h % 4) * 0.25;
     walls(buf, b.outer, b.minHeight, b.height, 1, tint, f.floors, u0);
     for (const hole of b.holes) walls(buf, hole, b.minHeight, b.height, -1, tint, f.floors, u0);
-    if (style === "academic") {
+    if (style === "academic" || style === "hostel") {
       // A concrete ribbon along the top of every floor, as the texture paints it.
       const shade = tint.clone().lerp(new THREE.Color(0xffffff), 0.35);
       for (let y = b.minHeight + FLOOR_H; y < b.height - 0.5; y += FLOOR_H) {
         ledges(sunshades, b.outer, y, shade, 1);
         for (const hole of b.holes) ledges(sunshades, hole, y, shade, -1);
+      }
+      if (b.fins) {
+        fins(sunshades, b.outer, b.minHeight, b.height - 0.2, shade, 1);
+        for (const hole of b.holes) fins(sunshades, hole, b.minHeight, b.height - 0.2, shade, -1);
       }
     }
 
@@ -324,7 +365,7 @@ export function buildBuildings(map: CampusMap, skip: Set<number>): BuildingRig {
     const rc = parseColour(b.roofColour) ?? new THREE.Color(0xbdb6aa).offsetHSL(0, 0, (((h >> 4) % 5) - 2) * 0.015);
     const cap = flatPolygon(b.outer, b.holes, b.height);
     if (cap) flatRoofs.addGeometry(cap, rc);
-    const pc = style === "academic" ? tint.clone().multiplyScalar(0.92) : new THREE.Color(PARAPET[style] ?? 0xe9e4da);
+    const pc = style === "academic" || style === "hostel" ? tint.clone().multiplyScalar(0.92) : new THREE.Color(PARAPET[style] ?? 0xe9e4da);
     if (b.height > 3 && b.type !== "roof") {
       walls(parapets, b.outer, b.height, b.height + 0.85, 1, pc, 1, 0);
       walls(parapets, b.outer, b.height, b.height + 0.85, -1, pc.clone().multiplyScalar(0.85), 1, 0);

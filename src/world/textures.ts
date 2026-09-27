@@ -121,28 +121,31 @@ const PAINTERS: Record<FacadeStyle, Painter> = {
       ctx.fillRect(W - 5, stripTop, 5, stripBot - stripTop);
     }
   },
-  // The older boys' blocks (Karavali, Aravali, Vindhya...): cream plaster
-  // between brick-red pilasters and floor bands, green-framed grilled windows.
+  // The older hostel blocks (the virtual tour's 7th Block): khaki render,
+  // a sunshade over each window, grey-green louvred windows, a floor joint.
+  // Painted in near-whites so the vertex tint gives the colour.
   hostel(ctx, W, H, night, rand) {
     if (!night) {
-      ctx.fillStyle = "#f7eedc";
+      ctx.fillStyle = "#fbf8ef";
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#a4493a";
-      ctx.fillRect(0, H - 12, W, 12);
-      ctx.fillRect(0, 0, 12, H);
-      ctx.fillRect(W - 12, 0, 12, H);
-      ctx.fillStyle = "rgba(0,0,0,0.12)";
-      ctx.fillRect(12, 0, 3, H - 12);
+      ctx.fillStyle = "#d9d3c2";
+      ctx.fillRect(0, H - 5, W, 2);
+      ctx.fillStyle = "#ece6d6";
+      ctx.fillRect(0, 0, 4, H);
     } else {
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, W, H);
     }
-    windowAt(ctx, 32, 36, W - 64, 58, night, rand() < 0.65, "#35505a", "#4f7a45", 2);
+    const lit = rand() < 0.65;
+    windowAt(ctx, 30, 38, W - 60, 56, night, lit, "#56666a", "#3e4b45", 2);
     if (!night) {
-      ctx.fillStyle = "#d8cbb0";
-      ctx.fillRect(26, 28, W - 52, 8);
-      ctx.fillStyle = "rgba(0,0,0,0.2)";
-      ctx.fillRect(26, 36, W - 52, 3);
+      // Louvre slats.
+      ctx.fillStyle = "rgba(210,220,215,0.35)";
+      for (let y = 44; y < 90; y += 6) ctx.fillRect(33, y, W - 66, 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(22, 26, W - 44, 9);
+      ctx.fillStyle = "rgba(60,50,30,0.35)";
+      ctx.fillRect(22, 35, W - 44, 4);
       // Clothes on the grille, the hostel tell.
       if (rand() < 0.3) {
         ctx.fillStyle = ["#c0392b", "#2e86c1", "#f4d03f", "#ecf0f1"][Math.floor(rand() * 4)];
