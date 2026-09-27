@@ -38,8 +38,16 @@ for (const url of area.overpass) {
     const json = JSON.parse(text);
     if (!Array.isArray(json.elements) || json.elements.length === 0) throw new Error("empty extract");
     mkdirSync(dirname(OUT), { recursive: true });
-    writeFileSync(OUT, text);
-    console.log(`wrote ${json.elements.length} elements (${Math.round(text.length / 1024)} KB) to public/data/nitk-osm.json`);
+    // Minified, with a note of when and where it came from.
+    const out = JSON.stringify({
+      generator: json.generator,
+      osm3s: json.osm3s,
+      fetched: new Date().toISOString(),
+      source: url,
+      elements: json.elements,
+    });
+    writeFileSync(OUT, out);
+    console.log(`wrote ${json.elements.length} elements (${Math.round(out.length / 1024)} KB) to public/data/nitk-osm.json`);
     process.exit(0);
   } catch (err) {
     console.warn(`  failed: ${err.message}`);
