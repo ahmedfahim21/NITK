@@ -14,11 +14,17 @@ npm run dev          # http://localhost:5173
 ## Two modes
 
 - **Story Mode:** your fresher year, told in chapters of missions (below).
-- **Explore Mode:** free roam of the real campus, with the **Asset workbench** open. Click any building to see its OSM tags (with links to view or edit it on openstreetmap.org), change its height, façade, colours and roof, or drag a `.glb` model onto it. Edits save in your browser and export as `public/data/overrides.json`. The Coverage tab lists buildings still missing names, heights and roof shapes. See **[docs/ASSETS.md](docs/ASSETS.md)** for the full workflow.
+- **Explore Mode:** free roam of the real campus, view-only. Walk into the Main Building, Central Library, SJA, Mega Mess, Night Canteen and LHC-A. The season picker and rain toggle are there to check the campus across the year.
 
-| | |
-|---|---|
-| ![Title](docs/title.png) | ![Asset workbench](docs/workbench.png) |
+Story Mode is behind a build flag so a deploy can ship Explore Mode alone:
+
+```bash
+npm run build                          # production: Explore only
+VITE_STORY_MODE=true npm run build     # production with Story Mode
+npm run dev                            # dev: Story Mode on (VITE_STORY_MODE=false to hide it)
+```
+
+![Title](docs/title.png)
 
 ## Seasons and the academic year
 
@@ -62,7 +68,7 @@ Everything is synthesized in the browser; there are no audio files to download.
   - *Night Canteen* (night)
   - *Against the Clock* (timed missions and chases)
 
-  N or ⏭ skips a track, ♪ toggles the music, and 🔊 opens separate volume controls for master, music, effects and ambience. Add your own MP3s in `public/music/` (see `docs/ASSETS.md`).
+  N or ⏭ skips a track, ♪ toggles the music, and 🔊 opens separate volume controls for master, music, effects and ambience. Add your own MP3s in `public/music/` (see [Music](#adding-music)).
 - **Ambience:** mixed from where you are and when:
   - waves loudest on the real coastline
   - NH66 traffic rumble and horns
@@ -140,18 +146,21 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 ## What's in the world
 
 - **OSM geometry, 1:1.** Every road (NH66 as a divided highway with a median), building footprint, landuse area, sports pitch, pool, barrier and mapped tree sits at its real position.
-- **Buildings.** Heights come from `height` or `building:levels` when OSM has them, otherwise from sensible defaults. Façades are styled by kind:
-  - cream-and-terracotta academic blocks
-  - hostel blocks with grilled windows
-  - glass-panel library and lecture halls
-  - pastel houses with Mangalore-tile hip roofs and black rooftop water tanks
-  - shopfronts with rolling shutters
+- **Buildings.** Heights come from `height` or `building:levels` when OSM has them, otherwise from sensible defaults. Façades are matched to photographs of the campus (`src/world/archetypes.ts`, by OSM name):
+  - the Main Building and the old departments: pale-yellow render with continuous concrete sunshade ledges over recessed windows
+  - the old boys' blocks and girls' hostels: cream plaster, brick-red pilasters, Mangalore-tile roofs
+  - the Mega Hostel towers: tan frame, cream panels, small grilled windows, a blue-glass stair core
+  - LHC-A: exposed laterite; the Library, LHC-D, CRF, CIDS and SJA: white render with lavender-grey bands
+  - pastel houses with Mangalore-tile hip roofs and black rooftop water tanks, and shopfronts with rolling shutters off campus
 
   Windows light up at night.
+- **Walk-in interiors.** The Main Building (enquiry desk, stair, office corridor), Central Library (stacks, reading tables, issue desk), SJA (stage and seating), Mega Mess (steel tables, serving counter), Night Canteen and LHC-A (classrooms round the courtyard) open up. Walk through the lit front door: the shell and roof cut away and the camera looks down into the room (`src/world/interiors.ts`).
 - **Landmarks.** These are matched by OSM name or tag, so they land wherever the real map puts them:
   - the lighthouse on its knoll, with a sweeping beam after dusk
-  - the Main Building's portico and trilingual nameboard (Kannada / Hindi / English)
-  - the gate arch on NH66
+  - the Main Building's olive entrance block: glass front between four yellow piers, three yellow arches over the porch, the blue fountains in front
+  - the main gate on NH66: stone piers, security cabin and the curved black-granite trilingual name wall
+  - the square red-and-white lighthouse with its gallery, lantern and sweeping radar
+  - Chemical Engineering's curved canopy
   - signage on the Central Library, SJA and Lecture Hall Complex
   - the fountain, the tricolour and water towers
 - **Coast.** The sea polygon is built from the OSM coastline. It has cel-banded shallows, swell lines, breakers and a surf line on the real shore, with sand and a casuarina belt behind it.
@@ -168,8 +177,6 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 | `B` | cycle bell (students jump aside) |
 | `J` | journal |
 | `N` | next music track |
-| `I` | show/hide the asset workbench (Explore mode) |
-| click | select a building (Explore mode) |
 | drag / double-click | look around / lock the mouse |
 | `←` `→` / wheel | turn / zoom |
 | `M` | map, search and teleport |
@@ -194,13 +201,41 @@ src/
                      minigames, club stalls, journal, cast, crowd, cycles,
                      rain/beacon/bees, UI, save state,
                      audio (buses), music (sequencer + tracks), ambience
-  editor/            the asset workbench (Explore mode)
   game/seasons.ts    calendar, seasons, sun times, festivals, seasonal grading
   game/festivals.ts  festival decorations
+  world/archetypes.ts per-building looks matched to photos
+  world/interiors.ts walk-in ground floors and the cutaway
   world/overrides.ts per-building overrides (public/data/overrides.json)
   world/models.ts    custom .glb models on OSM footprints
 scripts/fetch-osm.mjs  snapshot the extract into public/data (also run by CI)
 ```
+
+## Working on the campus
+
+Best first:
+
+1. **Improve OpenStreetMap.** Add `building:levels` (or `height`), `roof:shape`, `roof:colour`, `building:colour` and `name`, then refresh the snapshot (`npm run osm:fetch`, or the **OSM snapshot** workflow in GitHub Actions).
+2. **Match a building to photos** in `src/world/archetypes.ts` (façade style, wall colour, roof), or add hero details in `src/world/landmarks.ts`.
+3. **Overrides** for what OSM shouldn't hold: `public/data/overrides.json`, keyed by OSM id, wins over everything else.
+
+   ```json
+   { "version": 1, "buildings": { "way/361006764": { "levels": 4, "colour": "#ecdfae", "style": "academic", "roofShape": "flat" } } }
+   ```
+
+   Fields: `name`, `levels`, `height`, `minHeight`, `style` (`academic`, `hostel`, `megahostel`, `laterite`, `modern`, `house`, `shop`, `plain`, `industrial`), `colour`, `roofShape`, `roofColour`, `hidden`, `model`, `note`.
+4. **Custom models:** put a `.glb` in `public/models/` and reference it from the override (`"model": { "url": "models/main.glb", "scale": 1, "rotation": 0 }`). Metres, Y up, origin at the footprint centre on the ground, long side along +X. Materials are converted to cel shading, so keep them to a base colour and texture.
+
+To add a walk-in building, add its OSM name and a room kind to `ROOMS` in `src/world/interiors.ts`.
+
+### Adding music
+
+Drop tracks into `public/music/` and list them in `public/music/manifest.json`:
+
+```json
+[{ "title": "Lighthouse Blues", "file": "lighthouse.mp3", "moods": ["sunset", "day"] }]
+```
+
+Moods: `title`, `day`, `rain`, `sunset`, `night`, `mission`.
 
 ## Credits
 
