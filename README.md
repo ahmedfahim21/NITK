@@ -26,29 +26,32 @@ npm run dev                            # dev: Story Mode on (VITE_STORY_MODE=fal
 
 ![Title](docs/title.png)
 
-## Seasons and the academic year
+## Seasons, days and the schedule
 
-The game runs on the real calendar: day 0 is Monday 3 August 2026, and NITK's odd semester runs August–December, the even semester January–May. Seasons follow the Karnataka coast:
+The story isn't pinned to calendar dates; you can wander for a week if you like. Days count up as you sleep ("Day 3, Wednesday"), and **the season follows the chapter**:
 
-| Season | Months | Semester / story | What changes |
-|---|---|---|---|
-| **Monsoon** | Jun–Sep | odd sem opens (Chapters 1–2) | frequent rain spells, lush green, grey skies, rough sea, umbrellas everywhere, frogs at night |
-| **Post-monsoon** | Oct–Nov | Engineer, Deepavali | "October heat", afternoon thunderstorms with lightning and thunder |
-| **Winter** | Dec–Feb | endsems, Crescendo | dry and clear, calm sea, drier grass, students in jackets |
-| **Summer** | Mar–May | Incident, even-sem endsems | hot haze, straw-yellow grass, gulmohar and laburnum in flower, cicadas, pre-monsoon storms |
+| Season | Chapter | What changes |
+|---|---|---|
+| **Monsoon** | 1, Srinivasnagar | frequent rain spells, lush green, grey skies, rough sea, umbrellas everywhere, frogs at night |
+| **Post-monsoon** | 2, Recruitments | "October heat", afternoon thunderstorms with lightning and thunder |
+| **Winter** | later chapters | dry and clear, calm sea, drier grass, students in jackets |
+| **Summer** | later chapters | hot haze, straw-yellow grass, gulmohar and laburnum in flower, cicadas, pre-monsoon storms |
+
+**A day, Bully-style** (`src/game/schedule.ts`):
+- A **morning class at 9** and an **afternoon class or lab at 2**, weekdays, once classes start.
+- **Curfew at 11 PM.** Be back in your hostel; after that the warden's patrol finds you, fines you and marches you back. A warning comes at 10:30.
+- **Pass out at 2 AM** if you're still up, and wake in your room, poorer.
+- **Missions have hours** (and some only weekends or weekdays). Their givers only show up then, and curfew waits while you're on a mission.
+- **Missions unlock in waves:** each needs certain missions done, and some only appear once enough of the chapter is done. The journal (J) shows which are open and when.
+
+The clock at the top of the screen shows the time, the day and the season, with a strip marking today's classes and curfew.
 
 **Across the year:**
-- Sunrise and sunset follow Surathkal's real times, so dusk comes around 6:05 PM in November and 6:55 PM in August.
+- Sunrise and sunset follow Surathkal's times for the season.
 - The weather is rolled every game hour from the season's odds. Missions that script the weather hold it until they end.
-- Festival decorations go up on the 2026–27 dates:
-  - tricolour bunting for Independence Day and Republic Day
-  - red-and-yellow Kannada flags for Rajyotsava
-  - marigold garlands for Ganesh Chaturthi
-  - glowing akash kandil lanterns and diyas for Deepavali
-  - paper stars for Christmas
-- The journal shows the semester and season.
+- Festival decorations go up when the story reaches them: marigold garlands for Ganesh Chaturthi, red-and-yellow Kannada flags for Rajyotsava, akash kandil lanterns and diyas for Deepavali, paper stars for Christmas, tricolour bunting for Republic Day.
 
-In Explore mode, a season picker jumps to Monsoon (15 Aug), Post-monsoon (8 Nov, Deepavali), Winter (25 Dec) or Summer (29 Mar), and a Rain button toggles the weather, so you can check assets across the year.
+In Explore mode, a season picker switches between the seasons (with Deepavali and Christmas decorations) and a Rain button toggles the weather.
 
 | | |
 |---|---|
@@ -68,7 +71,7 @@ Everything is synthesized in the browser; there are no audio files to download.
   - *Night Canteen* (night)
   - *Against the Clock* (timed missions and chases)
 
-  N or ⏭ skips a track, ♪ toggles the music, and 🔊 opens separate volume controls for master, music, effects and ambience. Add your own MP3s in `public/music/` (see [Music](#adding-music)).
+  N or Next skips a track, Music toggles it, and Mix opens separate volume controls for master, music, effects and ambience. Add your own MP3s in `public/music/` (see [Music](#adding-music)).
 - **Ambience:** mixed from where you are and when:
   - waves loudest on the real coastline
   - NH66 traffic rumble and horns
@@ -91,33 +94,62 @@ The map square is set in `src/area.json`: 13.0005–13.0205 N, 74.7815–74.8060
 
 ## The game
 
-Chapters 1 and 2 are playable. Chapter 1, **Srinivasnagar**, covers your first days as a fresher, in August, during the monsoon. It has six missions:
+Chapters 1 and 2 are playable. You're a first-year **B.Tech Computer Science & Engineering** student, section S7. Mission details come from NITK's own sites (nitk.ac.in, IRIS, WebClub) and its virtual tour.
 
-| Mission | Giver | What happens |
+Chapter 1, **Srinivasnagar**, follows the real first-year order: reporting, the induction programme, then classes. The monsoon.
+
+| Mission | Giver, hours | What happens |
 |---|---|---|
-| **Main Gate** | automatic | Get off the bus on NH66, cross by the overpass, collect your ID card from the Academic Section, and find Karavali (1st Block) |
-| **Three Messes** | Rohan (roommate) | Pick 1st block veg, 2nd block non-veg, or race 90 s for the last seats at Sahyadri (7th block) |
-| **Wheels** | Vikram (final year) | Buy his roadster for ₹300, or rush his lab record to LHC in 3 minutes. You get a cycle |
-| **Log in to IRIS** | Ananya (IRIS team) | A password minigame with escalating rules (the highway, the year KREC was founded, …) |
-| **Maggi in the Rain** | Rohan, after 3 PM | The monsoon hits. Beat the shutters to Nescafe |
-| **The Sunset Rule** | Prakash (senior), 4:30–6:30 PM | Reach the lighthouse hill before the sun hits the sea, and don't disturb the bees. Chapter finale |
+| **Main Gate** | automatic | Off the bus on NH66, your ID card and CSE section from the Academic Section, find Karavali (1st Block) |
+| **Three Messes** | Rohan | Pick 1st block veg, 2nd block non-veg, or race 90 s for the last seats at Sahyadri |
+| **Wheels** | Vikram | Buy his roadster for ₹300, or rush his lab record to LHC in 3 minutes |
+| **Log in to IRIS** | Ananya, 9 AM – 5:30 PM | The password minigame; IRIS's real modules and history; your Semester I registration |
+| **Induction Week** | Prakash, 7 – 10 AM | SJA: the Director and the anti-ragging committee, then a heritage walk (KREC 1960, the CCC 1995, the 2018 buildings, Friday films at SAC) and a quiz |
+| **Saturday Parade** | Divya (NCC), weekends 6 – 9 AM | 2 Kar Engr Coy's enrolment parade on the Main Ground; drill words of command |
+| **Library Card** | Mrs. Pai, 9 AM – 8 PM | Find K&R, a Chemistry text and Timoshenko in the stacks without running |
+| **Lab Kit** | Vikram, 9 AM – 7 PM | The Co-op on a ₹600 budget: lab coat, goggles, the allowed calculator |
+| **Scholarship Form** | Mrs. Shetty, weekdays 10 AM – 2:30 PM | Lobby, SBI before 4, back before 5:30; never during her lunch |
+| **Roll Call** | Prof. Hegde, weekdays 8 – 9:05 AM | The first WO110 lecture in LHC-C: a proxy for Rohan, or not; classes start |
+| **Maggi in the Rain** | Rohan, 3 – 8 PM | The monsoon hits. Beat the shutters to Nescafe |
+| **The Sunset Rule** | Prakash, 4:30 – 6:30 PM | The lighthouse hill before the sun hits the sea. Chapter finale |
 
-Chapter 2, **Recruitments**, follows. It's a month later, in September, and recruitment week has club stalls in an arc in front of the real Students' Activity Centre amphitheatre:
+Chapter 2, **Recruitments**, is a few weeks later, in the post-monsoon. Club stalls stand in an arc in front of the Students' Activity Centre:
 
-| Mission | Giver | What happens |
+| Mission | Giver, hours | What happens |
 |---|---|---|
-| **Recruitment Week** | automatic | Visit the club stalls (WebClub, Star Gazing, LSD, Linux Users Group, Music, Photography, E-FOREA, SPICMACAY) and sign up for three |
-| **Come Back Next Year** | Ananya | Get politely rejected by IEEE, ACM, IE and IET; they go onto your "Next Year" list |
-| **Freshers Cup** | Phoenix captain, after 4 PM | A penalty-shootout minigame on Main Ground 1, Karavali vs Aravali |
-| **Flat Tyre** | Rohan | Kiran from Aravali let your tyres down on a Crescendo dare. Chase him across campus |
-| **sudo make me a coffee** | Sid (LUG), after 6 PM | A Linux terminal minigame: fix Rohan's dual-boot Wi-Fi, then get him out of vim |
-| **First Light** | Meera (Star Gazing), after 7:30 PM, no rain | Name constellations in the August sky (Saptarishi, Vrischika, Cassiopeia…) |
+| **Recruitment Week** | automatic | Visit the club stalls and sign up for three |
+| **Come Back Next Year** | Ananya | Get politely rejected by IEEE, ACM, IE and IET |
+| **Freshers Cup** | Phoenix captain, 4 – 7:30 PM | A penalty shootout on Main Ground 1, Karavali vs Aravali |
+| **Flat Tyre** | Rohan | Chase Kiran from Aravali across campus |
+| **sudo make me a coffee** | Sid (LUG), 6 – 11 PM | Fix Rohan's dual-boot Wi-Fi in a Linux terminal |
+| **First Light** | Meera, 7:30 – 11 PM, no rain | Name constellations |
+| **Ganapati Bappa** | Rohan, 4 – 6 PM | Garlands, modaks and serial lights for Karavali's Ganesh pandal before the 7 PM aarti |
+| **Raga at SJA** | Aditi (SPICMACAY), 4 – 6:25 PM | A veena and mridangam concert; the listening Q&A |
+| **Not Me But You** | Arjun (NSS), weekends 6 – 10 AM | The NSS/Rotaract clean-up on NITK Beach before the tide |
+| **CP League** | Ananya (WebClub), 5 – 9 PM | The Algorithms SIG's STL and complexity session at a CCC lab PC |
+| **Night Canteen Run** | Raju anna, 9 – 10:45 PM | Three hot orders to three blocks in four minutes |
+
+### Courses
+
+Your Semester I courses are NITK's real CSE plan. Turn up in the room when one is on and press E; each is its own minigame, and passing levels it up (to 5) and unlocks a perk, as in Bully:
+
+| Course | Room | Minigame | Perks |
+|---|---|---|---|
+| **CS110** C Programming | LHC-C | trace the output of C snippets | extra terminal time; seniors pay you to debug |
+| **CS111** C Programming Lab | Central Computer Centre | click the buggy line | extra terminal time; money fixing lab PCs |
+| **MA110** Engineering Mathematics I | LHC-D | a timed mental-maths sprint | energy and hunger drain slower |
+| **CY110** Chemistry | LHC-D | quiz | food fills you more |
+| **CY111** Chemistry Lab | Science Block | a titration: stop at the first faint pink | food fills you more |
+| **WO110** Engineering Mechanics | LHC-C | forces and moments quiz | a faster cycle |
+| **CV110** Environmental Studies | LHC-C | the Karnataka coast and environment | Clubs respect |
+
+The journal lists your courses, levels, perks and the timetable.
 
 The Bully-style systems:
 
 - **Missions and markers:** yellow "!" mission givers, a waypoint beam, an objective tracker with timers, and big MISSION PASSED / FAILED banners.
 - **Time and stats:** a game clock (one game minute per real second) with a daily routine, plus Energy, Food, ₹ and Attendance.
-- **Classes:** lectures at LHC at 9 AM and 2 PM on weekdays, each with a surprise quiz. Missing them drops your attendance below 75%.
+- **Classes:** see Courses above. Missing them drops your attendance; under 75% and IRIS tells your HoD.
 - **Daily life:**
   - meals at your mess at meal times
   - Maggi at Nescafe, Oreo shakes at Nandini, and the night canteen
