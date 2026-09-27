@@ -3,7 +3,7 @@
  * and story flags. Saved to localStorage so a session picks up where it left.
  */
 import type { TimeOfDay } from "../fx/presets";
-import { seasonOf, sunTimes, type Season } from "./seasons";
+import { SEASONS, SEASON_SAMPLE_DAY, sunTimes, type Season, type SeasonId } from "./seasons";
 
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -28,7 +28,11 @@ export type SaveData = {
 const KEY = "nitk-fresher-save-v1";
 
 export class GameState {
-  /** Day 0 is Monday 3 August 2026, the first day of the odd semester. */
+  /**
+   * Days since you arrived; day 0 is a Monday. The story isn't pinned to
+   * calendar dates (you may wander for a week): the season follows the
+   * chapter (flags.season) and festivals follow the missions (flags.fest).
+   */
   day = 0;
   /** Minutes since midnight. */
   minutes = 7 * 60 + 40;
@@ -65,13 +69,21 @@ export class GameState {
   }
 
   dateText(): string {
-    const d = new Date(2026, 7, 3 + this.day);
-    return `${DAYS[this.weekday]}, ${d.getDate()} ${d.toLocaleString("en-GB", { month: "long" })}`;
+    return `Day ${this.day + 1}, ${DAYS[this.weekday]}`;
+  }
+
+  get seasonId(): SeasonId {
+    return (this.flags.season as SeasonId | undefined) ?? "monsoon";
+  }
+
+  /** Festivals on campus right now, set by the story (comma-separated ids). */
+  get festivals(): string[] {
+    return String(this.flags.fest ?? "").split(",").filter(Boolean);
   }
 
   period(): TimeOfDay {
     const h = this.hour;
-    const { rise, set } = sunTimes(this.day);
+    const { rise, set } = sunTimes(SEASON_SAMPLE_DAY[this.seasonId]);
     if (h >= rise - 0.6 && h < rise + 3.4) return "morning";
     if (h >= rise + 3.4 && h < set - 1.5) return "noon";
     if (h >= set - 1.5 && h < set + 0.3) return "sunset";
@@ -79,7 +91,7 @@ export class GameState {
   }
 
   get season(): Season {
-    return seasonOf(this.day);
+    return SEASONS[this.seasonId];
   }
 
   /** Advance to a clock time (today if still ahead, else tomorrow). */

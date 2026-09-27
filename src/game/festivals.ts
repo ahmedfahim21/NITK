@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { toon } from "../fx/toon";
 import { groundHeight } from "../world/terrain";
 import type { Spot } from "./places";
-import { festivalsOn } from "./seasons";
+import { FESTIVALS } from "./seasons";
 
 const SAFFRON = 0xff9933;
 const WHITE = 0xf7f7f2;
@@ -143,9 +143,9 @@ export class Festivals {
     }
   }
 
-  /** Show whatever is on today; returns the festival names newly started. */
-  update(day: number): string[] {
-    const on = festivalsOn(day);
+  /** Show the festivals the story has switched on; returns the names newly started. */
+  update(ids: string[]): string[] {
+    const on = FESTIVALS.filter((f) => ids.includes(f.id));
     const key = on.map((f) => f.id).join(",");
     if (key === this.current) return [];
     const before = new Set(this.current.split(",").filter(Boolean));
