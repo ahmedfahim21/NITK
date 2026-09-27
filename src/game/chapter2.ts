@@ -7,7 +7,7 @@
 import type { Mission } from "./chapter1";
 import { CLUBS } from "./stalls";
 import { penalties, terminal, stargazing } from "./minigames";
-import { wait } from "./util";
+import { hhmm, wait } from "./util";
 import { perks } from "./courses";
 import { sfx } from "./audio";
 
@@ -513,4 +513,249 @@ export const CHAPTER2: Mission[] = [
     },
   },
 
+  /* ------------------------------------------------------------ */
+  {
+    id: "ch2-lsd",
+    title: "Quiz Night",
+    chapter: CH,
+    giver: "farhan",
+    where: "lhcD",
+    requires: ["ch2-stalls"],
+    hours: [18 * 60, 21 * 60],
+    reward: { money: 100, rep: { Clubs: 8 } },
+    failHint: "Knocked out in the prelims. Farhan runs an open quiz most evenings.",
+    async run(g) {
+      await g.say([
+        ["Farhan", "LSD. Literary, Stage and Debating. Don't make the joke; every fresher makes the joke."],
+        ["Farhan", "Tonight's the open prelims in LHC-D. Five questions, all on NITK and the coast. Three right and you're on a team for the finals."],
+      ]);
+      const right = await g.ui.quiz("LSD Open Quiz · Prelims", [
+        { q: "NITK was founded in 1960 as KREC. What did KREC stand for?", options: ["Karnataka Regional Engineering College", "Konkan Railway Engineering College", "Karavali Regional Education Centre"], answer: 0 },
+        { q: "Which highway runs between the campus and the beach?", options: ["NH 48", "NH 66", "NH 75"], answer: 1 },
+        { q: "Engineer, NITK's technical fest, carries which tagline?", options: ["Think. Create. Engineer.", "Build the Future", "Code. Break. Repeat."], answer: 0 },
+        { q: "Incident is NITK's…", options: ["Sports fest", "Cultural fest", "Entrepreneurship summit"], answer: 1 },
+        { q: "The inter-hostel cultural fest run by the Reading Room Committee is…", options: ["Crescendo", "Phoenix", "Aurora"], answer: 0 },
+      ]);
+      if (right < 3) {
+        await g.say([["Farhan", `${right} of 5. The Engineer tagline question gets everyone. Come back and try again.`]]);
+        return false;
+      }
+      await g.say([
+        ["Farhan", `${right} of 5. You're through, and you're on my team for the finals. I do the pop culture; you do anything with a date in it.`],
+        ["Farhan", "₹100 prize for the prelims. The finals prize is a trophy nobody knows where to keep."],
+      ]);
+      g.state.flags["club:lsd"] = true;
+      return true;
+    },
+  },
+
+  /* ------------------------------------------------------------ */
+  {
+    id: "ch2-wright",
+    title: "Wright Flight",
+    chapter: CH,
+    giver: "keerthi",
+    where: "mainGround",
+    requires: ["ch2-stalls"],
+    needs: 2,
+    hours: [16 * 60, 18 * 60 + 30],
+    window: (g) => (g.state.raining ? "Balsa and rain don't mix. Come back when it's dry." : null),
+    reward: { money: 150, rep: { Clubs: 10 } },
+    failHint: "Both gliders are in the grass, in pieces. Keerthi has more balsa.",
+    async run(g) {
+      await g.say([
+        ["Keerthi", "Flying and Robotics Club. Wright Flight is our Engineer event: a hand-launched glider, longest flight wins. Freshers build one in the recruitment week."],
+        ["Keerthi", "You get balsa, glue and two throws. The sea breeze does the rest, if you let it."],
+      ]);
+      const wing = await g.choose("Keerthi", "Pick a wing.", [
+        "Long and thin, a sailplane wing",
+        "Short and wide, very sturdy",
+        "Swept back like a fighter jet",
+      ]);
+      const nose = await g.choose("Keerthi", "How much clay on the nose?", ["None, keep it light", "A pea-sized lump", "A big lump, for stability"]);
+      const pitch = g.places.get("mainGround");
+      if (!(await g.goTo(pitch, "Walk to the middle of the ground to launch", { radius: 6 }))) return false;
+      const windFromSea = g.state.minutes >= 17 * 60;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const dir = await g.choose("", `Throw ${attempt} of 2. The breeze is coming ${windFromSea ? "off the sea, from the west" : "across the ground, gusty"}. Which way do you throw?`, [
+          "Into the wind",
+          "With the wind behind it",
+          "Straight up, as hard as possible",
+        ]);
+        let score = (wing === 0 ? 2 : wing === 2 ? 1 : 0) + (nose === 1 ? 2 : 0) + (dir === 0 ? 2 : dir === 1 ? 1 : -2) + (windFromSea ? 1 : 0);
+        if (attempt === 2) score += 1; // You've learnt something from the first one.
+        const secs = Math.max(1.5, score * 2.4);
+        sfx.blip();
+        await wait(900);
+        if (score >= 6) {
+          await g.say([["", `It lifts off your fingers, catches the breeze and floats. And floats. ${secs.toFixed(1)} seconds before it settles on the grass by the goalposts.`], ["Keerthi", "That's a club record for a fresher. Welcome to FARC."]]);
+          g.state.flags["club:farc"] = true;
+          return true;
+        }
+        await g.say([["", score >= 3 ? `${secs.toFixed(1)} seconds, then a slow, sad spiral into the grass.` : "It goes up, stalls, and nose-dives into the laterite. A wingtip snaps."]]);
+        if (attempt === 1) await g.say([["Keerthi", nose !== 1 ? "Check the balance. It should sit level on two fingers under the wing." : dir !== 0 ? "Throw it into the breeze. Headwind is free lift." : "Closer. Flat and gentle, don't throw it like a cricket ball."]]);
+      }
+      return false;
+    },
+  },
+
+  /* ------------------------------------------------------------ */
+  {
+    id: "ch2-expose",
+    title: "Expose",
+    chapter: CH,
+    giver: "arnav",
+    where: "sac",
+    requires: ["ch2-stalls", "ch1-sunset"],
+    hours: [16 * 60 + 30, 18 * 60],
+    window: (g) => (g.state.raining ? "No light in this rain. Come back on a clear evening." : null),
+    reward: { money: 120, rep: { Clubs: 8, Seniors: 3 } },
+    failHint: "The light went before your last photo. Arnav says golden hour happens every day.",
+    async run(g) {
+      await g.say([
+        ["Arnav", "Photography Club. Expose is our exhibition in the SAC foyer. Freshers get one wall. Your wall is empty."],
+        ["Arnav", "Four frames before the light goes: the Main Building clock tower, the library, the lighthouse from the hill, and the sea at the beach. Golden hour is short. Go."],
+      ]);
+      const deadline = 18 * 60 + 35;
+      const shots = [
+        { ...g.places.get("academicSection"), name: "The Main Building" },
+        { ...g.places.get("library"), name: "The Central Library" },
+        { ...g.places.get("lighthouseView"), name: "The lighthouse, from the hill" },
+        { ...g.places.get("beach"), name: "The sea at NITK Beach" },
+      ];
+      while (shots.length) {
+        const k = await g.goToAny(shots, `Photograph for Expose before ${hhmm(deadline)} (${4 - shots.length}/4)`, { radius: 6, clockBy: deadline });
+        if (k < 0) return false;
+        sfx.blip();
+        g.ui.toast(`Shot: ${shots.splice(k, 1)[0].name}`, "#1d3557");
+      }
+      const pick = await g.choose("Arnav (phone)", "Send me the one for the centre of the wall.", ["The lighthouse against the sunset", "The Main Building, long shadows", "The beach, with a lone fisherman"]);
+      await g.say([
+        ["Arnav (phone)", pick === 0 ? "Everyone takes the lighthouse. Yours is the one that's level. Centre of the wall." : "Not the obvious one. Good. Centre of the wall."],
+        ["Arnav (phone)", "₹120 for prints, and your name on a card in the SAC foyer. Welcome to the club."],
+      ]);
+      g.state.flags["club:photo"] = true;
+      return true;
+    },
+  },
+
+  /* ------------------------------------------------------------ */
+  {
+    id: "ch2-incub8",
+    title: "Pitch Deck",
+    chapter: CH,
+    giver: "vikram",
+    where: "step",
+    requires: ["ch2-stalls"],
+    needs: 4,
+    days: "weekday",
+    hours: [10 * 60, 17 * 60],
+    reward: { money: 500, rep: { Seniors: 10, Clubs: 5 } },
+    failHint: "The judges passed. Vikram says the next Incub8 pitch round is soon.",
+    async run(g) {
+      await g.say([
+        ["Vikram", "Incub8: the Students' Council's entrepreneurship event. Freshers pitch to real judges at NITK-STEP, the incubator."],
+        ["Vikram", "My racing team needs sponsors, so I'm doing the intros. You pitch. Three minutes, three questions. Come on."],
+      ]);
+      if (!(await g.goTo("step", "Get to NITK-STEP for the pitch round", { radius: 5 }))) return false;
+      const idea = await g.choose("", "Your idea, in one line:", [
+        "Mess menu ratings, synced with IRIS, so the mess sees what gets thrown away",
+        "A cycle-sharing app between the hostels and the LHC",
+        "A laundry pickup service from the hostels",
+      ]);
+      const names = ["MessMate", "PedalPool", "DhobiDash"];
+      await g.say([["Judge", `${names[idea]}. Go on then.`]]);
+      let score = 0;
+      const q1 = await g.choose("Judge", "Who pays you?", ["The students, ₹49 a month", "The mess contractor, to cut food waste", "Nobody yet, we'll figure it out"]);
+      score += idea === 0 ? [1, 2, 0][q1] : [2, 1, 0][q1];
+      const q2 = await g.choose("Judge", "How many users can you reach?", ["Every student on campus, about 7,000", "All of India's colleges, year one", "Just my wing, for now"]);
+      score += [2, 0, 1][q2];
+      const q3 = await g.choose("Judge", "What would you build first?", ["The simplest version, and test it with one hostel", "A full app with AI recommendations", "A logo and a pitch deck"]);
+      score += [2, 0, 0][q3];
+      if (score < 4) {
+        await g.say([["Judge", "Interesting. Come back when you've talked to twenty users."], ["Vikram", "Harsh. But fair. Try again next round."]]);
+        return false;
+      }
+      await g.say([
+        ["Judge", `Clear, and small enough to actually build. ₹500 of seed money, and a desk at STEP on Fridays if you want it.`],
+        ["Vikram", `${names[idea]}. Put it on your LinkedIn before someone in Aravali copies it.`],
+      ]);
+      g.state.flags["startup"] = names[idea];
+      return true;
+    },
+  },
+
+  /* ------------------------------------------------------------ */
+  {
+    id: "ch2-mural",
+    title: "Underpass",
+    chapter: CH,
+    giver: "isha",
+    where: "coop",
+    requires: ["ch2-stalls"],
+    needs: 3,
+    days: "weekend",
+    hours: [7 * 60, 11 * 60],
+    window: (g) => (g.state.raining ? "Paint won't stick in this rain. A dry weekend morning, then." : null),
+    reward: { rep: { Clubs: 8, Karavali: 3, Aravali: 3, Sahyadri: 3 } },
+    async run(g) {
+      await g.say([
+        ["Isha", "Artists' Forum is repainting the NH66 underpass: the tunnel under the highway to the beach. A wall each. Ours is still bare concrete."],
+        ["Isha", "Paint's at the co-op. Pick it up, meet me there."],
+      ]);
+      if (!(await g.goTo("coop", "Pick up the paint at the co-op", { radius: 4 }))) return false;
+      const motif = await g.choose("Divya", "What goes on our wall?", [
+        "Yakshagana: the crown, the painted face",
+        "The lighthouse and the sunset crowd",
+        "A giant surfboard and the Mangaluru coast",
+      ]);
+      const panels = g.places.around("underpass", 3, 10, 505, 4, "A bare panel");
+      if (!panels.length) throw new Error("[ch2-mural] no walkable spots around the underpass");
+      const total = panels.length;
+      while (panels.length) {
+        const k = await g.goToAny(panels, `Paint the underpass panels (${total - panels.length}/${total})`, { radius: 2.5 });
+        panels.splice(k, 1);
+        g.ui.toast("Panel painted", "#1e6f5c");
+      }
+      const motifName = ["Yakshagana", "The lighthouse", "The coast"][motif];
+      g.state.flags["mural"] = motifName;
+      await g.say([
+        ["", "By eleven your arms ache, there's paint in your hair, and a fisherman walking back from the beach stops to look."],
+        ["Isha", `${motifName}, forty feet of it. Everyone who walks to the beach for four years walks past this. No pressure.`],
+      ]);
+      return true;
+    },
+  },
+
+  /* ------------------------------------------------------------ */
+  {
+    id: "ch2-musicalnight",
+    title: "Musical Night",
+    chapter: CH,
+    giver: "dev",
+    where: "sac",
+    requires: ["ch2-stalls"],
+    needs: 3,
+    hours: [17 * 60, 19 * 60],
+    reward: { money: 100, rep: { Clubs: 8, Seniors: 5 } },
+    failHint: "The show started without the drums. Dev will need roadies next time too.",
+    async run(g) {
+      await g.say([
+        ["Dev", "Music Club's Musical Night at SAC. Two thousand people, seven bands, and our drummer's gone to buy a stick. One stick."],
+        ["Dev", "The gear's still in the practice room at SJA: the amp, the drum kit, the mic stands. Three trips. Doors open at seven-thirty."],
+      ]);
+      const deadline = 19 * 60 + 30;
+      for (const gear of ["the bass amp", "the drum kit", "the mic stands"]) {
+        if (!(await g.goTo("sjaHall", `Pick up ${gear} from SJA (before ${hhmm(deadline)})`, { radius: 5, clockBy: deadline }))) return false;
+        if (!(await g.goTo("sac", `Carry ${gear} to the SAC stage`, { radius: 6, clockBy: deadline }))) return false;
+        g.ui.toast(`On stage: ${gear}`, "#1d3557");
+      }
+      await g.say([
+        ["", "The tiers fill. The first band tunes for eleven minutes. Then the bass comes in through the amp you carried, and the whole of SAC stands up."],
+        ["Dev", "Roadie of the night. ₹100 and a Music Club T-shirt that's two sizes too big. They're all two sizes too big."],
+      ]);
+      g.state.flags["club:music"] = true;
+      return true;
+    },
+  },
 ];
