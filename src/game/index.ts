@@ -858,6 +858,19 @@ export class Game {
       } else this.hud.markers = [];
     }
 
+    // Glance at whoever you're walking up to.
+    let near: { x: number; z: number } | null = null;
+    let nd = 6;
+    for (const c of [...this.cast.chars.values(), ...this.cast.extras]) {
+      if (!c.root.visible) continue;
+      const d = Math.hypot(c.x - p.pos.x, c.z - p.pos.z);
+      if (d < nd && d > 0.6) {
+        nd = d;
+        near = { x: c.x, z: c.z };
+      }
+    }
+    p.lookAt = near;
+
     // Interactions: mission givers first, then everything else.
     let prompt: string | null = null;
     let action: (() => void | Promise<void>) | null = null;

@@ -1,13 +1,17 @@
 /**
- * The walker: a student with a backpack, a third-person orbit camera that
- * pulls in rather than clip through buildings, and a drone mode for seeing
- * the campus from above. Movement feel follows SADAK's movement.ts: speed
- * built up and bled off, turns that carve, a jump with hang time.
+ * The walker: you (hero.ts, a rigged first-year animated procedurally), a
+ * third-person orbit camera that pulls in rather than clip through
+ * buildings, and a drone mode for seeing the campus from above. Movement
+ * feel and the chase camera follow SADAK: speed built up and bled off, turns
+ * that carve, a jump with hang time and a landing squash; a camera that sits
+ * off the shoulder, leads the aim into the direction of travel, rolls a
+ * touch into turns and widens with speed.
  */
 import * as THREE from "three";
 import { toon } from "./fx/toon";
 import type { Grid } from "./world/grid";
 import { groundHeight } from "./world/terrain";
+import { HeroAnimator, makeHero } from "./hero";
 
 const WALK = 4.6;
 const RUN = 9.5;
@@ -215,7 +219,18 @@ export function makeStudent(look: Look = PLAYER_LOOK): { root: THREE.Group; part
 
 export class Player {
   readonly body: THREE.Group;
-  private parts: Record<string, THREE.Object3D>;
+  private anim: HeroAnimator;
+  /** Motion history for the animator and the camera. */
+  private lastSpeed = 0;
+  private lastFacing = 0;
+  private turnRate = 0;
+  private land = 0;
+  private air = 0;
+  private clockT = 0;
+  private lookAim = new THREE.Vector3();
+  private fov = 60;
+  /** Somewhere worth glancing at (a person you're walking up to), or null. */
+  lookAt: { x: number; z: number } | null = null;
   pos = new THREE.Vector3();
   vel = new THREE.Vector3();
   facing = 0;
@@ -247,9 +262,9 @@ export class Player {
     private grid: Grid,
     private input: Input
   ) {
-    const s = makeStudent();
-    this.body = s.root;
-    this.parts = s.parts;
+    const hero = makeHero();
+    this.body = hero.root;
+    this.anim = new HeroAnimator(hero.rig);
   }
 
   place(x: number, z: number, facing: number) {
@@ -288,11 +303,6 @@ export class Player {
     this.body.add(cycle);
     this.bikeSpeed = 0;
     this.vel.set(0, 0, 0);
-    const p = this.parts;
-    p.hips.position.set(0, 1.02, -0.18);
-    p.armL.rotation.x = -1.15;
-    p.armR.rotation.x = -1.15;
-    p.hips.rotation.x = 0.28;
   }
 
   /** Steps off; returns the cycle so the caller can park it in the world. */
@@ -301,9 +311,6 @@ export class Player {
     if (!c) return null;
     this.body.remove(c);
     this.riding = null;
-    const p = this.parts;
-    p.hips.position.set(0, 0.95, 0);
-    p.hips.rotation.x = 0;
     // Step to the left of the cycle.
     const lx = this.pos.x + Math.cos(this.facing) * 0.9;
     const lz = this.pos.z - Math.sin(this.facing) * 0.9;
@@ -416,6 +423,8 @@ export class Player {
         this.vel.y -= GRAVITY * (this.vel.y < 0 ? 1.3 : inp.down("Space") ? 0.65 : 1) * dt;
         this.pos.y += this.vel.y * dt;
         if (this.pos.y <= gy) {
+          // The harder the fall, the deeper the knees go.
+          this.land = Math.min(1, Math.abs(this.vel.y) / 9);
           this.pos.y = gy;
           this.vel.y = 0;
           this.grounded = true;
@@ -431,7 +440,8 @@ export class Player {
         const max = (14 - 8 * Math.min(1, sp / RUN)) * dt;
         this.facing = wrap(this.facing + THREE.MathUtils.clamp(turn, -max, max));
       }
-      this.animate(dt, sp);
+      this.motion(dt, sp);
+      this.body.rotation.z *= Math.exp(-dt * 8);
     }
 
     this.body.position.copy(this.pos);
@@ -480,14 +490,12 @@ export class Player {
     const c = this.riding!;
     const spin = (this.bikeSpeed * dt) / 0.34;
     for (const w of (c.userData.wheels as THREE.Object3D[]) ?? []) w.rotation.x += spin;
-    this.phase += spin;
-    const p = this.parts;
-    const pedal = Math.sin(this.phase) * 0.55;
-    p.legL.rotation.x = -1.0 + pedal;
-    p.legR.rotation.x = -1.0 - pedal;
-    // Lean into turns.
-    c.rotation.z = 0;
-    this.body.rotation.z = 0;
+    // One crank turn per ~2 wheel turns; coasting leaves the pedals still.
+    this.phase += spin * 0.5;
+    this.motion(dt, Math.abs(this.bikeSpeed), this.phase);
+    // Lean the whole bike into turns, harder the faster you go.
+    const lean = THREE.MathUtils.clamp(-this.turnRate * Math.abs(this.bikeSpeed) * 0.035, -0.35, 0.35);
+    this.body.rotation.z += (lean - this.body.rotation.z) * Math.min(1, dt * 6);
   }
 
   private free(x: number, z: number, radius = RADIUS) {
@@ -502,23 +510,34 @@ export class Player {
     return true;
   }
 
-  private animate(dt: number, sp: number) {
-    const p = this.parts;
-    const amp = Math.min(1, sp / WALK) * (sp > WALK + 1 ? 0.9 : 0.6);
-    this.phase += dt * (3 + sp * 1.25);
-    const s = Math.sin(this.phase) * amp;
-    p.legL.rotation.x = s;
-    p.legR.rotation.x = -s;
-    p.armL.rotation.x = -s * 0.8;
-    p.armR.rotation.x = s * 0.8;
-    p.hips.position.y = 0.95 + Math.abs(Math.cos(this.phase)) * 0.06 * amp;
-    p.hips.rotation.x = sp > WALK + 1 ? 0.12 : 0.03 * amp;
-    if (!this.grounded) {
-      p.legL.rotation.x = 0.5;
-      p.legR.rotation.x = -0.3;
-      p.armL.rotation.x = -2.4;
-      p.armR.rotation.x = -2.4;
+  /** Feed the animator: speed, acceleration, turn rate, air, landing squash, what to glance at. */
+  private motion(dt: number, sp: number, pedal?: number) {
+    const d = Math.max(dt, 1e-4);
+    const accel = (sp - this.lastSpeed) / d;
+    this.lastSpeed = sp;
+    const turn = wrap(this.facing - this.lastFacing) / d;
+    this.lastFacing = this.facing;
+    this.turnRate += (turn - this.turnRate) * Math.min(1, dt * 10);
+    this.air += ((this.grounded ? 0 : 1) - this.air) * Math.min(1, dt * (this.grounded ? 9 : 18));
+    this.land = Math.max(0, this.land - dt * 3.5);
+    this.clockT += dt;
+    let look = 0;
+    if (this.lookAt) {
+      const bearing = wrap(Math.atan2(this.lookAt.x - this.pos.x, this.lookAt.z - this.pos.z) - this.facing);
+      if (Math.abs(bearing) < 1.6) look = THREE.MathUtils.clamp(bearing, -1.1, 1.1);
     }
+    this.anim.update({
+      dt,
+      t: this.clockT,
+      speed: sp,
+      accel: THREE.MathUtils.clamp(accel, -30, 30),
+      turn: this.turnRate,
+      air: this.air,
+      vy: this.vel.y,
+      crouch: this.land,
+      look,
+      pedal,
+    });
   }
 
   private updateCamera(dt: number) {
@@ -540,11 +559,33 @@ export class Player {
       }
     }
     const want = target.clone().addScaledVector(dir, dist);
-    if (this.camPos.lengthSq() === 0) this.camPos.copy(want);
+    // Off the right shoulder, so what you walk toward isn't hidden behind your head.
+    if (!this.drone && dist > 2.5) {
+      const shoulder = 0.55 * Math.min(1, dist / 7);
+      want.x += -Math.cos(this.yaw) * shoulder;
+      want.z += Math.sin(this.yaw) * shoulder;
+    }
+    const first = this.camPos.lengthSq() === 0;
+    if (first) this.camPos.copy(want);
     // Snap in fast, ease out slowly, so walls never show through.
-    const k = dist < this.camPos.distanceTo(target) ? 1 : 1 - Math.exp(-dt * 6);
+    const k = dist < this.camPos.distanceTo(target) ? 1 : 1 - Math.exp(-dt * 7);
     this.camPos.lerp(want, k);
     this.camera.position.copy(this.camPos);
-    this.camera.lookAt(target);
+    // Aim leads into the direction of travel and is damped too: a lagging
+    // body with an instant aim reads as swimmy but jerky.
+    const lead = this.drone ? 0 : 0.35;
+    const aim = target.clone().addScaledVector(this.vel, lead);
+    if (first) this.lookAim.copy(aim);
+    this.lookAim.lerp(aim, 1 - Math.exp(-dt * 8));
+    this.camera.lookAt(this.lookAim);
+    // Roll a touch into turns, and widen the view with speed: most of the sense of pace.
+    const speed01 = THREE.MathUtils.clamp(this.speed / RUN, 0, 1.2);
+    if (!this.drone) this.camera.rotateZ(THREE.MathUtils.clamp(-this.turnRate * 0.012 * speed01, -0.04, 0.04));
+    const fov = this.drone ? 60 : 60 + speed01 * 8;
+    if (Math.abs(fov - this.fov) > 0.01) {
+      this.fov += (fov - this.fov) * Math.min(1, dt * 4);
+      this.camera.fov = this.fov;
+      this.camera.updateProjectionMatrix();
+    }
   }
 }

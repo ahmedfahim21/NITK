@@ -287,7 +287,7 @@ async function main() {
   const clockTime = clockEl.querySelector(".time") as HTMLDivElement;
   const clockDay = clockEl.querySelector(".day") as HTMLDivElement;
   const strip = clockEl.querySelector(".strip") as HTMLDivElement;
-  let stripKey = "";
+  let stripKey: string | null = null;
   let lastClock = "";
   const updateClock = () => {
     const st = game?.state;
