@@ -3,6 +3,7 @@
  * and story flags. Saved to localStorage so a session picks up where it left.
  */
 import type { TimeOfDay } from "../fx/presets";
+import { seasonOf, sunTimes, type Season } from "./seasons";
 
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -70,10 +71,15 @@ export class GameState {
 
   period(): TimeOfDay {
     const h = this.hour;
-    if (h >= 5.5 && h < 10) return "morning";
-    if (h >= 10 && h < 17.25) return "noon";
-    if (h >= 17.25 && h < 19.1) return "sunset";
+    const { rise, set } = sunTimes(this.day);
+    if (h >= rise - 0.6 && h < rise + 3.4) return "morning";
+    if (h >= rise + 3.4 && h < set - 1.5) return "noon";
+    if (h >= set - 1.5 && h < set + 0.3) return "sunset";
     return "night";
+  }
+
+  get season(): Season {
+    return seasonOf(this.day);
   }
 
   /** Advance to a clock time (today if still ahead, else tomorrow). */

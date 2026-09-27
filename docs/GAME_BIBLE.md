@@ -135,6 +135,16 @@ All of these already exist in the 3D world (or will, once the real OSM data load
 
 ## 5. Campaign: one fresher year, five chapters
 
+The seasons are built (`src/game/seasons.ts`), so each chapter lands in its real season:
+
+| Chapter | Dates | Semester | Season | Festivals on campus |
+|---|---|---|---|---|
+| 1 Srinivasnagar | early Aug | odd | Monsoon | Independence Day (15 Aug) |
+| 2 Recruitments | Sep | odd | Monsoon | Ganesh Chaturthi (mid-Sep) |
+| 3 Engineer | Oct | odd | Post-monsoon (storms) | Rajyotsava (1 Nov) |
+| 4 Midsems → Endsems | Nov–Dec | odd | Post-monsoon → Winter | Deepavali (early Nov), Christmas |
+| 5 Crescendo & Incident | Jan–Mar | even | Winter → Summer | Republic Day (26 Jan) |
+
 The calendar is real: the odd semester runs July/Aug–Dec with **Engineer in October**; the even semester runs Jan–May with **Incident in March**.
 
 ### Chapter 1: "Srinivasnagar" (August, monsoon): **built**

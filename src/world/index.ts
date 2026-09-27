@@ -28,6 +28,8 @@ export type World = {
   rebuildBuildings(): Promise<void>;
   /** Meshes that can be clicked to select a building. */
   pickables(): THREE.Object3D[];
+  /** Season visuals: land tint, sea state, foliage tint, summer blossoms. */
+  setSeason(s: { grass: [number, number, number]; foliage: [number, number, number]; sea: number; blossom: boolean }): void;
   apply(p: Preset): void;
   update(t: number, cam?: THREE.Vector3): void;
 };
@@ -137,6 +139,10 @@ export function buildWorld(map: CampusMap): World {
       buildings = buildBuildings(map, skip);
       group.add(buildings.group);
       await models.sync((k, err) => console.warn(`[models] ${k}:`, err));
+    },
+    setSeason(s) {
+      ground.setSeason(s.grass, s.sea);
+      trees.setSeason(s.foliage, s.blossom);
     },
     pickables() {
       return [buildings.group, models.group, landmarks.group];

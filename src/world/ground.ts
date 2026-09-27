@@ -52,6 +52,9 @@ const AREA_LAYER: Record<AreaKind, number> = {
   pool: 8,
 };
 
+/** Land use that greens up in the monsoon and yellows in summer. */
+const VEGETATED = new Set<AreaKind>(["campus", "residential", "grass", "park", "garden", "forest", "scrub", "farmland", "wetland", "pitch"]);
+
 const COURT_SPORTS = /basketball|volleyball|tennis|badminton|netball|multi|handball|skating/;
 
 /** Triangulated flat polygon at height y, facing up. */
@@ -183,6 +186,8 @@ export function ribbon(pts: Pt[], a: number, b: number, y: number, uScale = 0): 
 
 export type GroundRig = {
   group: THREE.Group;
+  /** Season: tint the land (lush monsoon green .. dry summer straw) and roughen the sea. */
+  setSeason(grass: [number, number, number], sea: number): void;
   seaUniforms: { uTime: { value: number }; uDeep: { value: THREE.Color }; uShallow: { value: THREE.Color }; uFoam: { value: THREE.Color } };
   apply(p: Preset): void;
   update(t: number): void;
@@ -194,6 +199,7 @@ export function buildGround(map: CampusMap): GroundRig {
 
   /* ---- land ---- */
   const landGeos: THREE.BufferGeometry[] = [];
+  const plainGeos: THREE.BufferGeometry[] = [];
   for (const l of map.land) {
     const g = flatPolygon(l, [], 0);
     if (g) {
@@ -212,7 +218,8 @@ export function buildGround(map: CampusMap): GroundRig {
     if (a.kind === "pitch" && a.sport && COURT_SPORTS.test(a.sport)) c = a.sport.includes("tennis") ? 0x3f7f9f : 0xb8603f;
     if (a.kind === "pitch" && a.sport === "cricket") c = 0x78b84f;
     paint(g, new THREE.Color(c));
-    landGeos.push(g);
+    const green = VEGETATED.has(a.kind) && !(a.kind === "pitch" && a.sport && COURT_SPORTS.test(a.sport));
+    (green ? landGeos : plainGeos).push(g);
   }
 
   /* ---- beach: a sand strip up from the waterline, under any mapped beach ---- */
@@ -220,18 +227,25 @@ export function buildGround(map: CampusMap): GroundRig {
     const g = ribbon(line, 0, 26, 0.035);
     g.deleteAttribute("uv");
     paint(g, new THREE.Color(0xe9d6a2));
-    landGeos.push(g);
+    plainGeos.push(g);
     const wet = ribbon(line, -0.5, 4, 0.04);
     wet.deleteAttribute("uv");
     paint(wet, new THREE.Color(0xcdb989));
-    landGeos.push(wet);
+    plainGeos.push(wet);
   }
 
+  // Vegetated ground takes the season's tint; sand, water and paving don't.
   const groundMat = toon(0xffffff, { vertexColors: true, ramp: "three" });
   const landMesh = new THREE.Mesh(merge(landGeos), groundMat);
   landMesh.receiveShadow = true;
   landMesh.name = "land";
   group.add(landMesh);
+  if (plainGeos.length) {
+    const plain = new THREE.Mesh(merge(plainGeos), toon(0xffffff, { vertexColors: true, ramp: "three" }));
+    plain.receiveShadow = true;
+    plain.name = "land-plain";
+    group.add(plain);
+  }
 
   /* ---- pitch markings ---- */
   const lineGeos: THREE.BufferGeometry[] = [];
@@ -287,6 +301,7 @@ export function buildGround(map: CampusMap): GroundRig {
     uShallow: { value: new THREE.Color(0x45b8bf) },
     uFoam: { value: new THREE.Color(0xffffff) },
     uLine: { value: coastLine(map) },
+    uRough: { value: 0.5 },
   };
   const seaGeos: THREE.BufferGeometry[] = [];
   for (const s of map.sea) {
@@ -308,6 +323,7 @@ export function buildGround(map: CampusMap): GroundRig {
         uniform float uTime;
         uniform vec3 uDeep, uShallow, uFoam;
         uniform vec3 uLine;
+        uniform float uRough;
         varying vec3 vWorld;
         void main() {
           // Distance out to sea from the fitted shoreline.
@@ -318,10 +334,10 @@ export function buildGround(map: CampusMap): GroundRig {
           vec3 c = mix( uDeep, uShallow, shallow );
           // Swell lines rolling in.
           float swell = sin( d * 0.09 + uTime * 1.3 + sin( vWorld.x * 0.013 + vWorld.z * 0.02 ) * 2.0 );
-          c = mix( c, uFoam, step( 0.965, swell ) * ( 1.0 - smoothstep( 60.0, 420.0, d ) ) * 0.55 );
+          c = mix( c, uFoam, step( 0.985 - uRough * 0.05, swell ) * ( 1.0 - smoothstep( 60.0, 300.0 + uRough * 400.0, d ) ) * 0.55 );
           // Breakers near the beach.
           float br = sin( d * 0.35 - uTime * 2.2 + sin( vWorld.z * 0.05 ) );
-          c = mix( c, uFoam, step( 0.8, br ) * ( 1.0 - smoothstep( 6.0, 45.0, d ) ) * 0.85 );
+          c = mix( c, uFoam, step( 0.88 - uRough * 0.18, br ) * ( 1.0 - smoothstep( 6.0, 25.0 + uRough * 55.0, d ) ) * 0.85 );
           // Glints.
           float g = fract( sin( dot( floor( vWorld.xz * 0.35 ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
           c += step( 0.992, g ) * step( 0.5, sin( uTime * 3.0 + g * 40.0 ) ) * 0.25;
@@ -363,6 +379,10 @@ export function buildGround(map: CampusMap): GroundRig {
   return {
     group,
     seaUniforms,
+    setSeason(grass, sea) {
+      groundMat.color.setRGB(...grass);
+      seaUniforms.uRough.value = sea;
+    },
     apply(p) {
       seaUniforms.uDeep.value.set(p.sea.deep);
       seaUniforms.uShallow.value.set(p.sea.shallow);

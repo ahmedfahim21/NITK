@@ -6,6 +6,7 @@ import type { Game } from "./index";
 import { CHAPTERS, MISSIONS } from "./index";
 import { CLUBS } from "./stalls";
 import type { Faction } from "./state";
+import { semesterOf } from "./seasons";
 
 const FACTIONS: Faction[] = ["Karavali", "Aravali", "Sahyadri", "Seniors", "IRIS", "Clubs"];
 
@@ -31,7 +32,7 @@ export function openJournal(g: Game): Promise<void> {
     }).join("");
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0">Journal</h2><span style="font-size:12px">J or Esc to close</span></div>
-      <div style="font-size:13px;margin:2px 0 10px">${st.dateText()} · ${st.clockText()} · ₹${Math.round(st.money)}</div>
+      <div style="font-size:13px;margin:2px 0 10px">${st.dateText()} · ${st.clockText()} · ${semesterOf(st.day)} · ${st.season.name} · ₹${Math.round(st.money)}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px">
         <div>
           <b>You</b>

@@ -98,6 +98,7 @@ export class RenderPipeline {
     u.uInkFadeStart.value = p.ink.fadeStart;
     u.uInkFadeEnd.value = p.ink.fadeEnd;
     u.uExposure.value = p.tone.exposure;
+    this.baseExposure = p.tone.exposure;
     u.uSplitShadow.value.fromArray(p.tone.splitShadow);
     u.uSplitLight.value.fromArray(p.tone.splitLight);
     u.uShadowLift.value = p.tone.shadowLift;
@@ -160,7 +161,23 @@ export class RenderPipeline {
     this.sun.target.updateMatrixWorld();
   }
 
+  private flashAmt = 0;
+  private baseExposure = 1;
+
+  /** A lightning flash: brief overexposure that decays over a few frames. */
+  flash(amount = 1.6) {
+    this.flashAmt = Math.max(this.flashAmt, amount);
+  }
+
   render() {
+    const u = this.cel.mat.uniforms;
+    if (this.flashAmt > 0.01) {
+      u.uExposure.value = this.baseExposure * (1 + this.flashAmt);
+      this.flashAmt *= 0.82;
+    } else if (this.flashAmt > 0) {
+      this.flashAmt = 0;
+      u.uExposure.value = this.baseExposure;
+    }
     const r = this.renderer;
     r.setRenderTarget(this.rtScene);
     r.clear();

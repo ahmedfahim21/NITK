@@ -20,6 +20,7 @@ export type AmbientInput = {
   onRoad: boolean;
   /** 0..1 how enclosed (indoors-ish): dampens everything. */
   muffle?: number;
+  season?: "monsoon" | "postmonsoon" | "winter" | "summer";
 };
 
 type Loop = { gain: GainNode; filter: BiquadFilterNode };
@@ -66,6 +67,8 @@ export class Ambience {
   private hornT = 5;
   private bellT = 10;
   private tickT = 0;
+  private frogT = 3;
+  private cicadas: GainNode | null = null;
 
   constructor(map: CampusMap) {
     this.coast = samplePolyline(map.coast, 12);
@@ -130,6 +133,28 @@ export class Ambience {
       gate.start();
     }
     this.crickets = g;
+    // Cicadas: a dense electric buzz for summer afternoons.
+    const cg = a.ctx.createGain();
+    cg.gain.value = 0;
+    cg.connect(a.amb);
+    const buzz = a.ctx.createOscillator();
+    buzz.type = "sawtooth";
+    buzz.frequency.value = 6800;
+    const bf = a.ctx.createBiquadFilter();
+    bf.type = "bandpass";
+    bf.frequency.value = 6800;
+    bf.Q.value = 8;
+    const am = a.ctx.createGain();
+    am.gain.value = 0.5;
+    const lfo = a.ctx.createOscillator();
+    lfo.frequency.value = 90;
+    const lg = a.ctx.createGain();
+    lg.gain.value = 0.5;
+    lfo.connect(lg).connect(am.gain);
+    buzz.connect(bf).connect(am).connect(cg);
+    buzz.start();
+    lfo.start();
+    this.cicadas = cg;
   }
 
   update(dt: number, s: AmbientInput) {
@@ -184,7 +209,17 @@ export class Ambience {
       this.birdT = 0.4 + Math.random() * (3.5 - chorus * 2.5);
       if (chorus > 0 && Math.random() < chorus) this.bird(0.03 + Math.random() * 0.04);
     }
-    this.crickets!.gain.setTargetAtTime(!day ? (s.raining ? 0.004 : 0.012) * m : 0, t, 1.5);
+    this.crickets!.gain.setTargetAtTime(!day ? (s.raining ? 0.004 : s.season === "winter" ? 0.007 : 0.012) * m : 0, t, 1.5);
+    // Summer cicadas through the hot hours.
+    const hot = s.season === "summer" && s.hour >= 10 && s.hour < 17.5 && !s.raining;
+    this.cicadas!.gain.setTargetAtTime(hot ? 0.006 * m : 0, t, 2);
+    // Monsoon frogs after rain and after dark.
+    this.frogT -= dt;
+    if (this.frogT <= 0) {
+      this.frogT = 0.25 + Math.random() * 1.2;
+      const wet = s.season === "monsoon" && (!day || s.raining);
+      if (wet && Math.random() < 0.8) this.frog(0.04 * m);
+    }
 
     // Temple bells round dawn and dusk.
     this.bellT -= dt;
@@ -262,6 +297,34 @@ export class Ambience {
       o.connect(g).connect(pan).connect(a.amb);
       o.start(st);
       o.stop(st + 0.09);
+    }
+  }
+
+  private frog(vel: number) {
+    const a = audio();
+    if (!a) return;
+    const t = a.ctx.currentTime;
+    // A throaty two-pulse croak: low square through a resonant filter.
+    const base = 140 + Math.random() * 90;
+    for (let k = 0; k < 2; k++) {
+      const st = t + k * 0.13;
+      const o = a.ctx.createOscillator();
+      o.type = "square";
+      o.frequency.setValueAtTime(base, st);
+      o.frequency.linearRampToValueAtTime(base * 0.8, st + 0.1);
+      const f = a.ctx.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = base * 4;
+      f.Q.value = 5;
+      const g = a.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.linearRampToValueAtTime(vel, st + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.11);
+      const pan = a.ctx.createStereoPanner();
+      pan.pan.value = Math.random() * 1.8 - 0.9;
+      o.connect(f).connect(g).connect(pan).connect(a.amb);
+      o.start(st);
+      o.stop(st + 0.13);
     }
   }
 

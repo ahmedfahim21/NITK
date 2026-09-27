@@ -20,6 +20,35 @@ npm run dev          # http://localhost:5173
 |---|---|
 | ![Title](docs/title.png) | ![Asset workbench](docs/workbench.png) |
 
+## Seasons and the academic year
+
+The game runs on the real calendar: day 0 is Monday 3 August 2026, and NITK's odd semester runs August–December, the even semester January–May. Seasons follow the Karnataka coast:
+
+| Season | Months | Semester / story | What changes |
+|---|---|---|---|
+| **Monsoon** | Jun–Sep | odd sem opens (Chapters 1–2) | frequent rain spells, lush green, grey skies, rough sea, umbrellas everywhere, frogs at night |
+| **Post-monsoon** | Oct–Nov | Engineer, Deepavali | "October heat", afternoon thunderstorms with lightning and thunder |
+| **Winter** | Dec–Feb | endsems, Crescendo | dry and clear, calm sea, drier grass, students in jackets |
+| **Summer** | Mar–May | Incident, even-sem endsems | hot haze, straw-yellow grass, gulmohar and laburnum in flower, cicadas, pre-monsoon storms |
+
+**Across the year:**
+- Sunrise and sunset follow Surathkal's real times, so dusk comes around 6:05 PM in November and 6:55 PM in August.
+- The weather is rolled every game hour from the season's odds. Missions that script the weather hold it until they end.
+- Festival decorations go up on the 2026–27 dates:
+  - tricolour bunting for Independence Day and Republic Day
+  - red-and-yellow Kannada flags for Rajyotsava
+  - marigold garlands for Ganesh Chaturthi
+  - glowing akash kandil lanterns and diyas for Deepavali
+  - paper stars for Christmas
+- The journal shows the semester and season.
+
+In Explore mode, a season picker jumps to Monsoon (15 Aug), Post-monsoon (8 Nov, Deepavali), Winter (25 Dec) or Summer (29 Mar), and a Rain button toggles the weather, so you can check assets across the year.
+
+| | |
+|---|---|
+| ![Monsoon](docs/season-monsoon.png) | ![Summer](docs/season-summer.png) |
+| ![Winter](docs/season-winter.png) | ![Deepavali](docs/festival-deepavali.png) |
+
 ## Sound
 
 Everything is synthesized in the browser; there are no audio files to download.
@@ -38,6 +67,7 @@ Everything is synthesized in the browser; there are no audio files to download.
   - waves loudest on the real coastline
   - NH66 traffic rumble and horns
   - birds, busiest at dawn and dusk; crickets at night
+  - frogs on monsoon nights, cicadas on summer afternoons, thunder in storm season
   - student chatter around the hangouts
   - temple bells at dawn and dusk near the Sadashiva temple
   - wind and monsoon rain
@@ -165,6 +195,8 @@ src/
                      rain/beacon/bees, UI, save state,
                      audio (buses), music (sequencer + tracks), ambience
   editor/            the asset workbench (Explore mode)
+  game/seasons.ts    calendar, seasons, sun times, festivals, seasonal grading
+  game/festivals.ts  festival decorations
   world/overrides.ts per-building overrides (public/data/overrides.json)
   world/models.ts    custom .glb models on OSM footprints
 scripts/fetch-osm.mjs  snapshot the extract into public/data (also run by CI)

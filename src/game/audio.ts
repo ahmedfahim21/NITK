@@ -157,6 +157,27 @@ export const sfx = {
   chapter() {
     [0, 7, 12, 16, 19, 24].forEach((s, i) => tone(N(s), i * 0.14, 1.4, "triangle", 0.18));
   },
+  /** Thunder: a crack then a long rolling rumble; `far` 0..1 softens it. */
+  thunder(far = 0.5) {
+    const a = ac();
+    const n = noise();
+    if (!a || !ambBus || !n) return;
+    const t = a.currentTime;
+    const src = a.createBufferSource();
+    src.buffer = n.brown;
+    const f = a.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(900 - far * 600, t);
+    f.frequency.exponentialRampToValueAtTime(120, t + 3.5);
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.9 - far * 0.5, t + 0.08 + far * 0.3);
+    g.gain.setTargetAtTime(0.35, t + 0.4, 0.4);
+    g.gain.setTargetAtTime(0.0001, t + 1.8, 1.1);
+    src.connect(f).connect(g).connect(ambBus);
+    src.start(t, Math.random());
+    src.stop(t + 6);
+  },
   bees() {
     const a = ac();
     if (!a || !sfxBus) return;

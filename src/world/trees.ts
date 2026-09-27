@@ -162,7 +162,7 @@ const KIND_CODE: AreaKind[] = [
 /** Campus trees are bucketed in tiles this big (m); the horizon band is one bucket per kind. */
 const TILE = 320;
 
-export type TreeRig = { group: THREE.Group; count: number; cull(cam: THREE.Vector3): void };
+export type TreeRig = { group: THREE.Group; count: number; cull(cam: THREE.Vector3): void; setSeason(foliage: [number, number, number], blossom: boolean): void };
 
 export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
   const rand = mulberry32(seed);
@@ -276,12 +276,50 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
     inst.receiveShadow = true;
     group.add(inst);
   }
+  // Summer flowers: gulmohar (flame red) and Indian laburnum (golden shower)
+  // on a share of the broadleaf trees, shown only in season.
+  const blossoms = new THREE.Group();
+  blossoms.visible = false;
+  {
+    const cluster = mergeGeometries(
+      [
+        new THREE.IcosahedronGeometry(1.5, 0).translate(0.6, 5.2, 0.3),
+        new THREE.IcosahedronGeometry(1.2, 0).translate(-0.8, 4.9, -0.4),
+        new THREE.IcosahedronGeometry(1.1, 0).translate(0.1, 5.8, -0.9),
+      ].map((g) => g.toNonIndexed())
+    )!;
+    const hosts = placed.filter((p) => p.kind === "broad" && !p.far && (Math.floor(p.x * 7 + p.z * 13) & 7) < 3);
+    for (const [colour, pick] of [
+      [0xe2442b, (i: number) => i % 3 !== 2],
+      [0xf2c318, (i: number) => i % 3 === 2],
+    ] as const) {
+      const list = hosts.filter((_, i) => pick(i));
+      if (!list.length) continue;
+      const inst = new THREE.InstancedMesh(cluster, toon(colour, { ramp: "soft", nearFade: 5 }), list.length);
+      const mm = new THREE.Matrix4();
+      const qq = new THREE.Quaternion();
+      list.forEach((p, i) => {
+        qq.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.r);
+        mm.compose(new THREE.Vector3(p.x, groundHeight(p.x, p.z), p.z), qq, new THREE.Vector3(p.s, p.s, p.s));
+        inst.setMatrixAt(i, mm);
+      });
+      inst.computeBoundingSphere();
+      inst.castShadow = true;
+      blossoms.add(inst);
+    }
+    group.add(blossoms);
+  }
+
   // Hide campus tiles well into the haze; the horizon band stays as a backdrop.
-  const tiles = group.children.filter((m) => !(m.userData.far as boolean)) as THREE.InstancedMesh[];
+  const tiles = group.children.filter((m) => (m as THREE.InstancedMesh).isInstancedMesh && !(m.userData.far as boolean)) as THREE.InstancedMesh[];
   for (const t of tiles) t.userData.centre = t.boundingSphere!.center.clone();
   return {
     group,
     count: placed.length,
+    setSeason(foliage, blossom) {
+      mat.color.setRGB(...foliage);
+      blossoms.visible = blossom;
+    },
     cull(cam) {
       for (const t of tiles) {
         const c = t.userData.centre as THREE.Vector3;

@@ -14,6 +14,7 @@ import { Music } from "./game/music";
 import { mix, setMix, unlockAudio } from "./game/audio";
 import { Workbench } from "./editor/workbench";
 import { applyOverrides, loadOverrides } from "./world/overrides";
+import { SEASONS, SEASON_SAMPLE_DAY, seasonalPreset, type Season, type SeasonId } from "./game/seasons";
 import type { Preset } from "./fx/presets";
 
 /** The monsoon version of a preset: grey sky, weak sun, thick haze. */
@@ -89,6 +90,8 @@ async function main() {
   /* ---- time of day: driven by the game clock ---- */
   let time: TimeOfDay = "morning";
   let raining = false;
+  let season: Season = SEASONS.monsoon;
+  world.setSeason(season);
   let game: Game | null = null;
   const timesEl = document.getElementById("times")!;
   const labels: Record<TimeOfDay, string> = { morning: "☀ AM", noon: "Noon", sunset: "Sunset", night: "Night" };
@@ -105,10 +108,12 @@ async function main() {
     if (game) game.state.advanceTo(PERIOD_START[t]);
     else setTime(t, raining);
   }
-  function setTime(t: TimeOfDay, rain = raining) {
+  function setTime(t: TimeOfDay, rain = raining, s: Season = season) {
     time = t;
     raining = rain;
-    const p = rain ? rainy(PRESETS[t]) : PRESETS[t];
+    season = s;
+    const seasonal = seasonalPreset(PRESETS[t], s);
+    const p = rain ? rainy(seasonal) : seasonal;
     pipeline.apply(p);
     sky.apply(p);
     world.apply(p);
@@ -204,7 +209,12 @@ async function main() {
       input,
       hud,
       camera,
-      { applyTime: (period, rain) => setTime(period, rain), music, mode: mode === "explore" ? "explore" : "story" },
+      {
+        applyTime: (period, rain, s) => setTime(period, rain, s),
+        flash: (k) => pipeline.flash(k),
+        music,
+        mode: mode === "explore" ? "explore" : "story",
+      },
       state,
       gameUi
     );
@@ -213,6 +223,33 @@ async function main() {
     if (mode === "explore") {
       bench = new Workbench(map, world, camera, canvas, player, scene, (m) => gameUi.toast(m, "#1d3557"));
       document.body.classList.add("exploring");
+      // Season and weather pickers, for checking assets across the year.
+      const row = document.getElementById("season-row")!;
+      row.style.display = "flex";
+      const sel = document.createElement("select");
+      for (const [id, label] of [
+        ["monsoon", "Monsoon · 15 Aug"],
+        ["postmonsoon", "Post-monsoon · 8 Nov (Deepavali)"],
+        ["winter", "Winter · 25 Dec (Christmas)"],
+        ["summer", "Summer · 29 Mar (gulmohar)"],
+      ] as const) {
+        const o = document.createElement("option");
+        o.value = id;
+        o.textContent = label;
+        sel.appendChild(o);
+      }
+      sel.addEventListener("change", () => {
+        const st = game!.state;
+        st.day = SEASON_SAMPLE_DAY[sel.value as SeasonId];
+        st.raining = false;
+      });
+      const rainBtn = document.createElement("button");
+      rainBtn.textContent = "Rain";
+      rainBtn.addEventListener("click", () => {
+        game!.state.raining = !game!.state.raining;
+        rainBtn.classList.toggle("on", game!.state.raining);
+      });
+      row.append(sel, rainBtn);
     }
     Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music, bench } });
   };

@@ -36,6 +36,7 @@
       #controls .row { display: flex; gap: 4px; }
       #controls button { font: inherit; font-weight: 700; padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; cursor: pointer; }
       #controls button.on { background: var(--navy); color: #fff; }
+      #season-row select { font: inherit; font-weight: 700; padding: 4px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; }
       #mix { display: none; flex-direction: column; gap: 4px; font-size: 12px; }
       #mix.open { display: flex; }
       #mix label { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; }
@@ -96,6 +97,7 @@
         <button id="btn-map" title="M">Map</button>
       </div>
       <div class="row" id="sound"></div>
+      <div class="row" id="season-row" style="display:none"></div>
       <div id="mix"></div>
       <div id="source"></div>
     </div>

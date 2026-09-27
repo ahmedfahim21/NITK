@@ -37,6 +37,10 @@ type Agent = {
 };
 
 const SHIRTS = [0xe74c3c, 0x2e86de, 0x27ae60, 0xf1c40f, 0x8e44ad, 0xecf0f1, 0x34495e, 0xe67e22, 0x16a085, 0xd35400, 0xc0392b, 0x2c3e50, 0xfd79a8, 0x6c5ce7, 0xffffff, 0x00b894];
+/** Season wardrobes: hoodies and jackets on winter mornings, light cottons in summer. */
+const JACKETS = [0x2d3436, 0x1d3557, 0x6d214f, 0x2f3640, 0x40407a, 0x84817a, 0x3d3d3d, 0x7f8c8d];
+const SUMMER = [0xffffff, 0xf7f1e3, 0xfff3b0, 0xc7ecee, 0xffeaa7, 0xdff9fb, 0xfab1a0, 0xecf0f1];
+
 const PANTS = [0x2d3436, 0x34495e, 0x2c3e8f, 0x3b4f7a, 0x6d5d4b, 0x1e272e, 0x485460];
 const SKIN = [0x8d5524, 0xa0623a, 0xc68642, 0xb07040, 0xe0ac69, 0x7a4a2a, 0x9c6a44];
 const HAIR = [0x1a1512, 0x241c16, 0x2e2018, 0x0f0c0a];
@@ -208,11 +212,21 @@ export class Crowd {
   }
 
   private coloured = false;
+  private wardrobe: "rain" | "normal" | "jackets" | "summer" = "normal";
+
+  setWardrobe(w: "rain" | "normal" | "jackets" | "summer") {
+    if (w === this.wardrobe) return;
+    this.wardrobe = w;
+    this.coloured = false;
+  }
+
   private colourAll() {
     const c = new THREE.Color();
     this.agents.forEach((ag, i) => {
       const r = mulberry32(ag.look);
-      const shirt = SHIRTS[Math.floor(r() * SHIRTS.length)];
+      const pick = r();
+      const palette = this.wardrobe === "jackets" && pick < 0.55 ? JACKETS : this.wardrobe === "summer" && pick < 0.6 ? SUMMER : SHIRTS;
+      const shirt = palette[Math.floor(r() * palette.length)];
       const pants = PANTS[Math.floor(r() * PANTS.length)];
       const skin = SKIN[Math.floor(r() * SKIN.length)];
       const hair = HAIR[Math.floor(r() * HAIR.length)];

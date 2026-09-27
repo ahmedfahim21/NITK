@@ -26,6 +26,8 @@ import { openJournal } from "./journal";
 import { QUIZ } from "./quiz";
 import { wait } from "./util";
 import { Ambience } from "./ambience";
+import { Festivals } from "./festivals";
+import type { Season } from "./seasons";
 import type { Music, Mood } from "./music";
 import { ROAD } from "../world/grid";
 
@@ -61,7 +63,9 @@ type Interactable = {
 };
 
 export type GameHooks = {
-  applyTime: (period: TimeOfDay, raining: boolean) => void;
+  applyTime: (period: TimeOfDay, raining: boolean, season: Season) => void;
+  /** Lightning: flash the frame. */
+  flash?: (amount: number) => void;
   music?: Music;
   /** Explore mode: free roam with no missions, stat drain or saving. */
   mode?: "story" | "explore";
@@ -94,6 +98,14 @@ export class Game {
   private t = 0;
   readonly explore: boolean;
   readonly ambience: Ambience;
+  readonly festivals: Festivals;
+  private lastDay = -1;
+  private lastHour = -1;
+  private season: Season | null = null;
+  /** Missions that script the weather hold it until they end. */
+  private weatherLock = false;
+  private storm = false;
+  private boltT = 8;
 
   constructor(
     readonly map: CampusMap,
@@ -126,6 +138,10 @@ export class Game {
       return { x, z, face: s.face ?? 0 };
     });
     this.group.add(this.crowd.group, this.riders.group, this.cast.group, this.rain.mesh, this.beacon.group, this.swarm.points, buildRacks(racks));
+    this.festivals = new Festivals(
+      (["mainGate", "academicSection", "karavali", "aravali", "sahyadri", "sac", "lhc", "nescafe"] as PlaceKey[]).map((k) => this.places.get(k))
+    );
+    this.group.add(this.festivals.group);
     player.blockedExtra = (x, z) => this.crowd.blocked(x, z) || this.cast.blocked(x, z);
     this.registerInteractables();
     window.addEventListener("pointerdown", unlockAudio);
@@ -193,8 +209,11 @@ export class Game {
     this.state.energy = Math.min(100, this.state.energy + energy);
   }
 
+  /** Missions script the weather; the natural weather waits until they end. */
   setRain(on: boolean) {
     this.state.raining = on;
+    this.storm = false;
+    if (this.active) this.weatherLock = true;
   }
 
   setClock(minutes: number) {
@@ -298,6 +317,7 @@ export class Game {
     this.player.frozen = false;
     this.cutscene = false;
     this.active = null;
+    this.weatherLock = false;
     if (ok) {
       this.state.completed.add(m.id);
       if (m.reward?.money) this.state.money += m.reward.money;
@@ -611,11 +631,57 @@ export class Game {
       st.minutes -= 1440;
       st.day++;
     }
+    // A new day: the season, and whatever festival is on.
+    if (st.day !== this.lastDay) {
+      this.lastDay = st.day;
+      const season = st.season;
+      if (season !== this.season) {
+        const changed = !!this.season;
+        this.season = season;
+        this.world.setSeason(season);
+        this.crowd.setWardrobe(season.wardrobe);
+        this.period = null;
+        if (changed || this.explore) this.ui.showBanner(season.name.toUpperCase(), season.blurb, "chapter", 4200);
+      }
+      for (const name of this.festivals.update(st.day)) this.ui.toast(`🎉 ${name} on campus`, "#b85c3e");
+    }
+    // The weather, rolled every game hour from the season's odds.
+    const hourNow = Math.floor(st.minutes / 60) + st.day * 24;
+    if (hourNow !== this.lastHour) {
+      const first = this.lastHour < 0;
+      this.lastHour = hourNow;
+      const se = st.season;
+      if (!this.weatherLock && !this.active && !first) {
+        const h = st.hour;
+        // Storm seasons build up in the afternoon and evening.
+        const boost = se.storms ? (h >= 14 && h < 21 ? 3 : 0.3) : 1;
+        if (st.raining) {
+          if (Math.random() < se.rainStop) {
+            st.raining = false;
+            this.storm = false;
+          }
+        } else if (Math.random() < se.rainStart * boost) {
+          st.raining = true;
+          this.storm = se.storms;
+          if (this.storm) this.ui.toast("A thunderstorm rolls in off the sea…", "#1d3557");
+        }
+      }
+    }
+    // Lightning and thunder.
+    if (this.storm && st.raining) {
+      this.boltT -= dt;
+      if (this.boltT <= 0) {
+        this.boltT = 5 + Math.random() * 14;
+        const far = Math.random();
+        this.hooks.flash?.(1.8 - far);
+        setTimeout(() => sfx.thunder(far), 300 + far * 2500);
+      }
+    }
     const period = st.period();
     if (period !== this.period || st.raining !== this.lastRain) {
       this.period = period;
       this.lastRain = st.raining;
-      this.hooks.applyTime(period, st.raining);
+      this.hooks.applyTime(period, st.raining, st.season);
       this.rain.on = st.raining;
       this.crowd.raining = st.raining;
       setRainSound(st.raining);
@@ -777,10 +843,11 @@ export class Game {
       running: p.speed > 5.5,
       riding: !!p.riding,
       onRoad: (this.world.grid.get(p.pos.x, p.pos.z) & ROAD) !== 0,
+      season: st.season.id,
     });
 
     ui.setStats({
-      clock: st.clockText(),
+      clock: `${st.clockText()} · ${st.season.name}`,
       date: st.dateText(),
       money: st.money,
       energy: st.energy,
