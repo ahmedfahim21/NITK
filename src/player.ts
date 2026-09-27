@@ -237,6 +237,8 @@ export class Player {
   private phase = 0;
   private grounded = true;
   private camPos = new THREE.Vector3();
+  /** Lowest camera pitch on foot. Raised indoors so the camera looks down into the room. */
+  minPitch = -0.25;
 
   constructor(
     private camera: THREE.PerspectiveCamera,
@@ -314,7 +316,10 @@ export class Player {
   update(dt: number) {
     const inp = this.input;
     this.yaw -= inp.dx * 0.0042;
-    this.pitch = THREE.MathUtils.clamp(this.pitch + inp.dy * 0.003, this.drone ? 0.25 : -0.25, 1.35);
+    const lo = this.drone ? 0.25 : this.minPitch;
+    this.pitch = THREE.MathUtils.clamp(this.pitch + inp.dy * 0.003, Math.min(lo, this.pitch), 1.35);
+    // Ease up to a raised floor rather than snapping.
+    if (this.pitch < lo) this.pitch = Math.min(lo, this.pitch + dt * 1.5);
     if (inp.down("ArrowLeft")) this.yaw += dt * 1.8;
     if (inp.down("ArrowRight")) this.yaw -= dt * 1.8;
     if (this.drone) this.droneDist = THREE.MathUtils.clamp(this.droneDist * (1 + inp.wheel * 0.12), 40, 700);

@@ -12,10 +12,11 @@ import { GameState } from "./game/state";
 import { GameUI } from "./game/ui";
 import { Music } from "./game/music";
 import { mix, setMix, unlockAudio } from "./game/audio";
-import { Workbench } from "./editor/workbench";
 import { applyOverrides, loadOverrides } from "./world/overrides";
+import { applyArchetypes } from "./world/archetypes";
 import { SEASONS, SEASON_SAMPLE_DAY, seasonalPreset, type Season, type SeasonId } from "./game/seasons";
 import type { Preset } from "./fx/presets";
+import { STORY_MODE } from "./flags";
 
 /** The monsoon version of a preset: grey sky, weak sun, thick haze. */
 function rainy(p: Preset): Preset {
@@ -50,6 +51,7 @@ async function main() {
   }
 
   const map = await loadCampus(progress);
+  applyArchetypes(map);
   applyOverrides(map, await loadOverrides());
   progress(`Building ${map.buildings.length} buildings and ${map.roads.length} roads…`);
   await nextFrame();
@@ -195,9 +197,8 @@ async function main() {
   }
 
   /* ---- the game ---- */
-  const saved = GameState.load();
+  const saved = STORY_MODE ? GameState.load() : null;
   const gameUi = new GameUI();
-  let bench: Workbench | null = null;
   const startGame = (mode: "new" | "continue" | "explore") => {
     const fresh = mode !== "continue";
     if (mode === "new") GameState.clear();
@@ -221,7 +222,6 @@ async function main() {
     scene.add(game.group);
     void game.begin(fresh || !saved, saved?.pos);
     if (mode === "explore") {
-      bench = new Workbench(map, world, camera, canvas, player, scene, (m) => gameUi.toast(m, "#1d3557"));
       document.body.classList.add("exploring");
       // Season and weather pickers, for checking assets across the year.
       const row = document.getElementById("season-row")!;
@@ -251,7 +251,7 @@ async function main() {
       });
       row.append(sel, rainBtn);
     }
-    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music, bench } });
+    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music } });
   };
 
   // Expose for debugging and automated screenshots.
@@ -264,13 +264,15 @@ async function main() {
   document.getElementById("loading")!.classList.add("done");
   if (params.has("explore")) {
     startGame("explore");
-  } else if (params.has("autostart")) {
+  } else if (params.has("autostart") && STORY_MODE) {
     startGame("new");
   } else {
     const choice = await gameUi.titleCard({
+      story: STORY_MODE,
       title: "NITK: FRESHER YEAR",
-      blurb:
-        "Monsoon, 2026. You've just got off the bus on NH66 with one suitcase and no idea where anything is. Four years at Surathkal start now: messes, classes, clubs, cycles, and the sunset from the lighthouse hill.",
+      blurb: STORY_MODE
+        ? "Monsoon, 2026. You've just got off the bus on NH66 with one suitcase and no idea where anything is. Four years at Surathkal start now: messes, classes, clubs, cycles, and the sunset from the lighthouse hill."
+        : "The NITK Surathkal campus, rebuilt from OpenStreetMap: the Main Building, the hostels, the beach and the lighthouse on its hill. Story Mode is coming soon.",
       hasSave: !!saved,
     });
     startGame(choice);
@@ -288,8 +290,9 @@ async function main() {
     }
     if (input.hit("KeyT")) skipTo(TIME_ORDER[(TIME_ORDER.indexOf(time) + 1) % TIME_ORDER.length]);
     if (input.hit("KeyH")) help.classList.toggle("hidden");
-    if (input.hit("KeyI") && bench) bench.toggle();
 
+    const room = player.drone ? null : world.interior(player.pos);
+    player.minPitch = room ? 0.6 : -0.25;
     if (!hud.isMapOpen) player.update(dt);
     if (game && !hud.isMapOpen) game.update(dt);
     input.endFrame();

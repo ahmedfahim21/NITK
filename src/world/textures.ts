@@ -13,6 +13,8 @@ export const BAY_W = 3.6;
 export type FacadeStyle =
   | "academic"
   | "hostel"
+  | "megahostel"
+  | "laterite"
   | "modern"
   | "house"
   | "shop"
@@ -78,60 +80,139 @@ function windowAt(
 }
 
 const PAINTERS: Record<FacadeStyle, Painter> = {
-  // Older NITK blocks: cream plaster, terracotta floor bands, deep sunshade
-  // ledges over tall grilled windows.
+  // NITK's 1960s-80s blocks (the Main Building wings, the departments):
+  // continuous concrete sunshade ribbons over a recessed strip of windows,
+  // a plain spandrel below. The wall colour comes from the vertex tint, so
+  // everything here is painted in near-whites and greys.
   academic(ctx, W, H, night, rand) {
+    const ledge = 16;
+    const stripTop = ledge;
+    const stripBot = Math.round(H * 0.66);
     if (!night) {
-      ctx.fillStyle = "#efe4cc";
+      ctx.fillStyle = "#fbf8f0";
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#b85c3e";
-      ctx.fillRect(0, H - 12, W, 12);
-      ctx.fillStyle = "#e2d3b2";
-      ctx.fillRect(0, 0, 6, H);
-      ctx.fillRect(W - 6, 0, 6, H);
+      // Recess behind the windows, in shadow under the ledge.
+      ctx.fillStyle = "#6d6a60";
+      ctx.fillRect(0, stripTop, W, stripBot - stripTop);
+      ctx.fillStyle = "#4b4942";
+      ctx.fillRect(0, stripTop, W, 8);
+      // Sunshade slab face and the line of shadow it throws.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, W, ledge - 3);
+      ctx.fillStyle = "#b9b3a2";
+      ctx.fillRect(0, ledge - 3, W, 3);
+      // Spandrel: a faint horizontal joint.
+      ctx.fillStyle = "#e6e0d0";
+      ctx.fillRect(0, H - 6, W, 2);
     } else {
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, W, H);
     }
-    windowAt(ctx, 26, 30, W - 52, 70, night, rand() < 0.45, "#3d5566", "#f7f2e6", 3);
+    // Two tall casements per bay, painted steel frames.
+    const wy = stripTop + 10;
+    const wh = stripBot - wy - 4;
+    for (let k = 0; k < 2; k++) {
+      windowAt(ctx, 8 + k * (W / 2), wy, W / 2 - 16, wh, night, rand() < 0.4, "#50626a", "#d8d2c0", 2);
+    }
     if (!night) {
-      ctx.fillStyle = "#cbb996";
-      ctx.fillRect(18, 22, W - 36, 8);
+      // Column face between bays.
+      ctx.fillStyle = "#f3efe4";
+      ctx.fillRect(0, stripTop, 5, stripBot - stripTop);
+      ctx.fillRect(W - 5, stripTop, 5, stripBot - stripTop);
     }
   },
+  // The older boys' blocks (Karavali, Aravali, Vindhya...): cream plaster
+  // between brick-red pilasters and floor bands, green-framed grilled windows.
   hostel(ctx, W, H, night, rand) {
     if (!night) {
-      ctx.fillStyle = "#f1dcbf";
+      ctx.fillStyle = "#f7eedc";
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#9c3f35";
-      ctx.fillRect(0, H - 10, W, 10);
+      ctx.fillStyle = "#a4493a";
+      ctx.fillRect(0, H - 12, W, 12);
+      ctx.fillRect(0, 0, 12, H);
+      ctx.fillRect(W - 12, 0, 12, H);
+      ctx.fillStyle = "rgba(0,0,0,0.12)";
+      ctx.fillRect(12, 0, 3, H - 12);
     } else {
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, W, H);
     }
-    windowAt(ctx, 30, 34, W - 60, 60, night, rand() < 0.65, "#35505a", "#6e8a4e", 2);
+    windowAt(ctx, 32, 36, W - 64, 58, night, rand() < 0.65, "#35505a", "#4f7a45", 2);
     if (!night) {
-      ctx.fillStyle = "#d9c3a2";
-      ctx.fillRect(24, 26, W - 48, 8);
+      ctx.fillStyle = "#d8cbb0";
+      ctx.fillRect(26, 28, W - 52, 8);
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(26, 36, W - 52, 3);
       // Clothes on the grille, the hostel tell.
       if (rand() < 0.3) {
         ctx.fillStyle = ["#c0392b", "#2e86c1", "#f4d03f", "#ecf0f1"][Math.floor(rand() * 4)];
-        ctx.fillRect(40 + rand() * 30, 70, 18, 22);
+        ctx.fillRect(44 + rand() * 30, 66, 18, 24);
       }
     }
   },
-  // Newer glass-and-panel blocks (library, lecture halls).
-  modern(ctx, W, H, night, rand) {
+  // The Mega Hostel towers: a tan concrete frame round cream infill panels,
+  // one small grilled window per bay, set to one side.
+  megahostel(ctx, W, H, night, rand) {
+    const left = rand() < 0.5;
     if (!night) {
-      ctx.fillStyle = "#e9ecef";
+      ctx.fillStyle = "#f2ebdf";
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#c9ced4";
-      ctx.fillRect(0, H - 16, W, 16);
+      ctx.fillStyle = "#c8976f";
+      ctx.fillRect(0, 0, 14, H);
+      ctx.fillRect(W - 14, 0, 14, H);
+      ctx.fillRect(0, H - 14, W, 14);
+      ctx.fillStyle = "rgba(0,0,0,0.1)";
+      ctx.fillRect(14, 0, 3, H - 14);
+      ctx.fillRect(14, H - 17, W - 28, 3);
     } else {
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, W, H);
     }
-    windowAt(ctx, 8, 14, W - 16, 92, night, rand() < 0.55, "#4f7fa3", "#aeb8c2", 4);
+    const wx = left ? 24 : W - 24 - 40;
+    windowAt(ctx, wx, 30, 40, 50, night, rand() < 0.7, "#34464f", "#fbfbfb", 2);
+    if (!night) {
+      ctx.fillStyle = "#c8976f";
+      ctx.fillRect(wx - 4, 24, 48, 6);
+    }
+  },
+  // Exposed laterite, the red stone of this coast (Lecture Hall Complex A):
+  // coursed blocks, white-framed windows, a concrete floor band.
+  laterite(ctx, W, H, night, rand) {
+    if (!night) {
+      ctx.fillStyle = "#b35a3c";
+      ctx.fillRect(0, 0, W, H);
+      for (let row = 0; row < H; row += 10) {
+        ctx.fillStyle = "rgba(240,200,170,0.45)";
+        ctx.fillRect(0, row, W, 1.5);
+        const off = (row / 10) % 2 ? 0 : 14;
+        for (let x = off; x < W; x += 28) ctx.fillRect(x, row, 1.5, 10);
+        ctx.fillStyle = `rgba(90,30,10,${0.05 + rand() * 0.12})`;
+        ctx.fillRect(rand() * W, row + 2, 20, 7);
+      }
+      ctx.fillStyle = "#e9e1d0";
+      ctx.fillRect(0, H - 12, W, 12);
+    } else {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, W, H);
+    }
+    windowAt(ctx, 28, 30, W - 56, 62, night, rand() < 0.5, "#3c4c55", "#f4f1ea", 3);
+  },
+  // The newer white blocks (Central Library, LHC-D, CRF, SJA): smooth white
+  // render with lavender-grey bands at every floor, punched windows.
+  modern(ctx, W, H, night, rand) {
+    if (!night) {
+      ctx.fillStyle = "#fbfbfc";
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#b8b3c9";
+      ctx.fillRect(0, H - 14, W, 14);
+      ctx.fillStyle = "#d9d6e3";
+      ctx.fillRect(0, 20, W, 5);
+    } else {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, W, H);
+    }
+    windowAt(ctx, 22, 32, 36, 64, night, rand() < 0.55, "#445a70", "#e4e4ea", 2);
+    windowAt(ctx, 70, 32, 36, 64, night, rand() < 0.55, "#445a70", "#e4e4ea", 2);
   },
   house(ctx, W, H, night, rand) {
     if (!night) {
@@ -222,6 +303,31 @@ export function facade(style: FacadeStyle) {
   const out = { map: tex(day), night: tex(night), floors };
   facadeCache.set(style, out);
   return out;
+}
+
+const curtainCache = new Map<string, THREE.Texture>();
+
+/** Blue-glass curtain wall: panes on a light aluminium grid, cols x rows per face. */
+export function curtainWall(cols: number, rows: number): THREE.Texture {
+  const key = `${cols}x${rows}`;
+  const hit = curtainCache.get(key);
+  if (hit) return hit;
+  const c = canvas(32, 32);
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, 32, 32);
+  g.addColorStop(0, "#6fb0ec");
+  g.addColorStop(1, "#3c7fcf");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 32, 32);
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.fillRect(3, 3, 10, 26);
+  ctx.fillStyle = "#d9e3ea";
+  ctx.fillRect(0, 0, 32, 2);
+  ctx.fillRect(0, 0, 2, 32);
+  const t = tex(c);
+  t.repeat.set(cols, rows);
+  curtainCache.set(key, t);
+  return t;
 }
 
 let tileRoof: THREE.Texture | null = null;

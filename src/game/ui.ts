@@ -414,7 +414,7 @@ export class GameUI {
     document.body.classList.remove("talking");
   }
 
-  titleCard(opts: { title: string; blurb: string; hasSave: boolean }): Promise<"new" | "continue" | "explore"> {
+  titleCard(opts: { title: string; blurb: string; hasSave: boolean; story: boolean }): Promise<"new" | "continue" | "explore"> {
     return new Promise((resolve) => {
       this.titlecard.classList.add("on");
       this.titlecard.innerHTML = `<h1>${opts.title}</h1><p>${opts.blurb}</p>`;
@@ -435,20 +435,22 @@ export class GameUI {
         p.textContent = sub;
         return box;
       };
-      const story = mode("STORY MODE", "Your fresher year at NITK: missions, classes, clubs, chapters.");
-      if (opts.hasSave) {
-        const c = el("button", undefined, undefined, story);
-        c.textContent = "Continue";
-        c.addEventListener("click", () => go("continue"));
-        const n = el("button", undefined, "ghost", story);
-        n.textContent = "New game";
-        n.addEventListener("click", () => go("new"));
-      } else {
-        const b = el("button", undefined, undefined, story);
-        b.textContent = "Start Fresher Year";
-        b.addEventListener("click", () => go("new"));
+      if (opts.story) {
+        const story = mode("STORY MODE", "Your fresher year at NITK: missions, classes, clubs, chapters.");
+        if (opts.hasSave) {
+          const c = el("button", undefined, undefined, story);
+          c.textContent = "Continue";
+          c.addEventListener("click", () => go("continue"));
+          const n = el("button", undefined, "ghost", story);
+          n.textContent = "New game";
+          n.addEventListener("click", () => go("new"));
+        } else {
+          const b = el("button", undefined, undefined, story);
+          b.textContent = "Start Fresher Year";
+          b.addEventListener("click", () => go("new"));
+        }
       }
-      const explore = mode("EXPLORE MODE", "Free roam the real campus. Inspect and edit buildings, drop in your own 3D models.");
+      const explore = mode("EXPLORE MODE", "Free roam the real campus. Walk into the library, the auditorium, the Mega Mess and more.");
       const e = el("button", undefined, undefined, explore);
       e.textContent = "Explore";
       e.style.background = "#7bd389";

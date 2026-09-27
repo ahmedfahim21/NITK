@@ -5,7 +5,7 @@
  * Placement: the model's origin goes on the footprint centroid at ground
  * level; its +X axis runs along the footprint's long side (the oriented
  * bounding box), then `rotation` degrees and `offset` are applied. Units are
- * metres. See docs/ASSETS.md.
+ * metres. See "Working on the campus" in the README.
  */
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
