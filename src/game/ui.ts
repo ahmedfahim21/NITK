@@ -1,72 +1,115 @@
 /**
- * Game UI in the Bully register: chunky outlined banners for chapters and
- * mission results, a dialogue box with a speaker plate, an objective tracker
- * with a timer, stat bars, interaction prompts, toasts, and overlays for
- * quizzes and the typing minigame.
+ * Game UI: banners for chapters and mission results, a lower-third dialogue,
+ * an objective tracker with a timer, the status card, interaction prompts,
+ * toasts, and paper cards for the journal, quizzes and minigames. Styled on
+ * the tokens in index.html (dark glass HUD, one gold accent).
  */
 import { sfx } from "./audio";
 
 const CSS = `
-#game-ui { position: fixed; inset: 0; pointer-events: none; font-family: "Noto Sans", system-ui, sans-serif; }
-#game-ui .plate { background: rgba(251,247,238,0.94); border: 2px solid #1b1f2a; border-radius: 10px; box-shadow: 3px 3px 0 rgba(27,31,42,0.85); }
-#stats { position: absolute; top: 92px; left: 14px; padding: 8px 10px; width: 210px; font-size: 12px; }
-#stats .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-#stats .lbl { width: 58px; font-weight: 700; }
-#stats .bar { flex: 1; height: 8px; border: 1.5px solid #1b1f2a; border-radius: 4px; overflow: hidden; background: #fff; }
-#stats .bar i { display: block; height: 100%; }
-#stats .clock { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 4px; }
-#stats .money { color: #1e6f5c; }
-#tracker { position: absolute; top: 212px; left: 14px; width: 260px; padding: 8px 10px; display: none; }
-#tracker.on { display: block; }
-#tracker .t { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #b85c3e; font-weight: 700; }
-#tracker .o { font-size: 14px; font-weight: 700; margin-top: 2px; }
-#tracker .timer { font-size: 22px; font-weight: 800; color: #c0392b; margin-top: 2px; font-variant-numeric: tabular-nums; }
-#prompt { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); padding: 6px 12px; font-weight: 700; font-size: 14px; display: none; }
-#prompt kbd { display: inline-block; min-width: 22px; padding: 0 6px; margin-right: 6px; border: 2px solid #1b1f2a; border-bottom-width: 4px; border-radius: 5px; background: #ffd23f; text-align: center; font-family: inherit; }
-#dialogue { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(720px, calc(100vw - 32px)); padding: 14px 18px 12px; display: none; pointer-events: auto; }
-#dialogue .who { position: absolute; top: -16px; left: 16px; padding: 2px 12px; background: #1d3557; color: #fff; font-weight: 800; border: 2px solid #1b1f2a; border-radius: 6px; font-size: 14px; }
-#dialogue .txt { font-size: 17px; line-height: 1.45; min-height: 50px; }
-#dialogue .more { text-align: right; font-size: 12px; opacity: 0.7; margin-top: 4px; }
-#dialogue .choices { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
-#dialogue .choices button { text-align: left; font: inherit; font-size: 15px; font-weight: 700; padding: 7px 10px; border: 2px solid #1b1f2a; border-radius: 7px; background: #fff; cursor: pointer; }
-#dialogue .choices button:hover { background: #ffd23f; }
+#game-ui { position: fixed; inset: 0; pointer-events: none; font-family: "Noto Sans", system-ui, sans-serif; color: var(--text); }
+#game-ui .plate { background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius); backdrop-filter: blur(12px) saturate(1.2); -webkit-backdrop-filter: blur(12px) saturate(1.2); box-shadow: 0 8px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06); }
+
+/* Status: money, three bars, what's next */
+#stats { position: absolute; top: 96px; left: 16px; padding: 11px 14px 12px; width: 232px; font-size: 12px; }
+#stats .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+#stats .money { font: 400 24px/1 var(--display); letter-spacing: 0.04em; color: var(--gold); }
+#stats .row { display: grid; grid-template-columns: 78px 1fr 34px; align-items: center; gap: 8px; margin: 5px 0; }
+#stats .lbl { font: 400 12px var(--label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+#stats .val { font: 400 13px var(--label); text-align: right; font-variant-numeric: tabular-nums; }
+#stats .bar { height: 5px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.12); }
+#stats .bar i { display: block; height: 100%; border-radius: 3px; transition: width 0.4s; }
+#stats .next { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.4; color: var(--text); }
+#stats .next.now { color: var(--gold); }
+
+/* Mission tracker */
+#tracker { position: absolute; top: 232px; left: 16px; width: 284px; padding: 11px 14px 12px 18px; display: none; overflow: hidden; }
+#tracker::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--gold); }
+#tracker.on { display: block; animation: slideIn 0.3s ease-out; }
+#tracker .t { font: 400 12px var(--label); letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
+#tracker .o { font-size: 14.5px; line-height: 1.4; margin-top: 4px; }
+#tracker .o span { color: var(--muted); }
+#tracker .timer { font: 400 30px/1 var(--display); letter-spacing: 0.06em; color: var(--red); margin-top: 6px; font-variant-numeric: tabular-nums; }
+@keyframes slideIn { from { transform: translateX(-12px); opacity: 0; } }
+
+/* Interaction prompt */
+#prompt { position: absolute; left: 50%; bottom: 168px; transform: translateX(-50%); padding: 8px 14px 8px 8px; font: 400 16px var(--label); letter-spacing: 0.04em; display: none; align-items: center; gap: 10px; border-radius: 999px !important; }
+#prompt kbd { min-width: 28px; height: 28px; border-radius: 999px; background: var(--gold); color: var(--ink); border: 0; font-size: 14px; }
+
+/* Dialogue: a cinematic lower third */
+#dialogue { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); width: min(760px, calc(100vw - 32px)); padding: 16px 22px 14px; display: none; pointer-events: auto; background: var(--glass-strong) !important; }
+#dialogue .who { font: 400 13px var(--label); letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+#dialogue .txt { font-size: 18px; line-height: 1.5; min-height: 54px; color: var(--text); }
+#dialogue .more { display: flex; justify-content: flex-end; align-items: center; gap: 6px; font: 400 11px var(--label); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+#dialogue .choices { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+#dialogue .choices button { display: flex; align-items: center; gap: 10px; text-align: left; font: 400 15px "Noto Sans", sans-serif; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,0.05); color: var(--text); cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+#dialogue .choices button:hover { background: rgba(242,184,75,0.16); border-color: var(--gold); }
+#dialogue .choices button kbd { flex: none; }
+
+/* Big moments */
 #banner { position: absolute; left: 0; right: 0; top: 30%; text-align: center; display: none; }
-#banner .big { font-size: clamp(34px, 7vw, 78px); font-weight: 900; letter-spacing: 0.04em; color: #ffd23f; -webkit-text-stroke: 3px #1b1f2a; paint-order: stroke fill; text-shadow: 5px 5px 0 #1b1f2a; transform: rotate(-2deg); }
-#banner .big.fail { color: #e74c3c; }
-#banner .big.chapter { color: #fbf7ee; }
-#banner .small { font-size: clamp(16px, 2.4vw, 24px); font-weight: 800; color: #fff; text-shadow: 2px 2px 0 #1b1f2a, -1px -1px 0 #1b1f2a; margin-top: 8px; }
-#banner.show { display: block; animation: slam 0.35s cubic-bezier(.2,1.6,.4,1); }
-@keyframes slam { from { transform: scale(1.8); opacity: 0; } to { transform: none; opacity: 1; } }
-#toasts { position: absolute; right: 14px; top: 250px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
-#toasts .toast { padding: 5px 10px; font-weight: 700; font-size: 13px; animation: toastIn 0.25s ease-out; }
-@keyframes toastIn { from { transform: translateX(30px); opacity: 0; } }
-#fade { position: absolute; inset: 0; background: #0e1320; opacity: 0; transition: opacity 0.6s; }
-#overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(14,19,32,0.55); pointer-events: auto; }
+#banner .band { display: inline-block; padding: 10px 56px 14px; background: linear-gradient(90deg, transparent, rgba(11,15,23,0.78) 18%, rgba(11,15,23,0.78) 82%, transparent); }
+#banner .big { font: 400 clamp(46px, 8vw, 104px)/1 var(--display); letter-spacing: 0.06em; color: var(--gold); text-shadow: 0 4px 24px rgba(0,0,0,0.45); }
+#banner .big.fail { color: var(--red); }
+#banner .big.chapter { color: var(--text); }
+#banner .big.start { font-size: clamp(34px, 5vw, 64px); color: var(--text); }
+#banner .small { font: 400 clamp(14px, 1.8vw, 20px) var(--label); letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+#banner .rule { width: 120px; height: 2px; margin: 10px auto 0; background: var(--gold); }
+#banner.show { display: block; animation: reveal 0.5s cubic-bezier(.2,.9,.3,1); }
+@keyframes reveal { from { opacity: 0; letter-spacing: 0.3em; } to { opacity: 1; } }
+
+/* Toasts */
+#toasts { position: absolute; right: 16px; top: 236px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; max-width: 320px; }
+#toasts .toast { position: relative; padding: 7px 12px 7px 16px; font-size: 13px; line-height: 1.35; color: var(--text); overflow: hidden; animation: toastIn 0.25s ease-out; border-radius: 10px !important; }
+#toasts .toast::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent, var(--gold)); }
+#toasts .toast.out { opacity: 0; transform: translateX(16px); transition: opacity 0.3s, transform 0.3s; }
+@keyframes toastIn { from { transform: translateX(24px); opacity: 0; } }
+#fade { position: absolute; inset: 0; background: #0b0f17; opacity: 0; transition: opacity 0.6s; }
+
+/* Paper cards: the journal, quizzes, minigames (in-world documents) */
+#overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(8,11,17,0.62); backdrop-filter: blur(4px); pointer-events: auto; }
 #overlay.on { display: flex; }
-#overlay .card { width: min(560px, calc(100vw - 32px)); padding: 18px 20px; }
-#overlay h2 { margin: 0 0 6px; font-size: 20px; }
-#overlay .q { font-size: 17px; font-weight: 700; margin: 10px 0; }
+#overlay .card { width: min(560px, calc(100vw - 32px)); padding: 22px 24px; background: var(--paper); color: var(--ink); border-radius: 16px; box-shadow: 0 24px 70px rgba(0,0,0,0.5); border: 1px solid rgba(0,0,0,0.08); }
+#overlay h2 { margin: 0 0 6px; font: 400 30px/1.05 var(--display); letter-spacing: 0.04em; color: var(--ink); }
+#overlay .q { font-size: 17px; margin: 12px 0; }
 #overlay .opts { display: flex; flex-direction: column; gap: 6px; }
-#overlay .opts button { text-align: left; font: inherit; font-size: 15px; font-weight: 700; padding: 8px 10px; border: 2px solid #1b1f2a; border-radius: 7px; background: #fff; cursor: pointer; }
-#overlay .opts button.right { background: #7bd389; }
-#overlay .opts button.wrong { background: #f28b82; }
+#overlay .opts button { text-align: left; font: 400 15px "Noto Sans", sans-serif; padding: 10px 12px; border: 1px solid rgba(17,21,29,0.16); border-radius: 10px; background: #fff; color: var(--ink); cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+#overlay .opts button:hover { border-color: var(--gold-deep); background: #fff8e8; }
+#overlay .opts button.right { background: #d9f2e6; border-color: #3a9b73; }
+#overlay .opts button.wrong { background: #fbe0db; border-color: #d0533f; }
 #overlay .typing { font-family: ui-monospace, Menlo, monospace; font-size: 22px; letter-spacing: 0.08em; margin: 10px 0; }
 #overlay .typing .done { color: #1e6f5c; }
-#overlay .typing .next { background: #ffd23f; }
-#overlay input { font: inherit; font-size: 18px; padding: 6px 8px; width: 100%; border: 2px solid #1b1f2a; border-radius: 6px; }
+#overlay .typing .next { background: #ffe29a; }
+#overlay input { font: inherit; font-size: 18px; padding: 8px 10px; width: 100%; border: 1px solid rgba(17,21,29,0.25); border-radius: 10px; background: #fff; color: var(--ink); }
 #overlay .rules { font-size: 13px; margin: 6px 0; }
 #overlay .rules div.ok { color: #1e6f5c; }
 #overlay .rules div.bad { color: #c0392b; }
-#bubbles .bubble { position: absolute; left: 0; top: 0; max-width: 220px; padding: 4px 8px; font-size: 12px; font-weight: 700; background: #fff; border: 2px solid #1b1f2a; border-radius: 10px; white-space: normal; will-change: transform; }
-#bubbles .bubble::after { content: ""; position: absolute; left: 50%; bottom: -8px; border: 6px solid transparent; border-top-color: #1b1f2a; transform: translateX(-50%); }
-#titlecard { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: radial-gradient(circle at 50% 40%, rgba(40,64,107,0.85), rgba(14,19,32,0.92)); pointer-events: auto; color: #fbf7ee; text-align: center; }
+#overlay .chip { display: inline-block; min-width: 54px; padding: 1px 7px; margin-right: 6px; border-radius: 999px; font: 400 11px var(--label); letter-spacing: 0.12em; text-transform: uppercase; text-align: center; }
+#overlay .chip.done { background: #d9f2e6; color: #1e6f5c; }
+#overlay .chip.open { background: #ffe8b8; color: #8a5a00; }
+#overlay .chip.locked { background: #eceae4; color: #8c8a84; }
+
+/* Speech bubbles over the crowd */
+#bubbles .bubble { position: absolute; left: 0; top: 0; max-width: 230px; padding: 6px 10px; font-size: 12.5px; line-height: 1.35; background: #fff; color: var(--ink); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.22); white-space: normal; will-change: transform; }
+#bubbles .bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; transform: translateX(-50%); }
+
+/* Title screen */
+#titlecard { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(ellipse at 50% 30%, rgba(31,51,84,0.82), rgba(8,11,17,0.94) 70%); pointer-events: auto; color: var(--text); text-align: center; padding: 20px; }
 #titlecard.on { display: flex; }
-#titlecard h1 { margin: 0; font-size: clamp(40px, 8vw, 90px); font-weight: 900; color: #ffd23f; -webkit-text-stroke: 3px #1b1f2a; paint-order: stroke fill; text-shadow: 6px 6px 0 #1b1f2a; transform: rotate(-3deg); }
-#titlecard p { margin: 0; max-width: 560px; font-size: 15px; opacity: 0.9; }
-#titlecard button { font: inherit; font-size: 18px; font-weight: 800; padding: 10px 22px; border: 3px solid #1b1f2a; border-radius: 10px; background: #ffd23f; cursor: pointer; box-shadow: 4px 4px 0 #1b1f2a; }
-#titlecard button.ghost { background: #fbf7ee; font-size: 14px; padding: 6px 14px; }
+#titlecard h1 { margin: 0; font: 400 clamp(56px, 11vw, 132px)/0.9 var(--display); letter-spacing: 0.04em; color: var(--text); }
+#titlecard h1 em { font-style: normal; color: var(--gold); }
+#titlecard p { margin: 0; max-width: 580px; font-size: 15px; line-height: 1.6; color: var(--muted); }
+#titlecard .mode { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 18px 22px 20px; min-width: 250px; max-width: 280px; background: var(--glass); border: 1px solid var(--line); border-radius: 16px; }
+#titlecard .mode .name { font: 400 26px var(--display); letter-spacing: 0.08em; }
+#titlecard .mode .sub { font-size: 13px; line-height: 1.5; color: var(--muted); }
+#titlecard button { font: 400 16px var(--label); letter-spacing: 0.14em; text-transform: uppercase; padding: 10px 24px; border: 0; border-radius: 999px; background: var(--gold); color: var(--ink); cursor: pointer; transition: transform 0.15s, background 0.15s; }
+#titlecard button:hover { transform: translateY(-1px); background: #ffcb66; }
+#titlecard button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line-strong); font-size: 13px; padding: 7px 16px; }
+#titlecard .hint { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+#titlecard .hint span { display: inline-flex; align-items: center; gap: 5px; }
 body.talking #help, body.talking #controls { display: none; }
-@media (max-width: 700px) { #stats { top: 70px; width: 170px; } #tracker { top: 180px; width: 200px; } }
+body.titling #title, body.titling #clock, body.titling #minimap-wrap, body.titling #help, body.titling #controls, body.titling #stats, body.titling #fps { visibility: hidden; }
+@media (max-width: 700px) { #stats { top: 72px; width: 190px; } #tracker { top: 196px; width: 220px; } #toasts { top: 150px; } #dialogue .txt { font-size: 16px; } }
 `;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, id?: string, cls?: string, parent?: HTMLElement): HTMLElementTagNameMap[K] {
@@ -129,14 +172,16 @@ export class GameUI {
 
   setStats(s: StatsView) {
     if (this.stats.style.display === "none") return;
-    const bar = (v: number, c: string) => `<div class="bar"><i style="width:${Math.max(0, Math.min(100, v))}%;background:${c}"></i></div>`;
+    const row = (label: string, v: number, c: string) =>
+      `<div class="row"><span class="lbl">${label}</span><div class="bar"><i style="width:${Math.max(0, Math.min(100, v))}%;background:${c}"></i></div><span class="val">${Math.round(v)}</span></div>`;
     const att = s.attendance;
-    this.stats.innerHTML = `
-      <div class="clock"><span>${s.clock}</span><span class="money">₹${Math.round(s.money)}</span></div>
-      <div class="row"><span class="lbl">Energy</span>${bar(s.energy, s.energy < 20 ? "#e74c3c" : "#f5b400")}</div>
-      <div class="row"><span class="lbl">Food</span>${bar(s.food, s.food < 20 ? "#e74c3c" : "#6ab04c")}</div>
-      <div class="row"><span class="lbl">Attend.</span>${bar(att, att < 75 ? "#e74c3c" : "#3867d6")}<b style="width:34px;text-align:right">${Math.round(att)}%</b></div>
-      ${s.next ? `<div style="margin-top:4px;font-size:11px">${s.next}</div>` : ""}`;
+    const html = `
+      <div class="head"><span class="cap">Wallet</span><span class="money">₹${Math.round(s.money)}</span></div>
+      ${row("Energy", s.energy, s.energy < 20 ? "var(--red)" : "var(--gold)")}
+      ${row("Food", s.food, s.food < 20 ? "var(--red)" : "var(--teal)")}
+      ${row("Attendance", att, att < 75 ? "var(--red)" : "var(--blue)")}
+      ${s.next ? `<div class="next${s.next.startsWith("Now:") ? " now" : ""}">${s.next}</div>` : ""}`;
+    if (this.stats.innerHTML !== html) this.stats.innerHTML = html;
   }
 
   setObjective(title: string | null, objective = "", timer?: number) {
@@ -155,20 +200,25 @@ export class GameUI {
       this.prompt.style.display = "none";
       return;
     }
-    this.prompt.style.display = "block";
+    this.prompt.style.display = "flex";
     const html = `<kbd>${key}</kbd>${text}`;
     if (this.prompt.innerHTML !== html) this.prompt.innerHTML = html;
   }
 
-  toast(text: string, colour = "#1b1f2a") {
+  /** A short note in the corner; `colour` is its accent rule. */
+  toast(text: string, colour = "#f2b84b") {
     const t = el("div", undefined, "toast plate", this.toasts);
-    t.style.color = colour;
+    // Callers pass the old paper-UI colours; the darkest ones vanish on glass, so they turn gold.
+    const n = parseInt(colour.replace("#", ""), 16);
+    const lum = ((n >> 16) & 255) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11;
+    t.style.setProperty("--accent", Number.isNaN(n) || lum < 70 ? "#f2b84b" : colour);
     t.textContent = text;
-    setTimeout(() => t.remove(), 3200);
+    setTimeout(() => t.classList.add("out"), 3000);
+    setTimeout(() => t.remove(), 3400);
   }
 
   showBanner(big: string, small = "", kind: "pass" | "fail" | "chapter" | "start" = "pass", ms = 3200) {
-    this.banner.innerHTML = `<div class="big ${kind === "fail" ? "fail" : kind === "chapter" ? "chapter" : ""}">${big}</div>${small ? `<div class="small">${small}</div>` : ""}`;
+    this.banner.innerHTML = `<div class="band"><div class="big ${kind === "pass" ? "" : kind}">${big}</div>${small ? `<div class="small">${small}</div>` : ""}<div class="rule"></div></div>`;
     this.banner.classList.remove("show");
     void this.banner.offsetWidth;
     this.banner.classList.add("show");
@@ -197,7 +247,7 @@ export class GameUI {
         full = text;
         let n = 0;
         txt.textContent = "";
-        more.textContent = i < lines.length - 1 ? "E / Space ▸" : "E / Space ✓";
+        more.innerHTML = `<kbd>E</kbd> ${i < lines.length - 1 ? "Next" : "Done"}`;
         clearInterval(typing);
         typing = window.setInterval(() => {
           n += 2;
@@ -256,7 +306,9 @@ export class GameUI {
       };
       options.forEach((o, k) => {
         const b = el("button", undefined, undefined, box);
-        b.textContent = `${k + 1}. ${o}`;
+        const key = el("kbd", undefined, undefined, b);
+        key.textContent = String(k + 1);
+        b.append(o);
         b.addEventListener("click", (ev) => {
           ev.stopPropagation();
           done(k);
@@ -281,7 +333,7 @@ export class GameUI {
   }
 
   /** Multiple-choice quiz. Resolves with the number answered correctly. */
-  quiz(title: string, questions: { q: string; options: string[]; answer: number }[]): Promise<number> {
+  quiz(title: string, questions: { q: string; options: string[]; answer: number; code?: string }[]): Promise<number> {
     return new Promise((resolve) => {
       this.busy = true;
       this.overlay.classList.add("on");
@@ -293,6 +345,13 @@ export class GameUI {
         const q = questions[i];
         card.innerHTML = `<h2>${title}</h2><div style="font-size:12px">Question ${i + 1} of ${questions.length}</div><div class="q"></div><div class="opts"></div>`;
         card.querySelector(".q")!.textContent = q.q;
+        if (q.code) {
+          // Code to read (C output tracing and the like), monospaced and unwrapped.
+          const pre = el("pre", undefined, undefined);
+          pre.style.cssText = "background:#11151c;color:#d7e0ea;padding:8px 10px;border-radius:6px;font:13px/1.45 ui-monospace,Menlo,monospace;overflow:auto;margin:6px 0";
+          pre.textContent = q.code;
+          card.querySelector(".q")!.after(pre);
+        }
         const opts = card.querySelector(".opts")!;
         let answered = false;
         const pick = (k: number, buttons: HTMLButtonElement[]) => {
@@ -417,21 +476,25 @@ export class GameUI {
   titleCard(opts: { title: string; blurb: string; hasSave: boolean; story: boolean }): Promise<"new" | "continue" | "explore"> {
     return new Promise((resolve) => {
       this.titlecard.classList.add("on");
-      this.titlecard.innerHTML = `<h1>${opts.title}</h1><p>${opts.blurb}</p>`;
+      document.body.classList.add("titling");
+      // "NITK: FRESHER YEAR" -> NITK in the text colour, the rest in gold.
+      const [first, ...rest] = opts.title.split(":");
+      this.titlecard.innerHTML = `<div class="cap">National Institute of Technology Karnataka, Surathkal</div><h1>${rest.length ? `${first}<br><em>${rest.join(":").trim()}</em>` : first}</h1><p>${opts.blurb}</p>`;
       const row = el("div", undefined, undefined, this.titlecard);
       row.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;justify-content:center";
       const go = (v: "new" | "continue" | "explore") => {
         this.titlecard.classList.remove("on");
+        document.body.classList.remove("titling");
         resolve(v);
       };
       const mode = (title: string, sub: string) => {
         const box = el("div", undefined, undefined, row);
-        box.style.cssText = "display:flex;flex-direction:column;gap:8px;align-items:center;background:rgba(251,247,238,0.08);border:2px solid rgba(251,247,238,0.35);border-radius:12px;padding:14px 18px;min-width:220px";
+        box.className = "mode";
         const h = el("div", undefined, undefined, box);
-        h.style.cssText = "font-weight:900;font-size:20px;letter-spacing:.04em";
+        h.className = "name";
         h.textContent = title;
         const p = el("div", undefined, undefined, box);
-        p.style.cssText = "font-size:12px;opacity:.8;max-width:220px";
+        p.className = "sub";
         p.textContent = sub;
         return box;
       };
@@ -453,11 +516,18 @@ export class GameUI {
       const explore = mode("EXPLORE MODE", "Free roam the real campus. Walk into the library, the auditorium, the Mega Mess and more.");
       const e = el("button", undefined, undefined, explore);
       e.textContent = "Explore";
-      e.style.background = "#7bd389";
       e.addEventListener("click", () => go("explore"));
-      const hint = el("p", undefined, undefined, this.titlecard);
-      hint.style.fontSize = "12px";
-      hint.textContent = "WASD walk · Shift run · E interact · M map · F drone · B cycle bell · N next track";
+      const hint = el("div", undefined, "hint", this.titlecard);
+      hint.innerHTML = [
+        ["W A S D", "walk"],
+        ["Shift", "run"],
+        ["E", "interact"],
+        ["J", "journal"],
+        ["M", "map"],
+        ["F", "drone"],
+      ]
+        .map(([k, what]) => `<span>${k.split(" ").map((x) => `<kbd>${x}</kbd>`).join("")} ${what}</span>`)
+        .join("");
     });
   }
 }

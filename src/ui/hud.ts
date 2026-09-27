@@ -191,7 +191,7 @@ export class Hud {
     ctx.fillRect(0, 0, W, H);
     const v = this.bigView;
     ctx.drawImage(this.base, (b.minX - v.ox) * scale, (b.minZ - v.oz) * scale, (b.maxX - b.minX) * scale, (b.maxZ - b.minZ) * scale);
-    ctx.font = `${Math.round(11 * devicePixelRatio)}px system-ui, sans-serif`;
+    ctx.font = `500 ${Math.round(12 * devicePixelRatio)}px 'Barlow Condensed', system-ui, sans-serif`;
     ctx.textAlign = "center";
     for (const p of this.places) {
       if (p.kind !== "landmark" && p.kind !== "building" && p.kind !== "pitch" && p.kind !== "track") continue;
@@ -200,22 +200,22 @@ export class Hud {
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(255,255,255,0.9)";
       ctx.strokeText(p.name, x, y);
-      ctx.fillStyle = p.kind === "landmark" ? "#7a2e1d" : "#333";
+      ctx.fillStyle = p.kind === "landmark" ? "#8a5a00" : "#2a2f38";
       ctx.fillText(p.name, x, y);
     }
     for (const m of this.markers) {
       ctx.fillStyle = m.color;
-      ctx.strokeStyle = "#1b1f2a";
+      ctx.strokeStyle = "#11151d";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc((m.x - v.ox) * scale, (m.z - v.oz) * scale, 9 * devicePixelRatio, 0, Math.PI * 2);
+      ctx.arc((m.x - v.ox) * scale, (m.z - v.oz) * scale, 8 * devicePixelRatio, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
     const px = (this.player.pos.x - v.ox) * scale;
     const py = (this.player.pos.z - v.oz) * scale;
-    ctx.fillStyle = "#e74c3c";
-    ctx.strokeStyle = "#fff";
+    ctx.fillStyle = "#f2b84b";
+    ctx.strokeStyle = "#11151d";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(px, py, 7 * devicePixelRatio, 0, Math.PI * 2);
@@ -246,14 +246,24 @@ export class Hud {
     ctx.save();
     ctx.translate(S / 2, S / 2);
     ctx.rotate(this.player.yaw + Math.PI - this.player.facing);
-    ctx.fillStyle = "#e74c3c";
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
+    // The player: a gold arrowhead with a soft view cone.
+    const cone = ctx.createRadialGradient(0, 0, 0, 0, 0, 46);
+    cone.addColorStop(0, "rgba(242,184,75,0.35)");
+    cone.addColorStop(1, "rgba(242,184,75,0)");
+    ctx.fillStyle = cone;
     ctx.beginPath();
-    ctx.moveTo(0, -10);
-    ctx.lineTo(7, 8);
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, 46, -Math.PI / 2 - 0.5, -Math.PI / 2 + 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#f2b84b";
+    ctx.strokeStyle = "#11151d";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -12);
+    ctx.lineTo(8, 9);
     ctx.lineTo(0, 4);
-    ctx.lineTo(-7, 8);
+    ctx.lineTo(-8, 9);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -272,29 +282,29 @@ export class Hud {
         sx *= lim / l;
         sy *= lim / l;
       }
+      // Objective blips: a gold dot in a dark ring, a halo when pinned to the rim.
+      ctx.fillStyle = l > lim ? "rgba(242,184,75,0.28)" : "rgba(242,184,75,0.18)";
+      ctx.beginPath();
+      ctx.arc(S / 2 + sx, S / 2 + sy, 15, 0, Math.PI * 2);
+      ctx.fill();
       ctx.fillStyle = m.color;
-      ctx.strokeStyle = "#1b1f2a";
+      ctx.strokeStyle = "#11151d";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(S / 2 + sx, S / 2 + sy, 9, 0, Math.PI * 2);
+      ctx.arc(S / 2 + sx, S / 2 + sy, 8, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#1b1f2a";
-      ctx.font = "900 13px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("!", S / 2 + sx, S / 2 + sy + 1);
     }
     // North marker on the rim.
     const r = S / 2 - 12;
     const nx = S / 2 + Math.sin(this.player.yaw) * r;
     const ny = S / 2 - Math.cos(this.player.yaw) * r;
-    ctx.fillStyle = "#1d3557";
+    ctx.fillStyle = "rgba(15,19,28,0.85)";
     ctx.beginPath();
-    ctx.arc(nx, ny, 10, 0, Math.PI * 2);
+    ctx.arc(nx, ny, 11, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 12px system-ui, sans-serif";
+    ctx.fillStyle = "#f2b84b";
+    ctx.font = "500 14px 'Barlow Condensed', system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("N", nx, ny + 1);
@@ -348,13 +358,14 @@ export class Hud {
 
   private updateLabels() {
     const p = this.player.pos;
-    const range = this.player.drone ? 700 : 160;
+    // Only what you're next to gets a label: the nearest couple on foot, a few more from the drone.
+    const range = this.player.drone ? 160 : 34;
     const cand = this.places
       .filter((pl) => pl.kind === "building" || pl.kind === "landmark" || pl.kind === "pitch" || pl.kind === "track")
       .map((pl) => ({ pl, d: Math.hypot(pl.x - p.x, pl.z - p.z) }))
       .filter((c) => c.d < range)
       .sort((a, b) => a.d - b.d)
-      .slice(0, 16);
+      .slice(0, this.player.drone ? 5 : 2);
     const keep = new Set<string>();
     const W = window.innerWidth;
     const H = window.innerHeight;
