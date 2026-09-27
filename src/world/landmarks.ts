@@ -12,7 +12,7 @@ import type { Building, CampusMap, Road } from "../osm/types";
 import { toon } from "../fx/toon";
 import type { Grid } from "./grid";
 import { SOLID } from "./grid";
-import { signTexture } from "./textures";
+import { FLOOR_H, curtainWall, signTexture } from "./textures";
 import { addMound, groundHeight } from "./terrain";
 
 export type LandmarkRig = {
@@ -20,6 +20,8 @@ export type LandmarkRig = {
   update(t: number, glow: number): void;
   /** Named spots for the map and the teleport list. */
   spots: { name: string; x: number; z: number }[];
+  /** Pieces standing on or in a building, by OSM id, to hide with it when you walk inside. */
+  attached: Map<number, THREE.Object3D[]>;
 };
 
 function nearestRoadPoint(x: number, z: number, roads: Road[], filter: (r: Road) => boolean): { p: Pt; road: Road; seg: number } | null {
@@ -42,6 +44,22 @@ function nearestRoadPoint(x: number, z: number, roads: Road[], filter: (r: Road)
     }
   }
   return best;
+}
+
+export type Face = ReturnType<typeof faceToward>;
+
+/** The Main Building's front: the face toward NH66, where the gate is. */
+export function mainEntrance(map: CampusMap, b: Building): Face {
+  const c = centroid(b.outer);
+  const gate = nearestRoadPoint(c[0], c[1], map.roads, (r) => r.kind === "trunk");
+  return faceToward(b, gate ? gate.p : [c[0] - 100, c[1]]);
+}
+
+/** A building's front: the face toward the nearest proper road. Signs and doors go here. */
+export function frontOf(map: CampusMap, b: Building): Face {
+  const c = centroid(b.outer);
+  const road = nearestRoadPoint(c[0], c[1], map.roads, (r) => r.rank >= 3);
+  return faceToward(b, road ? road.p : [c[0], c[1] + 50]);
 }
 
 /** The OBB face of a building that looks toward a point: centre, outward normal, width. */
@@ -102,6 +120,12 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
   group.name = "landmarks";
   const updaters: ((t: number, glow: number) => void)[] = [];
   const spots: { name: string; x: number; z: number }[] = [];
+  const attached = new Map<number, THREE.Object3D[]>();
+  const attach = (id: number, o: THREE.Object3D) => {
+    const list = attached.get(id) ?? [];
+    list.push(o);
+    attached.set(id, list);
+  };
 
   /* ---------------- lighthouse ---------------- */
   if (map.lighthouse) {
@@ -110,64 +134,77 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
     const base = groundHeight(lx, lz);
     const lh = new THREE.Group();
     lh.position.set(lx, base, lz);
+    // A square concrete tower (OSM: height 30.3 m, lit 1972) in red and
+    // white bands, a column of windows up each face, and a red service
+    // floor with a cantilevered gallery under the lantern.
+    const H = 26;
+    const W = 4.6;
     const white = toon(0xf7f5ee);
-    const red = toon(0xc0392b);
-    // Concrete cylinder, 41 m, painted in dark red and white bands.
-    const H = 41;
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 3.4, H, 16), white);
-    tower.position.y = H / 2;
-    lh.add(tower);
-    const stripe = toon(0x9e2b25);
-    const bands = 8;
-    for (let k = 0; k < bands; k += 2) {
-      const y0 = (k / bands) * H;
-      const y1 = ((k + 1) / bands) * H;
-      const r0 = 3.4 - (y0 / H) * 1.1 + 0.04;
-      const r1 = 3.4 - (y1 / H) * 1.1 + 0.04;
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, y1 - y0, 16), stripe);
-      band.position.y = (y0 + y1) / 2;
+    const red = toon(0xc0302a);
+    const bands = [red, white, red, white, red, white];
+    const bh = H / bands.length;
+    bands.forEach((m, k) => {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(W, bh, W), m);
+      band.position.y = bh * (k + 0.5);
       lh.add(band);
+    });
+    const winMat = toon(0x3a4a55, { glow: 0xffcf80 });
+    const frameMat = toon(0xffffff);
+    for (let y = 2.2; y < H - 1; y += 2.6) {
+      for (const [dx, dz, ry] of [
+        [0, W / 2, 0],
+        [0, -W / 2, Math.PI],
+        [W / 2, 0, Math.PI / 2],
+        [-W / 2, 0, -Math.PI / 2],
+      ] as const) {
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.8, 0.12), frameMat);
+        frame.position.set(dx * 1.01, y, dz * 1.01);
+        frame.rotation.y = ry;
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 0.14), winMat);
+        glass.position.copy(frame.position);
+        glass.rotation.y = ry;
+        lh.add(frame, glass);
+      }
     }
-    // Slit windows spiralling up the stair.
-    for (let k = 0; k < 6; k++) {
-      const y = 6 + k * 5.6;
-      const r = 3.4 - (y / H) * 1.1;
-      const a = k * 1.3;
-      const win = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.2, 0.2), toon(0x2c3e50, { glow: 0xffcf80 }));
-      win.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
-      win.lookAt(Math.cos(a) * r * 2, y, Math.sin(a) * r * 2);
-      lh.add(win);
+    // Service floor, wider than the shaft, then the gallery slab and rail.
+    const service = new THREE.Mesh(new THREE.BoxGeometry(W + 1.2, 3, W + 1.2), red);
+    service.position.y = H + 1.5;
+    lh.add(service);
+    for (let k = 0; k < 4; k++) {
+      const a = (k * Math.PI) / 2;
+      const w = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.2, 0.14), winMat);
+      w.position.set(Math.sin(a) * (W / 2 + 0.62), H + 1.7, Math.cos(a) * (W / 2 + 0.62));
+      w.rotation.y = a;
+      lh.add(w);
     }
-    const gallery = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 0.5, 20), toon(0x2d3436));
-    gallery.position.y = H + 0.25;
+    const gallery = new THREE.Mesh(new THREE.BoxGeometry(W + 3, 0.4, W + 3), toon(0x2d3436));
+    gallery.position.y = H + 3.2;
     lh.add(gallery);
-    for (let k = 0; k < 20; k++) {
-      const a = (k / 20) * Math.PI * 2;
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), toon(0x2d3436));
-      post.position.set(Math.cos(a) * 3.3, H + 1, Math.sin(a) * 3.3);
-      lh.add(post);
+    const railMat = toon(0xf7f5ee);
+    for (const [dx, dz, w, d] of [
+      [0, (W + 3) / 2, W + 3, 0.08],
+      [0, -(W + 3) / 2, W + 3, 0.08],
+      [(W + 3) / 2, 0, 0.08, W + 3],
+      [-(W + 3) / 2, 0, 0.08, W + 3],
+    ]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), railMat);
+      rail.position.set(dx, H + 3.85, dz);
+      lh.add(rail);
     }
-    const rail = new THREE.Mesh(new THREE.TorusGeometry(3.3, 0.06, 4, 24), toon(0x2d3436));
-    rail.rotation.x = Math.PI / 2;
-    rail.position.y = H + 1.5;
-    lh.add(rail);
     const lanternMat = toon(0xbfe6ff, { glow: 0xfff2b0, transparent: true, opacity: 0.85 });
-    const lantern = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, 3, 12), lanternMat);
-    lantern.position.y = H + 2;
+    const lantern = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 2.4, 10), lanternMat);
+    lantern.position.y = H + 4.6;
     lh.add(lantern);
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.9, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), red);
-    dome.position.y = H + 3.5;
-    lh.add(dome);
-    const vane = new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.4, 6), toon(0x2d3436));
-    vane.position.y = H + 5.8;
-    lh.add(vane);
-    // Keeper's quarters at the foot.
-    const hut = new THREE.Mesh(new THREE.BoxGeometry(10, 3.6, 7), white);
-    hut.position.set(7, 1.8, 3);
-    lh.add(hut);
-    const hutRoof = new THREE.Mesh(new THREE.BoxGeometry(10.6, 0.4, 7.6), red);
-    hutRoof.position.set(7, 3.8, 3);
-    lh.add(hutRoof);
+    const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 1.8, 0.9, 10), white);
+    roof.position.y = H + 6.25;
+    lh.add(roof);
+    // The DGPS/radar bar that sweeps on top.
+    const radar = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.35, 0.4), toon(0xe8e8e8));
+    radar.position.y = H + 7.1;
+    lh.add(radar);
+    updaters.push((t) => {
+      radar.rotation.y = t * 1.6;
+    });
     shadows(lh);
 
     // The beam: two long cones sweeping round, only after dusk.
@@ -180,7 +217,7 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
       side: THREE.DoubleSide,
     });
     const beam = new THREE.Group();
-    beam.position.y = H + 2;
+    beam.position.y = H + 4.6;
     for (const s of [0, Math.PI]) {
       const cone = new THREE.Mesh(new THREE.ConeGeometry(14, 260, 20, 1, true), beamMat);
       cone.rotation.z = Math.PI / 2;
@@ -197,18 +234,17 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
       beam.visible = glow > 0.3;
     });
     group.add(lh);
-    grid.stampDisc(lx, lz, 3.6, SOLID, base + H + 6);
     grid.fillPolygon(
       [
         [
-          [lx + 2, lz - 0.5],
-          [lx + 12, lz - 0.5],
-          [lx + 12, lz + 6.5],
-          [lx + 2, lz + 6.5],
+          [lx - W / 2 - 0.3, lz - W / 2 - 0.3],
+          [lx + W / 2 + 0.3, lz - W / 2 - 0.3],
+          [lx + W / 2 + 0.3, lz + W / 2 + 0.3],
+          [lx - W / 2 - 0.3, lz + W / 2 + 0.3],
         ],
       ],
       SOLID,
-      base + 4
+      base + H + 8
     );
     spots.push({ name: "Surathkal Lighthouse", x: lx - 8, z: lz - 8 });
   }
@@ -216,60 +252,74 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
   /* ---------------- Main Building ---------------- */
   const main = findByName(map, /^main building$|main building|administrative (block|building)/i);
   if (main) {
-    const c = centroid(main.outer);
-    const gate = nearestRoadPoint(c[0], c[1], map.roads, (r) => r.kind === "trunk") ?? { p: [c[0] - 100, c[1]] as Pt };
-    const f = faceToward(main, gate.p);
+    const f = mainEntrance(map, main);
     const g = new THREE.Group();
     g.position.set(f.x, 0, f.z);
     g.rotation.y = Math.atan2(f.nx, f.nz);
     const H = main.height;
-    const cream = toon(0xf4ead3);
-    const terracotta = toon(0xb85c3e);
-    // Raised central block with the emblem, standing proud of the facade.
-    const tw = Math.min(18, f.width * 0.3);
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(tw, H + 6, 6), cream);
-    tower.position.set(0, (H + 6) / 2, -1.5);
+    // From the photographs: an olive-green entrance block rising a floor
+    // above the pale-yellow wings, a full-height glass front between four
+    // yellow piers, a gilt grille under the parapet, a brick panel down one
+    // side, and three yellow arches over the porch.
+    const olive = toon(0xa3aa58);
+    const yellow = toon(0xeec43c);
+    const TH = H + 3.6;
+    const tw = Math.min(20, f.width * 0.5);
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(tw, TH, 9), olive);
+    tower.position.set(0, TH / 2, -3.9);
     g.add(tower);
-    const towerCap = new THREE.Mesh(new THREE.BoxGeometry(tw + 1, 0.6, 7), terracotta);
-    towerCap.position.set(0, H + 6.3, -1.5);
-    g.add(towerCap);
-    // Portico: slab on columns in front of the entrance.
-    const pw = tw + 4;
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(pw, 0.7, 7), cream);
-    slab.position.set(0, 7.2, 4);
-    g.add(slab);
-    const fascia = new THREE.Mesh(new THREE.BoxGeometry(pw, 0.35, 7.1), terracotta);
-    fascia.position.set(0, 7.7, 4);
-    g.add(fascia);
-    for (let k = 0; k < 6; k++) {
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 7, 10), toon(0xfbf7ee));
-      col.position.set(-pw / 2 + 1 + (k * (pw - 2)) / 5, 3.5, 7);
-      g.add(col);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(tw + 0.4, 0.5, 9.4), toon(0xeef0d8));
+    cap.position.set(0, TH + 0.25, -3.9);
+    g.add(cap);
+    const gw = tw * 0.56;
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(gw, TH - 6.2, 0.3), toon(0x2e4a52, { glow: 0xffd89a, ramp: "soft" }));
+    glass.position.set(0, 5 + (TH - 6.2) / 2, 0.62);
+    g.add(glass);
+    for (let k = 0; k < 4; k++) {
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(0.9, TH - 1.6, 0.9), yellow);
+      pier.position.set(glass.position.x - gw / 2 + (k * gw) / 3, (TH - 1.6) / 2, 0.95);
+      g.add(pier);
     }
-    const steps = new THREE.Mesh(new THREE.BoxGeometry(pw, 0.5, 5), toon(0xcfc6b4));
-    steps.position.set(0, 0.25, 4.5);
+    const grille = new THREE.Mesh(new THREE.BoxGeometry(gw, 1.3, 0.4), toon(0xc9a24a));
+    grille.position.set(glass.position.x, TH - 2.3, 0.8);
+    g.add(grille);
+    const brick = new THREE.Mesh(new THREE.BoxGeometry(tw * 0.16, TH - 4, 0.4), toon(0x9b4a3a));
+    brick.position.set(tw / 2 - tw * 0.08 - 0.3, 4 + (TH - 4) / 2, 0.75);
+    g.add(brick);
+    // Porch: a slab on the three arches, steps below.
+    const span = gw / 3;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(gw + 1, 0.5, 6), toon(0xf3ecd6));
+    slab.position.set(glass.position.x, 4.6, 3.6);
+    g.add(slab);
+    for (let k = 0; k < 3; k++) {
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(span / 2 - 0.2, 0.32, 6, 16, Math.PI), yellow);
+      arch.position.set(glass.position.x - gw / 2 + span * (k + 0.5), 4.35 - (span / 2 - 0.2), 6.4);
+      g.add(arch);
+    }
+    for (let k = 0; k < 4; k++) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.35 - (span / 2 - 0.2), 0.6), yellow);
+      leg.position.set(glass.position.x - gw / 2 + span * k, (4.35 - (span / 2 - 0.2)) / 2, 6.4);
+      g.add(leg);
+    }
+    const steps = new THREE.Mesh(new THREE.BoxGeometry(gw + 1, 0.3, 6.5), toon(0xcfc6b4));
+    steps.position.set(glass.position.x, 0.15, 3.5);
     g.add(steps);
-    const doorway = new THREE.Mesh(new THREE.BoxGeometry(6, 4.5, 0.2), toon(0x5a3a22));
-    doorway.position.set(0, 2.25, 1.6);
-    g.add(doorway);
-    // Nameboard, trilingual as on central institutions in Karnataka.
-    const board = signBoard(
-      ["ರಾಷ್ಟ್ರೀಯ ತಂತ್ರಜ್ಞಾನ ಸಂಸ್ಥೆ ಕರ್ನಾಟಕ", "राष्ट्रीय प्रौद्योगिकी संस्थान कर्नाटक", "NATIONAL INSTITUTE OF TECHNOLOGY KARNATAKA"],
-      tw - 1,
-      3.2,
-      { bg: "#f4ead3", fg: "#7a2e1d" }
-    );
-    board.position.set(0, H + 2.6, 1.56);
+    // Left of the brick panel, emblem first, as on the building.
+    const bw = tw * 0.84 - 2.2;
+    const board = signBoard(["NATIONAL INSTITUTE OF TECHNOLOGY KARNATAKA"], bw, bw / 22, { bg: "#a3aa58", fg: "#ffffff" });
+    board.position.set(-tw / 2 + 2.2 + bw / 2, TH - 0.4, 0.62);
     g.add(board);
-    const emblem = new THREE.Mesh(new THREE.CircleGeometry(1.3, 24), toon(0x1d3f7a, { glow: 0x88aaff }));
-    emblem.position.set(0, H + 4.9, 1.57);
+    const emblem = new THREE.Mesh(new THREE.CircleGeometry(0.65, 20), toon(0x1d3f7a, { glow: 0x88aaff }));
+    emblem.position.set(-tw / 2 + 1.3, TH - 0.4, 0.63);
     g.add(emblem);
-    const emblemRing = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.55, 24), toon(0xd4a017));
-    emblemRing.position.set(0, H + 4.9, 1.575);
-    g.add(emblemRing);
     shadows(g);
     group.add(g);
-    grid.fillPolygon([rectPts(f.x, f.z, f.nx, f.nz, pw, 8, 4)], SOLID, 8);
+    attach(main.id, g);
+    g.updateMatrixWorld(true);
+    for (let k = 0; k < 4; k++) {
+      const w = new THREE.Vector3(glass.position.x - gw / 2 + span * k, 0, 6.4).applyMatrix4(g.matrixWorld);
+      grid.stampDisc(w.x, w.z, 0.5, SOLID, 5);
+    }
     spots.push({ name: "Main Building", x: f.x + f.nx * 25, z: f.z + f.nz * 25 });
   }
 
@@ -283,14 +333,13 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
   for (const [re, lines, bg] of signed) {
     const b = findByName(map, re);
     if (!b) continue;
-    const c = centroid(b.outer);
-    const road = nearestRoadPoint(c[0], c[1], map.roads, (r) => r.rank >= 3);
-    const f = faceToward(b, road ? road.p : [c[0], c[1] + 50]);
+    const f = frontOf(map, b);
     const w = Math.min(f.width * 0.7, 18);
     const board = signBoard(lines, w, w / 9, { bg, fg: "#ffffff" });
     board.position.set(f.x + f.nx * 0.12, Math.min(b.height - 1.2, 9), f.z + f.nz * 0.12);
     board.rotation.y = Math.atan2(f.nx, f.nz);
     group.add(board);
+    attach(b.id, board);
     spots.push({ name: b.name!, x: f.x + f.nx * 15, z: f.z + f.nz * 15 });
     if (/auditorium/i.test(b.name!)) {
       // Fly tower over the stage end.
@@ -299,6 +348,83 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
       tower.rotation.y = -f.box.angle;
       shadows(tower);
       group.add(tower);
+      attach(b.id, tower);
+    }
+  }
+
+  /* ---------------- façade pieces, from photographs ---------------- */
+  // Mega Hostel towers: a blue-glass stair core stands proud of each front.
+  for (const b of map.buildings) {
+    if (!b.name || !/^Mega Hostel/i.test(b.name)) continue;
+    const f = frontOf(map, b);
+    const w = Math.min(8, f.width * 0.3);
+    const h = b.height + 1.2;
+    const floors = Math.max(1, Math.round(h / FLOOR_H));
+    const core = new THREE.Mesh(new THREE.BoxGeometry(w, h, 1.6), toon(0xffffff, { map: curtainWall(5, floors * 2), glow: 0x9fd0ff, emissiveMap: curtainWall(5, floors * 2) }));
+    core.position.set(f.x + f.nx * 0.7, h / 2, f.z + f.nz * 0.7);
+    core.rotation.y = Math.atan2(f.nx, f.nz);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(w + 3, 0.35, 3), toon(0xc8976f));
+    canopy.position.set(f.x + f.nx * 2, 3.2, f.z + f.nz * 2);
+    canopy.rotation.y = core.rotation.y;
+    shadows(core);
+    group.add(core, canopy);
+    attach(b.id, core);
+    attach(b.id, canopy);
+  }
+  // Chemical Engineering: a curved canopy on round piers, the blue nameboard on its fascia.
+  {
+    const b = findByName(map, /^Department of Chemical Engineering$/i);
+    if (b) {
+      const f = frontOf(map, b);
+      const g = new THREE.Group();
+      g.position.set(f.x, 0, f.z);
+      g.rotation.y = Math.atan2(f.nx, f.nz);
+      const R = Math.min(9, f.width * 0.4);
+      const mauve = toon(0xb58d95);
+      const fascia = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 1.3, 24, 1, true, -Math.PI / 2, Math.PI), mauve);
+      fascia.material.side = THREE.DoubleSide;
+      fascia.position.y = 6.2;
+      // CircleGeometry's lower half (y < 0) lands on +z once laid flat.
+      const roof = new THREE.Mesh(new THREE.CircleGeometry(R, 24, Math.PI, Math.PI), toon(0xe9dccf, { side: THREE.DoubleSide }));
+      roof.rotation.x = -Math.PI / 2;
+      roof.position.y = 6.8;
+      g.add(fascia, roof);
+      for (let k = 0; k < 5; k++) {
+        const a = -Math.PI / 2 + ((k + 0.5) / 5) * Math.PI;
+        const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 5.6, 10), mauve);
+        pier.position.set(Math.sin(a) * (R - 0.6), 2.8, Math.cos(a) * (R - 0.6));
+        g.add(pier);
+        const w = new THREE.Vector3(pier.position.x, 0, pier.position.z);
+        g.updateMatrixWorld(true);
+        w.applyMatrix4(g.matrixWorld);
+        grid.stampDisc(w.x, w.z, 0.5, SOLID, 7);
+      }
+      const board = signBoard(["DEPARTMENT OF CHEMICAL ENGINEERING"], R * 1.1, 1.1, { bg: "#1d3f8a", fg: "#ffffff" });
+      board.position.set(0, 7.6, R * 0.35);
+      g.add(board);
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(R, 24, Math.PI, Math.PI), toon(0xc0583a));
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = 0.06;
+      g.add(floor);
+      shadows(g);
+      group.add(g);
+      attach(b.id, g);
+    }
+  }
+  // Central Library: grey louvre fins flank the entrance bay.
+  {
+    const b = findByName(map, /central library/i);
+    if (b) {
+      const f = frontOf(map, b);
+      for (const s of [-1, 1]) {
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(1.4, b.height + 0.8, 0.6), toon(0x8d8c99));
+        const off = s * Math.min(6, f.width * 0.18);
+        fin.position.set(f.x - f.nz * off + f.nx * 0.3, (b.height + 0.8) / 2, f.z + f.nx * off + f.nz * 0.3);
+        fin.rotation.y = Math.atan2(f.nx, f.nz);
+        shadows(fin);
+        group.add(fin);
+        attach(b.id, fin);
+      }
     }
   }
 
@@ -318,34 +444,67 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
         const a = r.road.pts[r.seg - 1];
         const b = r.road.pts[r.seg];
         const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
-        const span = r.road.width + 6;
+        const span = r.road.width + 3;
         const g = new THREE.Group();
         g.position.set(r.p[0], 0, r.p[1]);
         g.rotation.y = -ang + Math.PI / 2;
-        const pillarMat = toon(0xb85c3e);
+        // As photographed: no arch. Granite-clad piers, a stone security
+        // cabin on one side, and a curved black-granite name wall on the
+        // other, trilingual, with the sliding grilles rolled back.
+        const stone = toon(0xdcd2bf);
+        const pink = toon(0xd9a184);
+        const solids: [number, number, number, number][] = [];
         for (const s of [-1, 1]) {
-          const p = new THREE.Mesh(new THREE.BoxGeometry(1.6, 8, 1.6), pillarMat);
-          p.position.set((s * span) / 2, 4, 0);
-          g.add(p);
-          const cap = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 2.2), toon(0xf4ead3));
-          cap.position.set((s * span) / 2, 8.25, 0);
-          g.add(cap);
+          const pier = new THREE.Mesh(new THREE.BoxGeometry(1.1, 5.2, 1.1), pink);
+          pier.position.set((s * span) / 2, 2.6, 0);
+          g.add(pier);
+          const grille = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.9, 6), toon(0x3a3f45));
+          grille.position.set(s * (span / 2 + 0.9), 0.95, -3.4);
+          g.add(grille);
+          solids.push([(s * span) / 2, 0, 0.8, 5.4]);
         }
-        const lintel = new THREE.Mesh(new THREE.BoxGeometry(span + 1.6, 2.2, 1.2), toon(0xf4ead3));
-        lintel.position.y = 7;
-        g.add(lintel);
-        for (const side of [1, -1]) {
-          const sign = signBoard(["NATIONAL INSTITUTE OF TECHNOLOGY KARNATAKA", "SURATHKAL"], span, 1.9, { bg: "#1d3557", fg: "#ffffff" });
-          sign.position.set(0, 7, side * 0.62);
-          if (side < 0) sign.rotation.y = Math.PI;
-          g.add(sign);
-        }
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(4, 3.2, 4.2), stone);
+        cabin.position.set(span / 2 + 2.8, 1.6, 1.2);
+        const cabinGlass = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.5, 0.1), toon(0x34454f, { glow: 0xffd89a }));
+        cabinGlass.position.set(span / 2 + 2.8, 1.9, 3.32);
+        const cabinRoof = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.3, 5), toon(0xf1ece2));
+        cabinRoof.position.set(span / 2 + 2.8, 3.35, 1.2);
+        g.add(cabin, cabinGlass, cabinRoof);
+        solids.push([span / 2 + 2.8, 1.2, 2.3, 3.4]);
+        const wallMat = toon(0x1f2023);
+        const R = 9;
+        const arc = 0.7;
+        const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 2.8, 16, 1, true, -arc / 2, arc), wallMat);
+        wall.material.side = THREE.DoubleSide;
+        const wallX = -(span / 2 + 5);
+        wall.position.set(wallX, 1.4 + 0.3, 3 - R);
+        g.add(wall);
+        const kerb = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.5, R + 0.5, 0.3, 16, 1, false, -arc / 2, arc), toon(0xb8664a));
+        kerb.position.set(wallX, 0.15, 3 - R);
+        g.add(kerb);
+        const name = signBoard(
+          ["ರಾಷ್ಟ್ರೀಯ ತಂತ್ರಜ್ಞಾನ ಸಂಸ್ಥೆ ಕರ್ನಾಟಕ", "राष्ट्रीय प्रौद्योगिकी संस्थान कर्नाटक", "National Institute of Technology", "Karnataka, Surathkal"],
+          5.4,
+          2.3,
+          { bg: "#1f2023", fg: "#efe6cf" }
+        );
+        name.position.set(wallX, 1.75, 3.06);
+        g.add(name);
+        solids.push([wallX, 2.6, 6, 1.2]);
         shadows(g);
         group.add(g);
         g.updateMatrixWorld(true);
-        for (const s of [-1, 1]) {
-          const w = new THREE.Vector3((s * span) / 2, 0, 0).applyMatrix4(g.matrixWorld);
-          grid.stampDisc(w.x, w.z, 1.2, SOLID, 8.5);
+        for (const [x, z, w, d] of solids) {
+          const pts: Pt[] = [
+            [x - w / 2, z - d / 2],
+            [x + w / 2, z - d / 2],
+            [x + w / 2, z + d / 2],
+            [x - w / 2, z + d / 2],
+          ].map(([px, pz]) => {
+            const v = new THREE.Vector3(px, 0, pz).applyMatrix4(g.matrixWorld);
+            return [v.x, v.z] as Pt;
+          });
+          grid.fillPolygon([pts], SOLID, 5.5);
         }
         spots.push({ name: "NITK Main Gate", x: r.p[0], z: r.p[1] });
       }
@@ -361,9 +520,12 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
       basin.position.y = 0.35;
       const water = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.6, 0.1, 28), toon(0x4fb3d9, { glow: 0x2255aa }));
       water.position.y = 0.62;
-      const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 2.2, 12), toon(0xd8d0c0));
+      // The fountains in front of the Main Building are painted NITK blue.
+      const blue = toon(0x3a86c8);
+      basin.material = blue;
+      const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 2.2, 12), blue);
       t1.position.y = 1.4;
-      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 0.6, 0.5, 16), toon(0xd8d0c0));
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 0.6, 0.5, 16), blue);
       bowl.position.y = 2.6;
       const jetMat = new THREE.MeshBasicMaterial({ color: 0xe8f6ff, transparent: true, opacity: 0.7 });
       const jet = new THREE.Mesh(new THREE.ConeGeometry(0.35, 3, 8, 1, true), jetMat);
@@ -466,24 +628,11 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
   return {
     group,
     spots,
+    attached,
     update(t, glow) {
       for (const u of updaters) u(t, glow);
     },
   };
-}
-
-function rectPts(x: number, z: number, nx: number, nz: number, w: number, d: number, off: number): Pt[] {
-  // Rectangle of width w along the face, depth d outward, centred `off` out.
-  const tx = -nz;
-  const tz = nx;
-  const cx = x + nx * off;
-  const cz = z + nz * off;
-  return [
-    [cx - tx * (w / 2) - nx * (d / 2), cz - tz * (w / 2) - nz * (d / 2)],
-    [cx + tx * (w / 2) - nx * (d / 2), cz + tz * (w / 2) - nz * (d / 2)],
-    [cx + tx * (w / 2) + nx * (d / 2), cz + tz * (w / 2) + nz * (d / 2)],
-    [cx - tx * (w / 2) + nx * (d / 2), cz - tz * (w / 2) + nz * (d / 2)],
-  ];
 }
 
 function flagpole(x: number, z: number, updaters: ((t: number, glow: number) => void)[]): THREE.Group {

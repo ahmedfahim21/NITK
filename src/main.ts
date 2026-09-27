@@ -13,6 +13,7 @@ import { GameUI } from "./game/ui";
 import { Music } from "./game/music";
 import { mix, setMix, unlockAudio } from "./game/audio";
 import { applyOverrides, loadOverrides } from "./world/overrides";
+import { applyArchetypes } from "./world/archetypes";
 import { SEASONS, SEASON_SAMPLE_DAY, seasonalPreset, type Season, type SeasonId } from "./game/seasons";
 import type { Preset } from "./fx/presets";
 import { STORY_MODE } from "./flags";
@@ -50,6 +51,7 @@ async function main() {
   }
 
   const map = await loadCampus(progress);
+  applyArchetypes(map);
   applyOverrides(map, await loadOverrides());
   progress(`Building ${map.buildings.length} buildings and ${map.roads.length} roads…`);
   await nextFrame();
@@ -289,6 +291,8 @@ async function main() {
     if (input.hit("KeyT")) skipTo(TIME_ORDER[(TIME_ORDER.indexOf(time) + 1) % TIME_ORDER.length]);
     if (input.hit("KeyH")) help.classList.toggle("hidden");
 
+    const room = player.drone ? null : world.interior(player.pos);
+    player.minPitch = room ? 0.6 : -0.25;
     if (!hud.isMapOpen) player.update(dt);
     if (game && !hud.isMapOpen) game.update(dt);
     input.endFrame();
