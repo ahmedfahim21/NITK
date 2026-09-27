@@ -25,7 +25,7 @@ import { flatPolygon } from "./ground";
 import { frontOf, mainEntrance, findByName, type Face } from "./landmarks";
 import { signTexture } from "./textures";
 
-export type InteriorKind = "lobby" | "library" | "auditorium" | "mess" | "canteen" | "lecture" | "lab";
+export type InteriorKind = "lobby" | "library" | "auditorium" | "mess" | "canteen" | "lecture" | "lab" | "chemlab";
 
 /** Which buildings open up, by OSM name. */
 const ROOMS: [RegExp, InteriorKind, string][] = [
@@ -35,7 +35,12 @@ const ROOMS: [RegExp, InteriorKind, string][] = [
   [/^Mega Mess/i, "mess", "Mega Mess"],
   [/^Night Canteen$/i, "canteen", "Night Canteen"],
   [/^Lecture Hall Complex A$/i, "lecture", "Lecture Hall Complex A"],
+  // First-year lectures run in LHC-C and LHC-D (game/courses.ts).
+  [/^Lecture Hall Complex - ?C$/i, "lecture", "Lecture Hall Complex C"],
+  [/^Lecture Hall Complex D$/i, "lecture", "Lecture Hall Complex D"],
   [/^Central Computer Center$/i, "lab", "Central Computer Centre"],
+  // The Science Block: first-year chemistry and physics labs.
+  [/^Departments of Chemistry and Physics$/i, "chemlab", "Science Block"],
 ];
 
 export function interiorBuildings(map: CampusMap): { b: Building; kind: InteriorKind; label: string }[] {
@@ -402,6 +407,11 @@ function furnish(kind: InteriorKind, k: Kit, L: Layout) {
     return;
   }
 
+  if (kind === "chemlab") {
+    chemistryLab(k, L, clearOfDoor);
+    return;
+  }
+
   // lobby: the Main Building's entrance hall and the corridors off it.
   // Two square pillars flank the way in: stone base, cream shaft, a flared
   // dark-wood capital. Coloured-glass jali over the door, and the Engineer
@@ -582,6 +592,47 @@ function computerLab(k: Kit, L: Layout, clearOfDoor: (u: number, v: number) => b
   }
 }
 
+/**
+ * The first-year chemistry lab in the Science Block: island benches with a
+ * reagent shelf down the middle, sinks at the ends, a burette stand at each
+ * place, fume hoods along the wall.
+ */
+function chemistryLab(k: Kit, L: Layout, clearOfDoor: (u: number, v: number) => boolean) {
+  const { len, wid } = L;
+  const top = k.mat(0x2f3a3f);
+  const cabinet = k.mat(0xd9d4c4);
+  const shelf = k.mat(0x8a5a32);
+  const rod = k.mat(0x9aa1a6);
+  const glass = k.mat(0xcfe8f2, { transparent: true, opacity: 0.6 });
+  const bottles = [k.mat(0x6b3a1e), k.mat(0x2b6cc4), k.mat(0xe8e2d2), k.mat(0x3f9e5a)];
+  let n = 0;
+  for (let u = -len / 2 + 4; u < len / 2 - 3; u += 4.2) {
+    for (let v = -wid / 2 + 3.5; v < wid / 2 - 3; v += 5) {
+      if (!clearOfDoor(u, v) || !k.room(u, v, 1.6, 3.6, 0.8)) continue;
+      k.box(u, v, 1.6, 0.85, 3.6, cabinet);
+      k.box(u, v, 1.7, 0.05, 3.7, top, 0.85, false);
+      k.box(u, v, 0.25, 0.5, 3.2, shelf, 0.9, false);
+      for (let b = -1.3; b <= 1.3; b += 0.43) k.box(u, v + b, 0.1, 0.2, 0.1, bottles[n++ % bottles.length], 1.4, false);
+      for (const side of [-1, 1]) {
+        for (const dv of [-1, 1]) {
+          const su = u + side * 0.55;
+          const sv = v + dv * 1.1;
+          k.box(su, sv, 0.04, 0.9, 0.04, rod, 0.9, false);
+          k.box(su, sv, 0.06, 0.55, 0.06, glass, 1.2, false);
+          k.box(su, sv, 0.18, 0.02, 0.18, k.mat(0x7a4a2a), 0.9, false);
+        }
+      }
+      k.box(u, v + 1.95, 1.2, 0.1, 0.5, k.mat(0xb9c0c6), 0.85, false);
+    }
+  }
+  for (let u = -len / 2 + 3; u < len / 2 - 3; u += 5) {
+    const v = wid / 2 - 0.8;
+    if (!k.room(u, v - 0.3, 1.8, 0.2, 0.05)) continue;
+    k.box(u, v, 1.8, 2.2, 0.9, k.mat(0xe8e5dc));
+    k.box(u, v - 0.46, 1.5, 0.8, 0.02, glass, 1, false);
+  }
+}
+
 /* ---------------- the rig ---------------- */
 
 export function buildInteriors(
@@ -624,7 +675,7 @@ export function buildInteriors(
     grid.fillPolygon([b.outer, ...b.holes], CLEAR, 0);
     const inside = new THREE.Group();
     inside.name = `interior-${label}`;
-    const floorColour = { lobby: 0xefe9dc, library: 0xd6cfbf, auditorium: 0x7a2e2e, mess: 0xcfcac0, canteen: 0xc9c3b6, lecture: 0xefeae0, lab: 0xf1ede4 }[kind];
+    const floorColour = { lobby: 0xefe9dc, library: 0xd6cfbf, auditorium: 0x7a2e2e, mess: 0xcfcac0, canteen: 0xc9c3b6, lecture: 0xefeae0, lab: 0xf1ede4, chemlab: 0xe9e6de }[kind];
     const fg = flatPolygon(b.outer, b.holes, 0.07);
     if (fg) {
       // Tile UVs in world metres, so tiles line up across the room.

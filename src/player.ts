@@ -237,6 +237,8 @@ export class Player {
   private phase = 0;
   private grounded = true;
   private camPos = new THREE.Vector3();
+  /** Cycle top-speed multiplier (the Engineering Mechanics perk, game/courses.ts). */
+  bikeBoost = 1;
   /** Lowest camera pitch on foot. Raised indoors so the camera looks down into the room. */
   minPitch = -0.25;
 
@@ -438,7 +440,7 @@ export class Player {
   }
 
   private ride(dt: number, dx: number, dz: number, l: number, run: boolean) {
-    const top = run ? 11.5 : 8;
+    const top = (run ? 11.5 : 8) * this.bikeBoost;
     // Steer toward the input direction at a rate that tightens with speed.
     if (l > 0.05) {
       const want = Math.atan2(dx, dz);
