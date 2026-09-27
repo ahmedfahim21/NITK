@@ -9,8 +9,12 @@ import { CLUBS } from "./stalls";
 import type { Faction } from "./state";
 import { COURSES, TIMETABLE, level, type CourseId } from "./courses";
 import { hhmm } from "./util";
-import { hoursText } from "./schedule";
+import { hoursText, openNow } from "./schedule";
+import { JOBS } from "./jobs";
 import { CAST } from "./cast";
+
+/** Clubs you join through a mission rather than at a recruitment stall. */
+const MISSION_CLUBS: [string, string][] = [["farc", "Flying and Robotics Club"]];
 
 const FACTIONS: Faction[] = ["Karavali", "Aravali", "Sahyadri", "Seniors", "IRIS", "Clubs"];
 
@@ -24,7 +28,7 @@ export function openJournal(g: Game): Promise<void> {
     card.style.maxHeight = "calc(100vh - 40px)";
     card.style.overflowY = "auto";
     const bar = (v: number) => `<div style="flex:1;height:9px;border:1.5px solid #1b1f2a;border-radius:5px;background:#fff;overflow:hidden"><i style="display:block;height:100%;width:${Math.max(0, Math.min(100, v * 2))}%;background:#1d3557"></i></div>`;
-    const clubs = CLUBS.filter((c) => st.flags[`club:${c.id}`]).map((c) => c.name);
+    const clubs = [...CLUBS.map((c) => [c.id, c.name] as [string, string]), ...MISSION_CLUBS].filter(([id]) => st.flags[`club:${id}`]).map(([, name]) => name);
     const next = String(st.flags.nextYear ?? "").split("|").filter(Boolean);
     const chapters = CHAPTERS.map((ch) => {
       const ms = MISSIONS.filter((m) => m.chapter === ch.name);
@@ -41,6 +45,18 @@ export function openJournal(g: Game): Promise<void> {
         .join("");
       return `<div style="margin-top:10px">${H(ch.name)}${rows}</div>`;
     }).join("");
+    // Jobs: once a day each. "Now" when the giver's out, "Done" when you've done it today.
+    const unlockedJobs = new Set(g.available().map((m) => m.id));
+    const jobRows = JOBS.map((m) => {
+      const doneToday = st.flags[`job:${m.id}`] === st.day;
+      const unlocked = m.requires.every((r) => st.completed.has(r));
+      const now = unlocked && !doneToday && unlockedJobs.has(m.id) && openNow(st, m);
+      const chip = doneToday ? `<span class="chip done">Done</span>` : now ? `<span class="chip open">Now</span>` : `<span class="chip locked">${unlocked ? "Later" : "Locked"}</span>`;
+      const pay = m.reward?.money ? ` <span style="opacity:.7">₹${m.reward.money}</span>` : "";
+      const when = unlocked && m.giver ? `<div style="margin-left:66px;font-size:11.5px;color:#6b6f78">${hoursText(m)}${m.id === "job-films" ? " (Fridays)" : ""} · ${CAST[m.giver].name}</div>` : "";
+      return `<div style="margin:3px 0;opacity:${unlocked ? 1 : 0.55}">${chip}${m.title}${pay}</div>${when}`;
+    }).join("");
+    const jobs = `<div style="margin-top:10px">${H("Campus jobs · once a day")}${jobRows}</div>`;
     const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
     const pips = (n: number) => "●".repeat(n) + "○".repeat(5 - n);
     const courses = (Object.keys(COURSES) as CourseId[])
@@ -65,7 +81,7 @@ export function openJournal(g: Game): Promise<void> {
           <div style="margin-top:10px">${H("Clubs")}${clubs.length ? clubs.join(", ") : "None yet"}</div>
           <div style="margin-top:8px">${H("Next year")}${next.length ? next.join(", ") : "Nothing yet"}</div>
         </div>
-        <div>${chapters}</div>
+        <div>${chapters}${jobs}</div>
       </div>
       <div style="margin-top:12px;font-size:12.5px">
         ${H(`B.Tech Computer Science &amp; Engineering · Semester I · Section ${st.flags.section ?? "S7"}`)}
