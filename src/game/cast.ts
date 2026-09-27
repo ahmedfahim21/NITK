@@ -17,7 +17,13 @@ export type CastId =
   | "kiran"
   | "meera"
   | "sid"
-  | "coach";
+  | "coach"
+  | "librarian"
+  | "hegde"
+  | "divya"
+  | "aditi"
+  | "arjun"
+  | "raju";
 
 export type Def = { name: string; role: string; look: Look; scale?: number };
 
@@ -77,6 +83,36 @@ export const CAST: Record<CastId, Def> = {
     role: "Runs the Freshers Cup. Whistle always ready",
     look: { skin: 0x8d5524, shirt: 0xf5b400, pants: 0x1e272e, shoe: 0xe8e8e8, hair: 0x1a1512, bag: null },
   },
+  librarian: {
+    name: "Mrs. Pai",
+    role: "Central Library issue desk. Hears a sandal squeak from forty metres",
+    look: { skin: 0xa0623a, shirt: 0x8e44ad, pants: 0x8e44ad, shoe: 0x6d5d4b, hair: 0x2b2b2b, bag: null, longHair: true },
+  },
+  hegde: {
+    name: "Prof. Hegde",
+    role: "Engineering Mechanics. Takes attendance by voice, never misses one",
+    look: { skin: 0x9c6a44, shirt: 0xdfe6e9, pants: 0x3d3d3d, shoe: 0x1b1f2a, hair: 0x9a9a9a, bag: 0x5b3a26 },
+  },
+  divya: {
+    name: "Divya",
+    role: "NCC senior under officer, 2nd year. Salutes like she means it",
+    look: { skin: 0xc68642, shirt: 0x8a7b4f, pants: 0x8a7b4f, shoe: 0x1b1f2a, hair: 0x1a1512, bag: null, longHair: true },
+  },
+  aditi: {
+    name: "Aditi",
+    role: "SPICMACAY coordinator. Carnatic vocalist, strict about phones in concerts",
+    look: { skin: 0xe0ac69, shirt: 0xd35400, pants: 0x6c3483, shoe: 0x6d5d4b, hair: 0x1a1512, bag: null, longHair: true },
+  },
+  arjun: {
+    name: "Arjun",
+    role: "NSS volunteer, 3rd-year Civil. Owns forty pairs of gloves",
+    look: { skin: 0x8d5524, shirt: 0x2e86c1, pants: 0x2d3436, shoe: 0xe8e8e8, hair: 0x1a1512, bag: 0x27ae60 },
+  },
+  raju: {
+    name: "Raju anna",
+    role: "Night Canteen. Egg maggi, egg roll, egg everything",
+    look: { skin: 0x7a4a2a, shirt: 0xf5f5f5, pants: 0x2d3436, shoe: 0x1b1f2a, hair: 0x1a1512, bag: null },
+  },
 };
 
 function markerTexture(): THREE.CanvasTexture {
@@ -87,7 +123,7 @@ function markerTexture(): THREE.CanvasTexture {
   ctx.beginPath();
   ctx.arc(64, 64, 60, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#ffd23f";
+  ctx.fillStyle = "#f2b84b";
   ctx.beginPath();
   ctx.arc(64, 64, 52, 0, Math.PI * 2);
   ctx.fill();

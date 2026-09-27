@@ -6,3 +6,17 @@ export function hhmm(m: number): string {
 export function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
+
+/**
+ * A time budget shared across the legs of a multi-stop run. Only the time
+ * spent inside `leg()` counts, so dialogue between stops is free.
+ */
+export class Budget {
+  constructor(public left: number) {}
+  async leg<T>(fn: (secondsLeft: number) => Promise<T>): Promise<T> {
+    const t0 = performance.now();
+    const r = await fn(Math.max(1, this.left));
+    this.left -= (performance.now() - t0) / 1000;
+    return r;
+  }
+}

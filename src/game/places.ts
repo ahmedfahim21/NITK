@@ -4,11 +4,12 @@
  * in front of a building), so missions work on the real map and the
  * approximate one alike.
  */
-import { centroid, orientedBox, type Pt } from "../geo";
+import { centroid, mulberry32, orientedBox, pointInPoly, type Pt } from "../geo";
 import type { Building, CampusMap } from "../osm/types";
 import type { World } from "../world";
 import { styleFor } from "../world/buildings";
-import { ROAD } from "../world/grid";
+import { ROAD, WATER } from "../world/grid";
+import { findByName, frontOf, mainEntrance } from "../world/landmarks";
 
 export type Spot = { x: number; z: number; name: string; /** facing the door */ face?: number };
 
@@ -31,7 +32,19 @@ export type PlaceKey =
   | "mainGround"
   | "lighthouse"
   | "lighthouseView"
-  | "beach";
+  | "beach"
+  | "coop"
+  | "sbi"
+  | "flagpole"
+  | "nightCanteen"
+  | "lobby"
+  | "libraryDesk"
+  | "lhcClass"
+  | "sjaHall"
+  | "labDesk"
+  | "lhcC"
+  | "lhcD"
+  | "scienceBlock";
 
 type Resolver = (ctx: Ctx) => Spot | null;
 type Ctx = { map: CampusMap; world: World; cache: Map<PlaceKey, Spot> };
@@ -276,6 +289,61 @@ const RESOLVERS: Record<PlaceKey, Resolver> = {
     const s = free(ctx, l[0] + (dx / d) * k, l[1] + (dz / d) * k, "Lighthouse hill");
     return { ...s, face: Math.atan2(dx, dz) };
   },
+  coop(ctx) {
+    const b = byName(ctx, /co-?operative society|\bco-?op\b/i);
+    if (b) return { ...doorOf(ctx, b), name: "NITK Co-operative Society" };
+    const f = get(ctx, "freshHonest");
+    return { ...f, name: "NITK Co-operative Society" };
+  },
+  sbi(ctx) {
+    const b = byName(ctx, /state bank|\bsbi\b/i);
+    if (b) return { ...doorOf(ctx, b), name: "State Bank of India" };
+    const a = get(ctx, "academicSection");
+    return free(ctx, a.x + 40, a.z + 20, "State Bank of India");
+  },
+  flagpole(ctx) {
+    // The Main Building's flagpole (landmarks.ts plants one at any OSM flagpole).
+    const c = mainBuildingCentre(ctx);
+    const pole = ctx.map.pois.filter((p) => p.kind === "flagpole").sort((a, b) => Math.hypot(a.x - c[0], a.z - c[1]) - Math.hypot(b.x - c[0], b.z - c[1]))[0];
+    if (pole) {
+      const s = free(ctx, pole.x + 4, pole.z + 3, "The flagpole, Main Building");
+      return { ...s, face: Math.atan2(pole.x - s.x, pole.z - s.z) };
+    }
+    const a = get(ctx, "academicSection");
+    return { ...free(ctx, a.x + 10, a.z, "The flagpole, Main Building") };
+  },
+  nightCanteen(ctx) {
+    const b = byName(ctx, /night canteen/i);
+    if (b) return { ...doorOf(ctx, b), name: "Night Canteen" };
+    const n = get(ctx, "nescafe");
+    return free(ctx, n.x + 15, n.z + 10, "Night Canteen");
+  },
+  // Inside the walk-in buildings (world/interiors.ts): a few metres in from the front door.
+  lobby(ctx) {
+    return inside(ctx, /^NITK Main Building$|main building/i, 9, "Main Building lobby", true) ?? get(ctx, "academicSection");
+  },
+  libraryDesk(ctx) {
+    return inside(ctx, /^NITK Central Library$|central library/i, 6, "Issue desk, Central Library") ?? get(ctx, "library");
+  },
+  lhcClass(ctx) {
+    return inside(ctx, /^Lecture Hall Complex A$/i, 8, "Classroom, LHC-A") ?? get(ctx, "lhc");
+  },
+  sjaHall(ctx) {
+    return inside(ctx, /^Silver Jubilee Auditorium$/i, 8, "Silver Jubilee Auditorium") ?? get(ctx, "sja");
+  },
+  labDesk(ctx) {
+    return inside(ctx, /^Central Computer Cent/i, 7, "Computer lab, Central Computer Centre") ?? get(ctx, "computerCentre");
+  },
+  lhcC(ctx) {
+    return inside(ctx, /^Lecture Hall Complex - ?C$/i, 8, "Classroom, LHC-C") ?? get(ctx, "lhc");
+  },
+  lhcD(ctx) {
+    return inside(ctx, /^Lecture Hall Complex D$/i, 8, "Classroom, LHC-D") ?? get(ctx, "lhc");
+  },
+  // The Science Block: the Chemistry and Physics departments, where first-year labs run.
+  scienceBlock(ctx) {
+    return inside(ctx, /chemistry and physics|department of chemistry/i, 7, "Chemistry Lab, Science Block") ?? get(ctx, "lhc");
+  },
   beach(ctx) {
     const lm = ctx.world.places.find((q) => /nitk beach/i.test(q.name));
     const from: Pt = lm ? [lm.x, lm.z] : [ctx.world.spawn.x, ctx.world.spawn.z];
@@ -310,6 +378,27 @@ function nearestCoast(ctx: Ctx, p: Pt): Pt {
   return best;
 }
 
+/** The nearest walkable point inside a building, `depth` metres in from its front door. */
+function inside(ctx: Ctx, re: RegExp, depth: number, name: string, main = false): Spot | null {
+  const b = findByName(ctx.map, re);
+  if (!b) return null;
+  const f = main ? mainEntrance(ctx.map, b) : frontOf(ctx.map, b);
+  const x0 = f.x - f.nx * depth;
+  const z0 = f.z - f.nz * depth;
+  const g = ctx.world.grid;
+  const ok = (x: number, z: number) => pointInPoly(x, z, b.outer) && !b.holes.some((h) => pointInPoly(x, z, h)) && !g.blocked(x, z);
+  for (let r = 0; r < 20; r += 0.5) {
+    const n = Math.max(1, Math.ceil(r * 6));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2;
+      const x = x0 + Math.cos(a) * r;
+      const z = z0 + Math.sin(a) * r;
+      if (ok(x, z) && ok(x + 0.5, z) && ok(x - 0.5, z) && ok(x, z + 0.5) && ok(x, z - 0.5)) return { x, z, name, face: Math.atan2(f.nx, f.nz) };
+    }
+  }
+  return null;
+}
+
 function get(ctx: Ctx, key: PlaceKey): Spot {
   const hit = ctx.cache.get(key);
   if (hit) return hit;
@@ -325,5 +414,44 @@ export class Places {
   }
   get(key: PlaceKey): Spot {
     return get(this.ctx, key);
+  }
+
+  /** `n` walkable spots inside a building's footprint, at least `gap` m apart (same every time for a seed). */
+  within(re: RegExp, n: number, seed: number, gap = 4, name = ""): Spot[] {
+    const b = findByName(this.ctx.map, re);
+    if (!b) return [];
+    const g = this.ctx.world.grid;
+    const box = orientedBox(b.outer);
+    const rand = mulberry32(seed);
+    const out: Spot[] = [];
+    for (let tries = 0; tries < 800 && out.length < n; tries++) {
+      const u = (rand() - 0.5) * box.len;
+      const v = (rand() - 0.5) * box.wid;
+      const x = box.cx + u * Math.cos(box.angle) - v * Math.sin(box.angle);
+      const z = box.cz + u * Math.sin(box.angle) + v * Math.cos(box.angle);
+      if (!pointInPoly(x, z, b.outer) || b.holes.some((h) => pointInPoly(x, z, h))) continue;
+      if (g.blocked(x, z) || g.blocked(x + 0.6, z) || g.blocked(x - 0.6, z) || g.blocked(x, z + 0.6) || g.blocked(x, z - 0.6)) continue;
+      if (out.some((o) => Math.hypot(o.x - x, o.z - z) < gap)) continue;
+      out.push({ x, z, name: name || (b.name ?? "") });
+    }
+    return out;
+  }
+
+  /** `n` walkable, dry spots within `r` m of a place, at least `gap` m apart. */
+  around(key: PlaceKey, n: number, r: number, seed: number, gap = 6, name = ""): Spot[] {
+    const c = this.get(key);
+    const g = this.ctx.world.grid;
+    const rand = mulberry32(seed);
+    const out: Spot[] = [];
+    for (let tries = 0; tries < 1200 && out.length < n; tries++) {
+      const a = rand() * Math.PI * 2;
+      const d = Math.sqrt(rand()) * r;
+      const x = c.x + Math.cos(a) * d;
+      const z = c.z + Math.sin(a) * d;
+      if (g.blocked(x, z) || g.get(x, z) & WATER) continue;
+      if (out.some((o) => Math.hypot(o.x - x, o.z - z) < gap)) continue;
+      out.push({ x, z, name: name || c.name });
+    }
+    return out;
   }
 }
