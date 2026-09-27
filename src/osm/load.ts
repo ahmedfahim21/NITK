@@ -1,11 +1,13 @@
 /**
- * Where the campus comes from, best first:
+ * Where the campus comes from:
  *
- *   1. public/data/nitk-osm.json   committed snapshot (`npm run osm:fetch`)
- *   2. Overpass API, live          fetched in the browser, cached locally
- *   3. src/data/fallback.ts        hand-approximated layout, offline
+ *   1. public/data/nitk-osm.json   the OSM snapshot that ships with the game
+ *                                  (refreshed by .github/workflows/osm-snapshot.yml)
+ *   2. src/data/fallback.ts        hand-approximated layout, if the snapshot is missing
  *
- * `?source=live|snapshot|fallback` in the URL forces one.
+ * Nothing is downloaded from OpenStreetMap at start-up. `?source=live` fetches
+ * the extract from Overpass instead (for checking fresh edits), and
+ * `?source=fallback` forces the approximate layout.
  */
 import area from "../area.json";
 import { overpassQuery } from "./query";
@@ -82,14 +84,14 @@ export async function loadCampus(progress: (msg: string) => void): Promise<Campu
     if (snap) return parseOsm(snap, "snapshot");
   }
 
-  if (force !== "fallback" && force !== "snapshot") {
-    const cached = force === "live" ? null : await fromCache();
-    if (cached) return parseOsm(cached, "live");
+  if (force === "live") {
     const live = await fromOverpass(progress);
     if (live) return parseOsm(live, "live");
+    const cached = await fromCache();
+    if (cached) return parseOsm(cached, "live");
   }
 
-  progress("Offline: using the approximate campus layout…");
+  progress("No map snapshot: using the approximate campus layout…");
   const { FALLBACK_OSM } = await import("../data/fallback");
   return parseOsm(FALLBACK_OSM, "fallback");
 }

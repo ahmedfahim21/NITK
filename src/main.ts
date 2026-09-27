@@ -7,6 +7,26 @@ import { RenderPipeline, type Quality } from "./fx/render";
 import { Sky } from "./fx/sky";
 import { Input, Player } from "./player";
 import { Hud } from "./ui/hud";
+import { Game } from "./game";
+import { GameState } from "./game/state";
+import { GameUI } from "./game/ui";
+import type { Preset } from "./fx/presets";
+
+/** The monsoon version of a preset: grey sky, weak sun, thick haze. */
+function rainy(p: Preset): Preset {
+  const grey = (hex: string, k: number) => "#" + new THREE.Color(hex).lerp(new THREE.Color(0x7d8794), k).getHexString();
+  return {
+    ...p,
+    sky: p.sky.map((c) => grey(c, p.glow > 0.8 ? 0.3 : 0.7)) as Preset["sky"],
+    sun: { ...p.sun, intensity: p.sun.intensity * 0.35 },
+    hemi: { ...p.hemi, intensity: p.hemi.intensity * 1.35 },
+    sea: { ...p.sea, deep: 0x2f4f63, shallow: 0x55808c },
+    grade: { ...p.grade, saturation: p.grade.saturation * 0.82 },
+    haze: { ...p.haze, color: [0.62, 0.66, 0.7], density: p.haze.density * 2.2 },
+  };
+}
+
+const PERIOD_START: Record<TimeOfDay, number> = { morning: 7 * 60, noon: 12 * 60, sunset: 17 * 60 + 45, night: 21 * 60 };
 
 const msg = document.getElementById("loading-msg")!;
 const progress = (m: string) => {
@@ -61,21 +81,29 @@ async function main() {
   };
   const hud = new Hud(map, world.places, player, camera, teleport);
 
-  /* ---- time of day ---- */
-  let time: TimeOfDay = (params.get("time") as TimeOfDay) || "morning";
+  /* ---- time of day: driven by the game clock ---- */
+  let time: TimeOfDay = "morning";
+  let raining = false;
+  let game: Game | null = null;
   const timesEl = document.getElementById("times")!;
   const labels: Record<TimeOfDay, string> = { morning: "☀ AM", noon: "Noon", sunset: "Sunset", night: "Night" };
   const buttons = new Map<TimeOfDay, HTMLButtonElement>();
   for (const t of TIME_ORDER) {
     const b = document.createElement("button");
     b.textContent = labels[t];
-    b.addEventListener("click", () => setTime(t));
+    b.title = "Skip the clock ahead to this time";
+    b.addEventListener("click", () => skipTo(t));
     timesEl.appendChild(b);
     buttons.set(t, b);
   }
-  function setTime(t: TimeOfDay) {
+  function skipTo(t: TimeOfDay) {
+    if (game) game.state.advanceTo(PERIOD_START[t]);
+    else setTime(t, raining);
+  }
+  function setTime(t: TimeOfDay, rain = raining) {
     time = t;
-    const p = PRESETS[t];
+    raining = rain;
+    const p = rain ? rainy(PRESETS[t]) : PRESETS[t];
     pipeline.apply(p);
     sky.apply(p);
     world.apply(p);
@@ -91,7 +119,7 @@ async function main() {
     fill.position.set(Math.sin(az) * 100, 60, -Math.cos(az) * 100);
     for (const [k, b] of buttons) b.classList.toggle("on", k === t);
   }
-  setTime(time);
+  setTime((params.get("time") as TimeOfDay) || "morning");
 
   /* ---- data source badge ---- */
   const src = document.getElementById("source")!;
@@ -117,14 +145,39 @@ async function main() {
   window.addEventListener("resize", resize);
   resize();
 
+  /* ---- the game ---- */
+  const saved = GameState.load();
+  const gameUi = new GameUI();
+  const startGame = (fresh: boolean) => {
+    if (fresh) GameState.clear();
+    const state = fresh || !saved ? new GameState() : saved.state;
+    game = new Game(map, world, player, input, hud, camera, { applyTime: (period, rain) => setTime(period, rain) }, state, gameUi);
+    scene.add(game.group);
+    void game.begin(fresh || !saved, saved?.pos);
+    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene } });
+  };
+
   // Expose for debugging and automated screenshots.
-  Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud } });
+  Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene } });
 
   const clock = new THREE.Clock();
   const fpsEl = document.getElementById("fps")!;
   let frames = 0;
   let fpsT = 0;
   document.getElementById("loading")!.classList.add("done");
+  if (params.has("explore")) {
+    // Free roam, no story.
+  } else if (params.has("autostart")) {
+    startGame(true);
+  } else {
+    const choice = await gameUi.titleCard({
+      title: "NITK: FRESHER YEAR",
+      blurb:
+        "Monsoon, 2026. You've just got off the bus on NH66 with one suitcase and no idea where anything is. Four years at Surathkal start now: messes, classes, clubs, cycles, and the sunset from the lighthouse hill.",
+      hasSave: !!saved,
+    });
+    startGame(choice === "new");
+  }
 
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.05);
@@ -136,13 +189,14 @@ async function main() {
       player.toggleDrone();
       droneBtn.classList.toggle("on", player.drone);
     }
-    if (input.hit("KeyT")) setTime(TIME_ORDER[(TIME_ORDER.indexOf(time) + 1) % TIME_ORDER.length]);
+    if (input.hit("KeyT")) skipTo(TIME_ORDER[(TIME_ORDER.indexOf(time) + 1) % TIME_ORDER.length]);
     if (input.hit("KeyH")) help.classList.toggle("hidden");
 
     if (!hud.isMapOpen) player.update(dt);
+    if (game && !hud.isMapOpen) game.update(dt);
     input.endFrame();
 
-    world.update(t);
+    world.update(t, camera.position);
     sky.follow(camera);
     pipeline.focusShadows(player.pos);
     pipeline.render();

@@ -137,7 +137,8 @@ All of these already exist in the 3D world (or will, once the real OSM data load
 
 The calendar is real: the odd semester runs July/Aug–Dec with **Engineer in October**; the even semester runs Jan–May with **Incident in March**.
 
-### Chapter 1: "Srinivasnagar" (August, monsoon)
+### Chapter 1: "Srinivasnagar" (August, monsoon): **built**
+*Built as six missions (Main Gate, Three Messes, Wheels, Log in to IRIS, Maggi in the Rain, The Sunset Rule) in `src/game/chapter1.ts`. The design below was the plan; the README lists what shipped.*
 *The campus is named Srinivasnagar after founder U. Srinivas Mallya.*
 
 1. **Main Gate.** Get off the bus on NH66, cross by the overbridge, and find the Main Building's academic section. *Tutorial: movement, map, teleport.*

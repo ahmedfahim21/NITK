@@ -26,10 +26,10 @@ function colourise(g: THREE.BufferGeometry, c: number): THREE.BufferGeometry {
   return geo;
 }
 
-function palmGeometry(): THREE.BufferGeometry {
+function palmGeometry(lite = false): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   // Gently curved trunk in four segments, 1 unit = 1 m for a 12 m palm.
-  const segs = 4;
+  const segs = lite ? 2 : 4;
   let x = 0;
   let y = 0;
   for (let i = 0; i < segs; i++) {
@@ -46,13 +46,13 @@ function palmGeometry(): THREE.BufferGeometry {
   }
   const top = new THREE.Vector3(x, y, 0);
   // Fronds: long drooping leaves, each a folded strip.
-  const fronds = 10;
+  const fronds = lite ? 6 : 8;
   for (let k = 0; k < fronds; k++) {
     const a = (k / fronds) * Math.PI * 2 + (k % 2) * 0.2;
     const len = 4.2;
     const pts: number[] = [];
     const idx: number[] = [];
-    const steps = 5;
+    const steps = lite ? 2 : 4;
     for (let s = 0; s <= steps; s++) {
       const t = s / steps;
       const along = t * len;
@@ -80,13 +80,13 @@ function palmGeometry(): THREE.BufferGeometry {
   return mergeGeometries(parts)!;
 }
 
-function broadGeometry(variant: number): THREE.BufferGeometry {
+function broadGeometry(variant: number, lite = false): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   const trunk = new THREE.CylinderGeometry(0.22, 0.34, 3.2, 6);
   trunk.translate(0, 1.6, 0);
   parts.push(colourise(trunk, 0x6b4f3a));
   const rand = mulberry32(variant * 97 + 3);
-  const blobs = 4;
+  const blobs = lite ? 2 : 4;
   const greens = [0x4f8f3a, 0x5a9c40, 0x467f34, 0x62a547];
   for (let i = 0; i < blobs; i++) {
     const r = 1.6 + rand() * 1.1;
@@ -159,9 +159,10 @@ const KIND_CODE: AreaKind[] = [
   "dirt",
 ];
 
-const TILE = 160;
+/** Campus trees are bucketed in tiles this big (m); the horizon band is one bucket per kind. */
+const TILE = 320;
 
-export type TreeRig = { group: THREE.Group; count: number };
+export type TreeRig = { group: THREE.Group; count: number; cull(cam: THREE.Vector3): void };
 
 export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
   const rand = mulberry32(seed);
@@ -185,7 +186,7 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
     }
   }
 
-  const placed: { x: number; z: number; kind: Kind; s: number; r: number; v: number }[] = [];
+  const placed: { x: number; z: number; kind: Kind; s: number; r: number; v: number; far?: boolean }[] = [];
   const free = (x: number, z: number, pad: number) => {
     for (const [dx, dz] of [
       [0, 0],
@@ -222,18 +223,20 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
 
   // Horizon: a band of palms and canopy on the land beyond the map.
   const land = map.land;
-  for (let n = 0; n < 16000; n++) {
+  for (let n = 0; n < 9000; n++) {
     const x = b.minX - 1400 + rand() * (b.maxX - b.minX + 2800);
     const z = b.minZ - 1400 + rand() * (b.maxZ - b.minZ + 2800);
     if (x > b.minX - 5 && x < b.maxX + 5 && z > b.minZ - 5 && z < b.maxZ + 5) continue;
     if (!land.some((l: Pt[]) => pointInPoly(x, z, l))) continue;
-    placed.push({ x, z, kind: rand() < 0.6 ? "palm" : "broad", s: 0.9 + rand() * 0.5, r: rand() * 6.28, v: Math.floor(rand() * 3) });
+    placed.push({ x, z, kind: rand() < 0.6 ? "palm" : "broad", s: 0.9 + rand() * 0.5, r: rand() * 6.28, v: 0, far: true });
   }
 
   for (const p of placed) if (p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ) grid.stampDisc(p.x, p.z, 0.45, SOLID, 8);
 
   /* ---- instancing by tile and kind ---- */
   const geos: Record<string, THREE.BufferGeometry> = {
+    farpalm: palmGeometry(true),
+    farbroad0: broadGeometry(0, true),
     palm: palmGeometry(),
     casuarina: casuarinaGeometry(),
     broad0: broadGeometry(0),
@@ -243,7 +246,8 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
   const mat = toon(0xffffff, { vertexColors: true, ramp: "soft", side: THREE.DoubleSide, nearFade: 5 });
   const buckets = new Map<string, typeof placed>();
   for (const p of placed) {
-    const key = `${p.kind === "broad" ? `broad${p.v}` : p.kind}|${Math.floor(p.x / TILE)}|${Math.floor(p.z / TILE)}`;
+    const kind = p.kind === "broad" ? `broad${p.v}` : p.kind;
+    const key = p.far ? `far${kind}|h` : `${kind}|${Math.floor(p.x / TILE)}|${Math.floor(p.z / TILE)}`;
     let list = buckets.get(key);
     if (!list) buckets.set(key, (list = []));
     list.push(p);
@@ -266,12 +270,25 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
       inst.setColorAt(i, tint);
     });
     inst.computeBoundingSphere();
-    const far = Math.abs(list[0].x) > 1500 || Math.abs(list[0].z) > 1500;
+    const far = !!list[0].far;
     inst.castShadow = !far;
+    inst.userData.far = far;
     inst.receiveShadow = true;
     group.add(inst);
   }
-  return { group, count: placed.length };
+  // Hide campus tiles well into the haze; the horizon band stays as a backdrop.
+  const tiles = group.children.filter((m) => !(m.userData.far as boolean)) as THREE.InstancedMesh[];
+  for (const t of tiles) t.userData.centre = t.boundingSphere!.center.clone();
+  return {
+    group,
+    count: placed.length,
+    cull(cam) {
+      for (const t of tiles) {
+        const c = t.userData.centre as THREE.Vector3;
+        t.visible = Math.hypot(c.x - cam.x, c.z - cam.z) < 950;
+      }
+    },
+  };
 }
 
 /** Scanline paint that overwrites (flags = code, top = tag). */

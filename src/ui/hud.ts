@@ -60,6 +60,8 @@ export class Hud {
   private mapOpen = false;
   private tmp = new THREE.Vector3();
   private bigView = { scale: 1, ox: 0, oz: 0 };
+  /** Objective and mission-giver blips. */
+  markers: { x: number; z: number; color: string }[] = [];
 
   constructor(
     private map: CampusMap,
@@ -201,6 +203,15 @@ export class Hud {
       ctx.fillStyle = p.kind === "landmark" ? "#7a2e1d" : "#333";
       ctx.fillText(p.name, x, y);
     }
+    for (const m of this.markers) {
+      ctx.fillStyle = m.color;
+      ctx.strokeStyle = "#1b1f2a";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc((m.x - v.ox) * scale, (m.z - v.oz) * scale, 9 * devicePixelRatio, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
     const px = (this.player.pos.x - v.ox) * scale;
     const py = (this.player.pos.z - v.oz) * scale;
     ctx.fillStyle = "#e74c3c";
@@ -247,6 +258,33 @@ export class Hud {
     ctx.fill();
     ctx.stroke();
     ctx.restore();
+    // Objective blips, pinned to the rim when out of range.
+    for (const m of this.markers) {
+      const dx = (m.x - this.player.pos.x) * zoom;
+      const dz = (m.z - this.player.pos.z) * zoom;
+      const c = Math.cos(this.player.yaw);
+      const s = Math.sin(this.player.yaw);
+      let sx = dx * c - dz * s;
+      let sy = dx * s + dz * c;
+      const lim = S / 2 - 16;
+      const l = Math.hypot(sx, sy);
+      if (l > lim) {
+        sx *= lim / l;
+        sy *= lim / l;
+      }
+      ctx.fillStyle = m.color;
+      ctx.strokeStyle = "#1b1f2a";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(S / 2 + sx, S / 2 + sy, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#1b1f2a";
+      ctx.font = "900 13px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("!", S / 2 + sx, S / 2 + sy + 1);
+    }
     // North marker on the rim.
     const r = S / 2 - 12;
     const nx = S / 2 + Math.sin(this.player.yaw) * r;

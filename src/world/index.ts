@@ -24,7 +24,7 @@ export type World = {
   spawn: { x: number; z: number; facing: number };
   stats: { buildings: number; roads: number; trees: number };
   apply(p: Preset): void;
-  update(t: number): void;
+  update(t: number, cam?: THREE.Vector3): void;
 };
 
 export function buildWorld(map: CampusMap): World {
@@ -90,6 +90,8 @@ export function buildWorld(map: CampusMap): World {
   const add = (name: string, x: number, z: number, y: number, kind: string) => {
     const key = name.trim().toLowerCase();
     if (!key || seen.has(key)) return;
+    // "NITK Main Building" next to the "Main Building" landmark is one place.
+    if (places.some((p) => Math.hypot(p.x - x, p.z - z) < 80 && (key.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(key)))) return;
     seen.add(key);
     places.push({ name: name.trim(), x, z, y, kind });
   };
@@ -127,8 +129,9 @@ export function buildWorld(map: CampusMap): World {
       ground.apply(p);
       props.setGlow(p.glow);
     },
-    update(t) {
+    update(t, cam) {
       ground.update(t);
+      if (cam) trees.cull(cam);
       landmarks.update(t, glow);
     },
   };

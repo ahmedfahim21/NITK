@@ -1,0 +1,311 @@
+/**
+ * Story locations. Each resolves from OSM names/tags when the map has them,
+ * and otherwise from a sensible stand-in (the nearest hostel block, a spot
+ * in front of a building), so missions work on the real map and the
+ * approximate one alike.
+ */
+import { centroid, orientedBox, type Pt } from "../geo";
+import type { Building, CampusMap } from "../osm/types";
+import type { World } from "../world";
+import { styleFor } from "../world/buildings";
+import { ROAD } from "../world/grid";
+
+export type Spot = { x: number; z: number; name: string; /** facing the door */ face?: number };
+
+export type PlaceKey =
+  | "busStop"
+  | "mainGate"
+  | "academicSection"
+  | "karavali"
+  | "aravali"
+  | "sahyadri"
+  | "megaMess"
+  | "nescafe"
+  | "nandini"
+  | "freshHonest"
+  | "computerCentre"
+  | "lhc"
+  | "library"
+  | "sja"
+  | "mainGround"
+  | "lighthouse"
+  | "lighthouseView"
+  | "beach";
+
+type Resolver = (ctx: Ctx) => Spot | null;
+type Ctx = { map: CampusMap; world: World; cache: Map<PlaceKey, Spot> };
+
+function byName(ctx: Ctx, re: RegExp): Building | undefined {
+  return ctx.map.buildings.filter((b) => b.name && re.test(b.name)).sort((a, b) => b.area - a.area)[0];
+}
+
+function poi(ctx: Ctx, re: RegExp, tag?: (t: Record<string, string>) => boolean) {
+  return ctx.map.pois.find((p) => (p.name && re.test(p.name)) || (tag ? tag(p.tags) : false));
+}
+
+/** A walkable point just outside a building's face nearest to `toward`. */
+function doorOf(ctx: Ctx, b: Building, toward?: Pt): Spot {
+  const box = orientedBox(b.outer);
+  const c = centroid(b.outer);
+  const t = toward ?? nearestRoad(ctx, c) ?? [c[0], c[1] + 30];
+  const dx = t[0] - box.cx;
+  const dz = t[1] - box.cz;
+  const cs = Math.cos(box.angle);
+  const sn = Math.sin(box.angle);
+  const u = dx * cs + dz * sn;
+  const v = -dx * sn + dz * cs;
+  let px: number;
+  let pz: number;
+  // Step out of whichever face points at the target, 3 m clear of the wall.
+  if (Math.abs(u) / (box.len / 2) > Math.abs(v) / (box.wid / 2)) {
+    const s = Math.sign(u) * (box.len / 2 + 3);
+    px = box.cx + cs * s;
+    pz = box.cz + sn * s;
+  } else {
+    const s = Math.sign(v) * (box.wid / 2 + 3);
+    px = box.cx - sn * s;
+    pz = box.cz + cs * s;
+  }
+  const [fx, fz] = ctx.world.grid.nearestFree(px, pz);
+  return { x: fx, z: fz, name: b.name ?? "", face: Math.atan2(box.cx - fx, box.cz - fz) };
+}
+
+function nearestRoad(ctx: Ctx, p: Pt): Pt | null {
+  let best: Pt | null = null;
+  let bd = Infinity;
+  for (const r of ctx.map.roads) {
+    if (r.kind === "trunk") continue;
+    for (const q of r.pts) {
+      const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (d < bd) {
+        bd = d;
+        best = q;
+      }
+    }
+  }
+  return best;
+}
+
+function free(ctx: Ctx, x: number, z: number, name: string): Spot {
+  const [fx, fz] = ctx.world.grid.nearestFree(x, z);
+  return { x: fx, z: fz, name };
+}
+
+/** Hostel buildings, nearest first to a point. */
+function hostels(ctx: Ctx, from: Pt): Building[] {
+  return ctx.map.buildings
+    .filter((b) => styleFor(b) === "hostel" && !/mess|mega\s*tower|girls|gh-?\d|pg/i.test(b.name ?? "") && b.area > 250)
+    .sort((a, b) => {
+      const ca = centroid(a.outer);
+      const cb = centroid(b.outer);
+      return Math.hypot(ca[0] - from[0], ca[1] - from[1]) - Math.hypot(cb[0] - from[0], cb[1] - from[1]);
+    });
+}
+
+function mainBuildingCentre(ctx: Ctx): Pt {
+  const mb = byName(ctx, /main building/i);
+  if (mb) return centroid(mb.outer);
+  return [ctx.world.spawn.x, ctx.world.spawn.z];
+}
+
+/** The n-th hostel block (by distance from the Main Building) that is at least 35 m from the ones before it. */
+function nthHostel(ctx: Ctx, n: number): Building | undefined {
+  const list = hostels(ctx, mainBuildingCentre(ctx));
+  const picked: Building[] = [];
+  for (const b of list) {
+    const c = centroid(b.outer);
+    if (picked.every((p) => {
+      const q = centroid(p.outer);
+      return Math.hypot(q[0] - c[0], q[1] - c[1]) > 35;
+    })) picked.push(b);
+    if (picked.length > n) break;
+  }
+  return picked[n];
+}
+
+const RESOLVERS: Record<PlaceKey, Resolver> = {
+  busStop(ctx) {
+    const gate = get(ctx, "mainGate");
+    // The bus drops you on the far shoulder of NH66, across from the gate.
+    const tr = ctx.map.roads.filter((r) => r.kind === "trunk");
+    let best: Pt = [gate.x - 20, gate.z];
+    let bd = Infinity;
+    for (const r of tr) for (const q of r.pts) {
+      const d = Math.hypot(q[0] - gate.x, q[1] - gate.z);
+      if (d < bd) {
+        bd = d;
+        best = q;
+      }
+    }
+    const dx = best[0] - gate.x;
+    const dz = best[1] - gate.z;
+    const l = Math.hypot(dx, dz) || 1;
+    const g = ctx.world.grid;
+    let seenRoad = false;
+    let clear = 0;
+    for (let s = 0; s < 120; s += 0.5) {
+      const x = gate.x + (dx / l) * s;
+      const z = gate.z + (dz / l) * s;
+      const onRoad = (g.get(x, z) & ROAD) !== 0;
+      if (onRoad) {
+        seenRoad = true;
+        clear = 0;
+      } else if (seenRoad && !g.blocked(x, z) && ++clear > 4) {
+        return { ...free(ctx, x, z, "NH66 bus stop"), face: Math.atan2(-dx, -dz) };
+      }
+    }
+    return free(ctx, best[0] + (dx / l) * 14, best[1] + (dz / l) * 14, "NH66 bus stop");
+  },
+  mainGate(ctx) {
+    const p = ctx.world.places.find((q) => /main gate/i.test(q.name));
+    if (p) return free(ctx, p.x, p.z, "Main Gate");
+    return free(ctx, ctx.world.spawn.x, ctx.world.spawn.z, "Main Gate");
+  },
+  academicSection(ctx) {
+    const b = byName(ctx, /main building|administrative/i);
+    if (!b) return null;
+    const lm = ctx.world.places.find((q) => q.name === "Main Building");
+    const s = doorOf(ctx, b, lm ? [lm.x, lm.z] : undefined);
+    return { ...s, name: "Academic Section, Main Building" };
+  },
+  karavali(ctx) {
+    const b = byName(ctx, /karavali|\bblock[\s-]*(1|i)\b|1st block|first block/i) ?? nthHostel(ctx, 0);
+    return b ? { ...doorOf(ctx, b), name: "Karavali (Block 1)" } : null;
+  },
+  aravali(ctx) {
+    const b = byName(ctx, /aravali|\bblock[\s-]*(2|ii)\b|2nd block/i) ?? nthHostel(ctx, 1);
+    return b ? { ...doorOf(ctx, b), name: "Aravali (Block 2)" } : null;
+  },
+  sahyadri(ctx) {
+    const b = byName(ctx, /sahyadri|\bblock[\s-]*(7|vii)\b|7th block/i) ?? nthHostel(ctx, 3) ?? nthHostel(ctx, 2);
+    return b ? { ...doorOf(ctx, b), name: "Sahyadri (Block 7)" } : null;
+  },
+  megaMess(ctx) {
+    const b = byName(ctx, /mega mess|\bmess\b|dining/i);
+    if (b) return { ...doorOf(ctx, b), name: b.name ?? "Mega Mess" };
+    const k = get(ctx, "karavali");
+    return free(ctx, k.x + 25, k.z, "Mess");
+  },
+  nescafe(ctx) {
+    const b = byName(ctx, /^nescaf[eé]$/i);
+    if (b) return { ...doorOf(ctx, b), name: "Nescafe" };
+    const p = poi(ctx, /nescafe|nescafé/i);
+    if (p) return free(ctx, p.x, p.z, "Nescafe");
+    // Right in front of Aravali, the 2nd block.
+    const a = get(ctx, "aravali");
+    return free(ctx, a.x + 6, a.z + 6, "Nescafe");
+  },
+  nandini(ctx) {
+    const b = byName(ctx, /nandh?ini\s*\(?boys/i) ?? byName(ctx, /nandh?ini/i);
+    if (b) return { ...doorOf(ctx, b), name: "Nandini" };
+    const p = poi(ctx, /nandh?ini/i, (t) => t.shop === "dairy");
+    if (p) return free(ctx, p.x, p.z, "Nandini Milk Parlour");
+    const sc = byName(ctx, /shopping|complex|market/i);
+    if (sc) return { ...doorOf(ctx, sc), name: "Nandini Milk Parlour" };
+    const n = get(ctx, "nescafe");
+    return free(ctx, n.x + 60, n.z - 20, "Nandini Milk Parlour");
+  },
+  freshHonest(ctx) {
+    const p = poi(ctx, /fresh\s*(and|&|n)\s*honest/i);
+    if (p) return free(ctx, p.x, p.z, "Fresh and Honest");
+    const k = get(ctx, "karavali");
+    const a = get(ctx, "aravali");
+    return free(ctx, (k.x + a.x) / 2 + 10, (k.z + a.z) / 2, "Fresh and Honest");
+  },
+  computerCentre(ctx) {
+    const b =
+      byName(ctx, /central computer cent/i) ??
+      byName(ctx, /computer cent|\bccc\b/i) ??
+      byName(ctx, /information technology|computer science/i) ??
+      byName(ctx, /library/i);
+    return b ? { ...doorOf(ctx, b), name: b.name ?? "Computer Centre" } : null;
+  },
+  lhc(ctx) {
+    const b = byName(ctx, /lecture hall|\blhc\b/i);
+    return b ? { ...doorOf(ctx, b), name: "Lecture Hall Complex" } : null;
+  },
+  library(ctx) {
+    const b = byName(ctx, /central library|library/i);
+    return b ? { ...doorOf(ctx, b), name: "Central Library" } : null;
+  },
+  sja(ctx) {
+    const b = byName(ctx, /jubilee|auditorium/i);
+    return b ? { ...doorOf(ctx, b), name: "Silver Jubilee Auditorium" } : null;
+  },
+  mainGround(ctx) {
+    const a = ctx.map.areas.filter((q) => (q.kind === "pitch" || q.kind === "track") && q.name && /ground/i.test(q.name)).sort((p, q) => {
+      const pa = orientedBox(p.outer);
+      const qa = orientedBox(q.outer);
+      return qa.len * qa.wid - pa.len * pa.wid;
+    })[0];
+    if (!a) return null;
+    const [x, z] = centroid(a.outer);
+    return free(ctx, x, z, a.name ?? "Main Ground");
+  },
+  lighthouse(ctx) {
+    const l = ctx.map.lighthouse;
+    return l ? free(ctx, l[0], l[1], "Surathkal Lighthouse") : null;
+  },
+  lighthouseView(ctx) {
+    const l = ctx.map.lighthouse;
+    if (!l) return get(ctx, "beach");
+    // The seaward brow of the hill, clear of the hives at the tower's foot.
+    const coast = nearestCoast(ctx, l);
+    const dx = coast[0] - l[0];
+    const dz = coast[1] - l[1];
+    const d = Math.hypot(dx, dz) || 1;
+    const k = Math.min(18, d * 0.6);
+    const s = free(ctx, l[0] + (dx / d) * k, l[1] + (dz / d) * k, "Lighthouse hill");
+    return { ...s, face: Math.atan2(dx, dz) };
+  },
+  beach(ctx) {
+    const lm = ctx.world.places.find((q) => /nitk beach/i.test(q.name));
+    const from: Pt = lm ? [lm.x, lm.z] : [ctx.world.spawn.x, ctx.world.spawn.z];
+    const c = nearestCoast(ctx, from);
+    const toLand = mainBuildingCentre(ctx);
+    const dx = toLand[0] - c[0];
+    const dz = toLand[1] - c[1];
+    const d = Math.hypot(dx, dz) || 1;
+    return free(ctx, c[0] + (dx / d) * 12, c[1] + (dz / d) * 12, "NITK Beach");
+  },
+};
+
+function nearestCoast(ctx: Ctx, p: Pt): Pt {
+  let best: Pt = [p[0] - 300, p[1]];
+  let bd = Infinity;
+  const b = ctx.map.bounds;
+  for (const line of ctx.map.coast) {
+    for (let i = 1; i < line.length; i++) {
+      const [a, c] = [line[i - 1], line[i]];
+      const steps = Math.max(1, Math.ceil(Math.hypot(c[0] - a[0], c[1] - a[1]) / 10));
+      for (let k = 0; k <= steps; k++) {
+        const q: Pt = [a[0] + ((c[0] - a[0]) * k) / steps, a[1] + ((c[1] - a[1]) * k) / steps];
+        if (q[0] < b.minX || q[0] > b.maxX || q[1] < b.minZ || q[1] > b.maxZ) continue;
+        const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        if (d < bd) {
+          bd = d;
+          best = q;
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function get(ctx: Ctx, key: PlaceKey): Spot {
+  const hit = ctx.cache.get(key);
+  if (hit) return hit;
+  const s = RESOLVERS[key](ctx) ?? { x: ctx.world.spawn.x, z: ctx.world.spawn.z, name: key };
+  ctx.cache.set(key, s);
+  return s;
+}
+
+export class Places {
+  private ctx: Ctx;
+  constructor(map: CampusMap, world: World) {
+    this.ctx = { map, world, cache: new Map() };
+  }
+  get(key: PlaceKey): Spot {
+    return get(this.ctx, key);
+  }
+}

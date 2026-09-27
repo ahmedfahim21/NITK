@@ -1,0 +1,20 @@
+/** Surprise-quiz questions: NITK lore mixed with first-year engineering. */
+export const QUIZ: { q: string; options: string[]; answer: number }[] = [
+  { q: "NITK started life in 1960 as…", options: ["Karnataka Regional Engineering College", "Mangalore Institute of Technology", "Surathkal Polytechnic"], answer: 0 },
+  { q: "The campus is called Srinivasnagar after…", options: ["A Mangalore mayor", "U. Srinivas Mallya, the founder", "Srinivasa Ramanujan"], answer: 1 },
+  { q: "Which highway runs straight through campus?", options: ["NH48", "NH75", "NH66"], answer: 2 },
+  { q: "Mega Tower 3 is called…", options: ["Everest", "Kailash", "Himalaya"], answer: 1 },
+  { q: "On NITK's 10-point scale, an A+ is worth…", options: ["9", "10", "8"], answer: 0 },
+  { q: "Which fest happens in October?", options: ["Incident", "Engineer", "Crescendo"], answer: 1 },
+  { q: "Incident, the cultural fest, was first held in…", options: ["1980", "1996", "2005"], answer: 0 },
+  { q: "The Surathkal lighthouse was lit on…", options: ["6 August 1960", "15 May 1972", "26 January 2002"], answer: 1 },
+  { q: "Which of these can a first-year NOT join?", options: ["WebClub", "Star Gazing Club", "IEEE"], answer: 2 },
+  { q: "Karavali is which block?", options: ["1st", "4th", "7th"], answer: 0 },
+  { q: "SI unit of stress?", options: ["Newton", "Pascal", "Joule"], answer: 1 },
+  { q: "Newton's second law:", options: ["F = mv", "F = ma", "F = m/a"], answer: 1 },
+  { q: "Ohm's law:", options: ["V = IR", "V = I/R", "P = IR"], answer: 0 },
+  { q: "Worst case of binary search on n items:", options: ["O(n)", "O(1)", "O(log n)"], answer: 2 },
+  { q: "In C, what does `printf(\"%d\", 7 / 2);` print?", options: ["3", "3.5", "4"], answer: 0 },
+  { q: "A body in equilibrium has net force…", options: ["Equal to its weight", "Zero", "Pointing down"], answer: 1 },
+  { q: "0b1010 in decimal is…", options: ["10", "12", "5"], answer: 0 },
+];
