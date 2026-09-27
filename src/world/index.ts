@@ -24,10 +24,6 @@ export type World = {
   places: Place[];
   spawn: { x: number; z: number; facing: number };
   stats: { buildings: number; roads: number; trees: number };
-  /** Rebuild building meshes and custom models after an override changes. */
-  rebuildBuildings(): Promise<void>;
-  /** Meshes that can be clicked to select a building. */
-  pickables(): THREE.Object3D[];
   /** Season visuals: land tint, sea state, foliage tint, summer blossoms. */
   setSeason(s: { grass: [number, number, number]; foliage: [number, number, number]; sea: number; blossom: boolean }): void;
   apply(p: Preset): void;
@@ -84,7 +80,7 @@ export function buildWorld(map: CampusMap): World {
 
   const ground = buildGround(map);
   const roads = buildRoads(map);
-  let buildings = buildBuildings(map, skip);
+  const buildings = buildBuildings(map, skip);
   const models = new ModelLayer(map);
   void models.sync((k, err) => console.warn(`[models] ${k}:`, err));
   const trees = buildTrees(map, grid);
@@ -133,19 +129,9 @@ export function buildWorld(map: CampusMap): World {
     places,
     spawn: { x: sx, z: sz, facing },
     stats: { buildings: map.buildings.length, roads: map.roads.length, trees: trees.count },
-    async rebuildBuildings() {
-      group.remove(buildings.group);
-      buildings.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-      buildings = buildBuildings(map, skip);
-      group.add(buildings.group);
-      await models.sync((k, err) => console.warn(`[models] ${k}:`, err));
-    },
     setSeason(s) {
       ground.setSeason(s.grass, s.sea);
       trees.setSeason(s.foliage, s.blossom);
-    },
-    pickables() {
-      return [buildings.group, models.group, landmarks.group];
     },
     apply(p) {
       glow = p.glow;

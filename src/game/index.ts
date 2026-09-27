@@ -356,7 +356,7 @@ export class Game {
       const [x, z] = this.world.grid.nearestFree(g.x + 8, g.z + 8);
       this.player.place(x, z, 0);
       this.giveCycle();
-      this.ui.toast("Explore mode: click a building to inspect it. E rides your cycle.", "#1e6f5c");
+      this.ui.toast("Explore mode: walk in through the doors of the library, SJA, the Mega Mess and more. E rides your cycle.", "#1e6f5c");
       return;
     }
     const skipto = new URLSearchParams(location.search).get("skipto");
