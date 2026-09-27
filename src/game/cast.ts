@@ -3,7 +3,8 @@
  * of them is modelled on a real student or staff member.
  */
 import * as THREE from "three";
-import { makeStudent, type Look } from "../player";
+import { makePerson, type Look } from "../people";
+import type { HeroAnimator } from "../hero";
 import { groundHeight } from "../world/terrain";
 
 export type CastId =
@@ -140,8 +141,8 @@ function markerTexture(): THREE.CanvasTexture {
 export class Character {
   readonly root: THREE.Group;
   readonly marker: THREE.Sprite;
-  private parts: Record<string, THREE.Object3D>;
-  private phase = Math.random() * 6;
+  private anim: HeroAnimator;
+  private t = Math.random() * 60;
   x = 0;
   z = 0;
   face = 0;
@@ -150,17 +151,15 @@ export class Character {
   /** When set, runs along these points at `runSpeed`. */
   path: [number, number][] | null = null;
   runSpeed = 6;
-  private legs: THREE.Object3D[];
-  private arms: THREE.Object3D[];
 
   constructor(
     readonly id: string,
     readonly def: Def,
     tex: THREE.Texture
   ) {
-    const s = makeStudent(def.look);
+    const s = makePerson(def.look);
     this.root = s.root;
-    this.parts = s.parts;
+    this.anim = s.anim;
     this.marker = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
     this.marker.scale.set(0.75, 0.75, 1);
     this.marker.position.y = 2.55;
@@ -168,8 +167,6 @@ export class Character {
     this.marker.visible = false;
     this.root.add(this.marker);
     this.root.visible = false;
-    this.legs = [s.parts.legL, s.parts.legR];
-    this.arms = [s.parts.armL, s.parts.armR];
   }
 
   get name() {
@@ -192,6 +189,8 @@ export class Character {
 
   update(dt: number, player: THREE.Vector3, t: number) {
     if (!this.root.visible) return;
+    this.t += dt;
+    let speed = 0;
     if (this.path && this.path.length) {
       // Run to the next waypoint.
       const [tx, tz] = this.path[0];
@@ -199,6 +198,7 @@ export class Character {
       const dz = tz - this.z;
       const d = Math.hypot(dx, dz);
       const step = this.runSpeed * dt;
+      speed = this.runSpeed;
       if (d <= step) {
         this.x = tx;
         this.z = tz;
@@ -210,29 +210,17 @@ export class Character {
       }
       this.root.position.set(this.x, groundHeight(this.x, this.z), this.z);
       this.root.rotation.y = this.face;
-      this.phase += dt * (3 + this.runSpeed * 1.3);
-      const sw = Math.sin(this.phase) * 0.9;
-      this.legs[0].rotation.x = sw;
-      this.legs[1].rotation.x = -sw;
-      this.arms[0].rotation.x = -sw;
-      this.arms[1].rotation.x = sw;
-      this.marker.position.y = 2.55 + Math.sin(t * 3) * 0.12;
-      return;
     }
-    this.phase += dt;
-    const p = this.parts;
-    // Idle: weight shift and a hand that talks.
-    p.hips.position.y = 0.95 + Math.sin(this.phase * 1.6) * 0.01;
-    p.armR.rotation.x = Math.sin(this.phase * 2.1) * 0.12;
-    p.armL.rotation.x = -Math.sin(this.phase * 1.7) * 0.08;
-    p.legL.rotation.x = 0;
-    p.legR.rotation.x = 0;
+    // Turn toward the player when they come close; glance with the head first.
     const d = Math.hypot(player.x - this.x, player.z - this.z);
-    if (this.watch && d < 9) {
+    let look = 0;
+    if (!speed && this.watch && d < 9) {
       const want = Math.atan2(player.x - this.x, player.z - this.z);
       const diff = Math.atan2(Math.sin(want - this.root.rotation.y), Math.cos(want - this.root.rotation.y));
-      this.root.rotation.y += diff * Math.min(1, dt * 5);
+      this.root.rotation.y += diff * Math.min(1, dt * 4);
+      look = Math.max(-1.1, Math.min(1.1, diff));
     }
+    this.anim.update({ dt, t: this.t, speed, accel: 0, turn: 0, air: 0, vy: 0, crouch: 0, look });
     this.marker.position.y = 2.55 + Math.sin(t * 3) * 0.12;
   }
 }

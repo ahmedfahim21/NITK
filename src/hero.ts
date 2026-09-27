@@ -92,20 +92,49 @@ export type HeroRig = {
   lanyard: THREE.Group;
 };
 
-/** The hero, standing, feet on y=0, facing +z. */
-export function makeHero(): { root: THREE.Group; rig: HeroRig } {
-  const mat = toon(0xffffff, { vertexColors: true, flat: false });
-  const g = (name: string, parent: THREE.Object3D, x = 0, y = 0, z = 0) => {
+/**
+ * The bare skeleton: joints only, at the hero's proportions, feet on y=0,
+ * facing +z. The hero, the named characters and the crowd all hang their
+ * meshes on this, so one animator drives everyone.
+ */
+export function makeSkeleton(name = "person"): HeroRig {
+  const g = (n: string, parent: THREE.Object3D, x = 0, y = 0, z = 0) => {
     const o = new THREE.Group();
-    o.name = name;
+    o.name = n;
     o.position.set(x, y, z);
     parent.add(o);
     return o;
   };
   const root = new THREE.Group();
-  root.name = "hero";
-
+  root.name = name;
   const pelvis = g("pelvis", root, 0, HIP_Y, 0);
+  const hipL = g("hipL", pelvis, -0.095, -0.05, 0);
+  const hipR = g("hipR", pelvis, 0.095, -0.05, 0);
+  const kneeL = g("kneeL", hipL, 0, -THIGH, 0);
+  const kneeR = g("kneeR", hipR, 0, -THIGH, 0);
+  const ankleL = g("ankleL", kneeL, 0, -SHIN, 0);
+  const ankleR = g("ankleR", kneeR, 0, -SHIN, 0);
+  const spine = g("spine", pelvis, 0, 0.08, 0);
+  const chest = g("chest", spine, 0, 0.14, 0);
+  const bag = g("bag", chest, 0, 0.3, -0.17);
+  const lanyard = g("lanyard", chest, 0, 0.32, 0.12);
+  const neck = g("neck", chest, 0, 0.27, 0.01);
+  const head = g("head", neck, 0, 0.08, 0.01);
+  const shoulderL = g("shoulderL", chest, -0.212, 0.23, 0);
+  const shoulderR = g("shoulderR", chest, 0.212, 0.23, 0);
+  const elbowL = g("elbowL", shoulderL, 0, -0.28, 0);
+  const elbowR = g("elbowR", shoulderR, 0, -0.28, 0);
+  const wristL = g("wristL", elbowL, 0, -0.24, 0);
+  const wristR = g("wristR", elbowR, 0, -0.24, 0);
+  return { root, pelvis, spine, chest, neck, head, shoulderL, shoulderR, elbowL, elbowR, wristL, wristR, hipL, hipR, kneeL, kneeR, ankleL, ankleR, bag, lanyard };
+}
+
+/** The hero, standing, feet on y=0, facing +z. */
+export function makeHero(): { root: THREE.Group; rig: HeroRig } {
+  const mat = toon(0xffffff, { vertexColors: true, flat: false });
+  const rig = makeSkeleton("hero");
+  const { root, pelvis, spine, chest, bag, lanyard, neck, head } = rig;
+
   {
     const k = new Kit();
     // Jeans seat, a belt, and the tee's hem over it.
@@ -116,7 +145,7 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
   }
 
   const leg = (side: number) => {
-    const hip = g(side < 0 ? "hipL" : "hipR", pelvis, side * 0.095, -0.05, 0);
+    const hip = side < 0 ? rig.hipL : rig.hipR;
     {
       const k = new Kit();
       k.add(limb(0.078, THIGH, 0.062), JEANS);
@@ -124,7 +153,7 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
       k.add(new THREE.BoxGeometry(0.006, THIGH * 0.9, 0.02).translate(side * 0.07, -THIGH / 2, 0), JEANS_SEAM);
       hip.add(k.mesh(mat));
     }
-    const knee = g(side < 0 ? "kneeL" : "kneeR", hip, 0, -THIGH, 0);
+    const knee = side < 0 ? rig.kneeL : rig.kneeR;
     {
       const k = new Kit();
       k.add(new THREE.SphereGeometry(0.062, 12, 8), JEANS);
@@ -132,7 +161,7 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
       k.add(new THREE.CylinderGeometry(0.057, 0.057, 0.035, 12).translate(0, -SHIN + 0.05, 0), JEANS_SEAM);
       knee.add(k.mesh(mat));
     }
-    const ankle = g(side < 0 ? "ankleL" : "ankleR", knee, 0, -SHIN, 0);
+    const ankle = side < 0 ? rig.ankleL : rig.ankleR;
     {
       const k = new Kit();
       k.add(new THREE.BoxGeometry(0.1, 0.075, 0.25).translate(0, -0.035, 0.05), SHOE);
@@ -144,16 +173,14 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
     }
     return { hip, knee, ankle };
   };
-  const L = leg(-1);
-  const R = leg(1);
+  leg(-1);
+  leg(1);
 
-  const spine = g("spine", pelvis, 0, 0.08, 0);
   {
     const k = new Kit();
     k.add(new THREE.CylinderGeometry(0.182, 0.185, 0.2, 16).translate(0, 0.08, 0), TEE);
     spine.add(k.mesh(mat));
   }
-  const chest = g("chest", spine, 0, 0.14, 0);
   {
     const k = new Kit();
     k.add(new THREE.CylinderGeometry(0.212, 0.182, 0.3, 16).scale(1, 1, 0.78).translate(0, 0.13, 0), TEE);
@@ -171,7 +198,6 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
   }
 
   // The backpack, hung from the top of the chest so it can swing.
-  const bag = g("bag", chest, 0, 0.3, -0.17);
   {
     const k = new Kit();
     k.add(new THREE.BoxGeometry(0.32, 0.4, 0.15).translate(0, -0.22, -0.035), BAG);
@@ -182,7 +208,6 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
   }
 
   // The ID card on its lanyard, hanging from the neck.
-  const lanyard = g("lanyard", chest, 0, 0.32, 0.12);
   {
     const k = new Kit();
     for (const s of [-1, 1]) k.add(new THREE.BoxGeometry(0.016, 0.2, 0.006).rotateZ(s * 0.28).translate(s * 0.03, -0.09, 0.03), LANYARD);
@@ -191,13 +216,11 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
     lanyard.add(k.mesh(mat));
   }
 
-  const neck = g("neck", chest, 0, 0.27, 0.01);
   {
     const k = new Kit();
     k.add(new THREE.CylinderGeometry(0.048, 0.056, 0.1, 12).translate(0, 0.04, 0), SKIN);
     neck.add(k.mesh(mat));
   }
-  const head = g("head", neck, 0, 0.08, 0.01);
   {
     const k = new Kit();
     k.add(new THREE.SphereGeometry(0.1, 20, 14).scale(0.92, 1.12, 1.0).translate(0, 0.09, 0), SKIN);
@@ -221,7 +244,7 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
   }
 
   const arm = (side: number) => {
-    const shoulder = g(side < 0 ? "shoulderL" : "shoulderR", chest, side * 0.212, 0.23, 0);
+    const shoulder = side < 0 ? rig.shoulderL : rig.shoulderR;
     {
       const k = new Kit();
       // Short tee sleeve, then the bare upper arm.
@@ -230,7 +253,7 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
       k.add(limb(0.05, 0.28, 0.046), SKIN);
       shoulder.add(k.mesh(mat));
     }
-    const elbow = g(side < 0 ? "elbowL" : "elbowR", shoulder, 0, -0.28, 0);
+    const elbow = side < 0 ? rig.elbowL : rig.elbowR;
     {
       const k = new Kit();
       k.add(new THREE.SphereGeometry(0.046, 10, 6), SKIN);
@@ -238,7 +261,7 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
       if (side < 0) k.add(new THREE.CylinderGeometry(0.041, 0.041, 0.025, 10).translate(0, -0.2, 0), WATCH);
       elbow.add(k.mesh(mat));
     }
-    const wrist = g(side < 0 ? "wristL" : "wristR", elbow, 0, -0.24, 0);
+    const wrist = side < 0 ? rig.wristL : rig.wristR;
     {
       const k = new Kit();
       k.add(new THREE.BoxGeometry(0.06, 0.09, 0.035).translate(0, -0.045, 0.005), SKIN);
@@ -247,31 +270,8 @@ export function makeHero(): { root: THREE.Group; rig: HeroRig } {
     }
     return { shoulder, elbow, wrist };
   };
-  const AL = arm(-1);
-  const AR = arm(1);
-
-  const rig: HeroRig = {
-    root,
-    pelvis,
-    spine,
-    chest,
-    neck,
-    head,
-    shoulderL: AL.shoulder,
-    shoulderR: AR.shoulder,
-    elbowL: AL.elbow,
-    elbowR: AR.elbow,
-    wristL: AL.wrist,
-    wristR: AR.wrist,
-    hipL: L.hip,
-    hipR: R.hip,
-    kneeL: L.knee,
-    kneeR: R.knee,
-    ankleL: L.ankle,
-    ankleR: R.ankle,
-    bag,
-    lanyard,
-  };
+  arm(-1);
+  arm(1);
   return { root, rig };
 }
 

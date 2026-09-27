@@ -9,7 +9,8 @@ import { mulberry32, pointInPoly, type Pt } from "../geo";
 import type { CampusMap } from "../osm/types";
 import { toon } from "../fx/toon";
 import { groundHeight } from "../world/terrain";
-import { makeStudent, type Look } from "../player";
+import { makePerson, type Look } from "../people";
+import type { HeroAnimator } from "../hero";
 
 function tube(a: THREE.Vector3, b: THREE.Vector3, r: number): THREE.BufferGeometry {
   const len = a.distanceTo(b);
@@ -119,7 +120,7 @@ export function buildRacks(spots: { x: number; z: number; face: number }[]): THR
   return out;
 }
 
-type Rider = { g: THREE.Group; cycle: THREE.Group; legs: THREE.Object3D[]; edge: number; dir: 1 | -1; t: number; speed: number; x: number; z: number };
+type Rider = { g: THREE.Group; cycle: THREE.Group; anim: HeroAnimator; edge: number; dir: 1 | -1; t: number; speed: number; x: number; z: number };
 
 /** A few students riding the campus roads. */
 export class Riders {
@@ -170,18 +171,13 @@ export class Riders {
     for (let k = 0; k < count; k++) {
       const g = new THREE.Group();
       const cycle = makeCycle(FRAMES[k % FRAMES.length]);
-      const s = makeStudent(looks[k % looks.length]);
-      const p = s.parts;
-      p.hips.position.set(0, 1.02, -0.18);
-      p.hips.rotation.x = 0.28;
-      p.armL.rotation.x = -1.15;
-      p.armR.rotation.x = -1.15;
+      const s = makePerson(looks[k % looks.length]);
       g.add(cycle, s.root);
       this.group.add(g);
       this.riders.push({
         g,
         cycle,
-        legs: [p.legL, p.legR],
+        anim: s.anim,
         edge: Math.floor(this.rand() * this.edges.length),
         dir: this.rand() < 0.5 ? 1 : -1,
         t: this.rand(),
@@ -224,9 +220,8 @@ export class Riders {
       r.g.rotation.y = Math.atan2(dx * r.dir, dz * r.dir);
       const spin = (v * dt) / 0.34;
       for (const w of r.cycle.userData.wheels as THREE.Object3D[]) w.rotation.x += spin;
-      const ph = (r.cycle.userData.phase = ((r.cycle.userData.phase as number) ?? 0) + spin);
-      r.legs[0].rotation.x = -1.0 + Math.sin(ph) * 0.55;
-      r.legs[1].rotation.x = -1.0 - Math.sin(ph) * 0.55;
+      const ph = (r.cycle.userData.phase = ((r.cycle.userData.phase as number) ?? 0) + spin * 0.5);
+      r.anim.update({ dt, t: ph, speed: v, accel: 0, turn: 0, air: 0, vy: 0, crouch: 0, look: 0, pedal: ph });
     }
   }
 }

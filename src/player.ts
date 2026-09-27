@@ -8,7 +8,6 @@
  * touch into turns and widens with speed.
  */
 import * as THREE from "three";
-import { toon } from "./fx/toon";
 import type { Grid } from "./world/grid";
 import { groundHeight } from "./world/terrain";
 import { HeroAnimator, makeHero } from "./hero";
@@ -141,80 +140,6 @@ export class Input {
     this.dy = 0;
     this.wheel = 0;
   }
-}
-
-export type Look = {
-  skin: number;
-  shirt: number;
-  pants: number;
-  shoe: number;
-  hair: number;
-  /** Backpack colour, or null for none. */
-  bag: number | null;
-  longHair?: boolean;
-};
-
-export const PLAYER_LOOK: Look = { skin: 0xc68863, shirt: 0x2e86de, pants: 0x2d3436, shoe: 0xf5f6fa, hair: 0x1e1a18, bag: 0xd35400 };
-
-export function makeStudent(look: Look = PLAYER_LOOK): { root: THREE.Group; parts: Record<string, THREE.Object3D> } {
-  const root = new THREE.Group();
-  const skin = toon(look.skin);
-  const shirt = toon(look.shirt);
-  const pants = toon(look.pants);
-  const shoe = toon(look.shoe);
-  const hair = toon(look.hair);
-  const bag = toon(look.bag ?? 0);
-
-  const hips = new THREE.Group();
-  hips.position.y = 0.95;
-  root.add(hips);
-  const legs: THREE.Object3D[] = [];
-  for (const s of [-1, 1]) {
-    const hip = new THREE.Group();
-    hip.position.set(s * 0.12, 0, 0);
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.85, 0.18), pants);
-    leg.position.y = -0.43;
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.1, 0.3), shoe);
-    foot.position.set(0, -0.88, 0.05);
-    hip.add(leg, foot);
-    hips.add(hip);
-    legs.push(hip);
-  }
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.62, 0.26), shirt);
-  torso.position.y = 0.33;
-  hips.add(torso);
-  const arms: THREE.Object3D[] = [];
-  for (const s of [-1, 1]) {
-    const sh = new THREE.Group();
-    sh.position.set(s * 0.3, 0.6, 0);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.13), shirt);
-    arm.position.y = -0.24;
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.1), skin);
-    hand.position.y = -0.56;
-    sh.add(arm, hand);
-    hips.add(sh);
-    arms.push(sh);
-  }
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), skin);
-  head.position.y = 0.84;
-  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
-  hairCap.position.y = 0.87;
-  hairCap.rotation.x = -0.25;
-  hips.add(head, hairCap);
-  if (look.longHair) {
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.42, 0.09), hair);
-    tail.position.set(0, 0.66, -0.16);
-    hips.add(tail);
-  }
-  if (look.bag !== null) {
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.44, 0.18), bag);
-    pack.position.set(0, 0.36, -0.22);
-    hips.add(pack);
-  }
-  root.traverse((o) => {
-    if ((o as THREE.Mesh).isMesh) o.castShadow = true;
-  });
-  return { root, parts: { hips, legL: legs[0], legR: legs[1], armL: arms[0], armR: arms[1] } };
 }
 
 export class Player {
