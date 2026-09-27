@@ -146,9 +146,9 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 ## What's in the world
 
 - **OSM geometry, 1:1.** Every road (NH66 as a divided highway with a median), building footprint, landuse area, sports pitch, pool, barrier and mapped tree sits at its real position.
-- **Buildings.** Heights come from `height` or `building:levels` when OSM has them, otherwise from sensible defaults. Façades are matched to photographs of the campus (`src/world/archetypes.ts`, by OSM name):
-  - the Main Building and the old departments: pale-yellow render with continuous concrete sunshade ledges over recessed windows
-  - the old boys' blocks and girls' hostels: cream plaster, brick-red pilasters, Mangalore-tile roofs
+- **Buildings.** Heights come from `height` or `building:levels` when OSM has them, otherwise from sensible defaults. Façades are matched to photographs of the campus and NITK's [virtual tour](https://vtour.nitk.ac.in/) (`src/world/archetypes.ts`, by OSM name):
+  - the Main Building and the old departments: khaki-yellow render with continuous concrete sunshade ledges over recessed windows; the Main Building's wings add vertical fins (an egg-crate front)
+  - the old hostel blocks: khaki render, sunshade ledges, louvred windows; tiled roofs only where OSM says pitched
   - the Mega Hostel towers: tan frame, cream panels, small grilled windows, a blue-glass stair core
   - LHC-A: exposed laterite; the Library, LHC-D, CRF, CIDS and SJA: white render with lavender-grey bands
   - pastel houses with Mangalore-tile hip roofs and black rooftop water tanks, and shopfronts with rolling shutters off campus
@@ -158,13 +158,16 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 - **Landmarks.** These are matched by OSM name or tag, so they land wherever the real map puts them:
   - the lighthouse on its knoll, with a sweeping beam after dusk
   - the Main Building's olive entrance block: glass front between four yellow piers, three yellow arches over the porch, the blue fountains in front
-  - the main gate on NH66: stone piers, security cabin and the curved black-granite trilingual name wall
+  - the main gate on NH66: stone piers, security cabin and the curved black-granite trilingual name wall; inside it, two yellow pavilions with terracotta roofs and a balustrade with yellow ball finials
+  - the front lawns from the gate to the Main Building: red-brick walks, croton beds, Ashoka rows
+  - the SAC amphitheatre: green tiers, red stair flights, lavender stage under a canopy on yellow poles
   - the square red-and-white lighthouse with its gallery, lantern and sweeping radar
   - Chemical Engineering's curved canopy
   - signage on the Central Library, SJA and Lecture Hall Complex
   - the fountain, the tricolour and water towers
 - **Coast.** The sea polygon is built from the OSM coastline. It has cel-banded shallows, swell lines, breakers and a surf line on the real shore, with sand and a casuarina belt behind it.
-- **Vegetation.** Coconut palms, broadleaf canopy and casuarinas, scattered by land use.
+- **Vegetation.** Coconut palms, broadleaf canopy and casuarinas, scattered by land use. On campus: columnar Ashoka trees, rain-tree avenues arching over the roads, and bare laterite soil in their shade.
+- **Street furniture.** Black-and-white painted kerbs and white globe lamps on campus roads; compound walls with a laterite plinth, jali screen and pillars.
 - **Time of day.** Morning, noon, Arabian-Sea sunset and night, with lit windows, street-lamp pools and stars.
 - **HUD.** A rotating minimap, a full map with click-to-teleport and place search, floating building labels, and a "you are near" banner.
 
