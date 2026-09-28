@@ -17,13 +17,14 @@ import { Places, type PlaceKey, type Spot } from "./places";
 import { Crowd, CHATTER, BUMP_LINES } from "./crowd";
 import { Riders, buildRacks, makeCycle } from "./cycles";
 import { Beacon, Rain, Swarm } from "./fx";
-import { Cast, type CastId } from "./cast";
+import { Cast, CAST, type CastId } from "./cast";
 import { sfx, setRainSound, unlockAudio } from "./audio";
 import { CHAPTER1, type Mission } from "./chapter1";
 import { CHAPTER2 } from "./chapter2";
 import { JOBS } from "./jobs";
 import { buildStalls, CLUBS, type StallRig } from "./stalls";
 import { openJournal } from "./journal";
+import { openYearbook } from "./yearbook";
 import { attend, classNow, closeMissed, nextClassText, perks } from "./courses";
 import { CURFEW_WARNING, PASS_OUT, WAKE, afterCurfew, openNow } from "./schedule";
 import { wait } from "./util";
@@ -36,6 +37,12 @@ import { ROAD } from "../world/grid";
 type Target = Spot | PlaceKey | CastId;
 
 export const MISSIONS: Mission[] = [...CHAPTER1, ...CHAPTER2, ...JOBS];
+
+const CAST_BY_NAME = new Map((Object.entries(CAST) as [CastId, (typeof CAST)[CastId]][]).map(([id, d]) => [d.name, id]));
+
+/** Story missions on the map are gold; campus jobs are teal. */
+export const STORY_COLOUR = "#f2b84b";
+export const JOB_COLOUR = "#3ec7b0";
 
 export const CHAPTERS: { name: string; next: string }[] = [
   { name: "Chapter 1 · Srinivasnagar", next: "Chapter 2: Recruitments" },
@@ -180,7 +187,20 @@ export class Game {
   }
 
   say(lines: [string, string][]) {
+    // Whoever speaks to you (in person, on the phone, by text) goes in the yearbook.
+    for (const [who] of lines) {
+      const name = who.replace(/\s*\(.*\)\s*$/, "");
+      const id = CAST_BY_NAME.get(name);
+      if (id) this.meet(id);
+    }
     return this.ui.say(lines);
+  }
+
+  /** Adds someone to the yearbook, once. */
+  meet(id: CastId) {
+    if (this.explore || this.state.flags[`met:${id}`]) return;
+    this.state.flags[`met:${id}`] = this.state.day;
+    this.ui.toast(`Yearbook · ${CAST[id].name}`, "#1d3557");
   }
 
   choose(who: string, q: string, options: string[]) {
@@ -356,9 +376,13 @@ export class Game {
     return this.available().filter((m) => openNow(this.state, m));
   }
 
+  /** Which mission each giver out on campus is offering, for the map's markers. */
+  private offering = new Map<CastId, Mission>();
+
   /** Put givers of available missions in place with their "!" markers. */
   refreshGivers() {
     for (const c of this.cast.chars.values()) c.marker.visible = false;
+    this.offering.clear();
     if (this.active) return;
     // A giver with several open missions stands where the first one is,
     // which is also the one talking to them starts.
@@ -366,6 +390,7 @@ export class Game {
     for (const m of this.openMissions()) {
       if (!m.giver || placed.has(m.giver)) continue;
       placed.add(m.giver);
+      this.offering.set(m.giver, m);
       const c = this.put(m.giver, m.where!, 1.5, 1.5);
       c.marker.visible = true;
     }
@@ -860,7 +885,8 @@ export class Game {
       let timerShown = nav.timer;
       if (nav.clockBy !== undefined) timerShown = Math.max(0, nav.clockBy - st.minutes) / Math.max(0.01, st.timeScale);
       ui.setObjective(this.active?.title ?? "", `${nav.objective} <span style="opacity:.6">(${Math.round(bd)} m)</span>`, timerShown);
-      this.hud.markers = tgts.map((t) => ({ x: t.x, z: t.z, color: "#f2b84b" }));
+      const act = this.active;
+      this.hud.markers = tgts.map((t) => ({ x: t.x, z: t.z, color: act?.repeat ? JOB_COLOUR : STORY_COLOUR, icon: act?.icon ?? "pin", label: ("name" in t && typeof t.name === "string" && t.name) || nav.objective, objective: true }));
       const done = (hit: number) => {
         this.nav = null;
         this.beacon.set(null);
@@ -874,13 +900,21 @@ export class Game {
       this.beacon.set(null);
       if (!this.active) {
         ui.setObjective(null);
-        this.hud.markers = [...this.cast.chars.values()].filter((c) => c.marker.visible).map((c) => ({ x: c.x, z: c.z, color: "#f2b84b" }));
+        this.hud.markers = [...this.cast.chars.entries()]
+          .filter(([, c]) => c.marker.visible)
+          .map(([id, c]) => {
+            const m = this.offering.get(id);
+            return { x: c.x, z: c.z, color: m?.repeat ? JOB_COLOUR : STORY_COLOUR, icon: m?.icon ?? "star", label: m ? `${m.title} · ${CAST[id].name}` : CAST[id].name };
+          });
       } else this.hud.markers = [];
     }
 
     // Glance at whoever you're walking up to.
     let near: { x: number; z: number } | null = null;
     let nd = 6;
+    for (const [id, c] of this.cast.chars) {
+      if (c.root.visible && !this.cutscene && Math.hypot(c.x - p.pos.x, c.z - p.pos.z) < 3.5) this.meet(id);
+    }
     for (const c of [...this.cast.chars.values(), ...this.cast.extras]) {
       if (!c.root.visible) continue;
       const d = Math.hypot(c.x - p.pos.x, c.z - p.pos.z);
@@ -929,6 +963,7 @@ export class Game {
     ui.setPrompt(prompt);
     if (action && inp.hit("KeyE") && performance.now() - ui.lastClosed > 350) void action();
     if (inp.hit("KeyJ") && !holding) void openJournal(this);
+    if (inp.hit("KeyY") && !holding) void openYearbook(this);
     if (p.riding && inp.hit("KeyB")) {
       sfx.bell();
       for (const n of this.crowd.near(p.pos.x, p.pos.z, 7)) this.crowd.startle(n.i, p.pos.x, p.pos.z);

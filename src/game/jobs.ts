@@ -23,6 +23,7 @@ export const JOBS: Mission[] = [
   {
     id: "job-newswagon",
     title: "News Wagon",
+    icon: "news",
     chapter: CH,
     repeat: true,
     giver: "nikhil",
@@ -58,6 +59,7 @@ export const JOBS: Mission[] = [
   {
     id: "job-xerox",
     title: "Xerox Run",
+    icon: "printer",
     chapter: CH,
     repeat: true,
     giver: "manju",
@@ -91,6 +93,7 @@ export const JOBS: Mission[] = [
   {
     id: "job-puncture",
     title: "Puncture Repair",
+    icon: "wrench",
     chapter: CH,
     repeat: true,
     giver: "babu",
@@ -129,6 +132,7 @@ export const JOBS: Mission[] = [
   {
     id: "job-mess",
     title: "Mess Supply",
+    icon: "parcel",
     chapter: CH,
     repeat: true,
     giver: "kotian",
@@ -161,6 +165,7 @@ export const JOBS: Mission[] = [
   {
     id: "job-shelving",
     title: "Library Shelving",
+    icon: "book",
     chapter: CH,
     repeat: true,
     giver: "librarian",
@@ -201,6 +206,7 @@ export const JOBS: Mission[] = [
   {
     id: "job-films",
     title: "Friday Films",
+    icon: "film",
     chapter: CH,
     repeat: true,
     giver: "tanvi",

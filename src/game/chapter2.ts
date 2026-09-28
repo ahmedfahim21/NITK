@@ -25,6 +25,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-stalls",
     title: "Recruitment Week",
+    icon: "store",
     chapter: CH,
     requires: ["ch1-sunset"],
     reward: { rep: { Clubs: 10 } },
@@ -88,6 +89,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-nextyear",
     title: "Come Back Next Year",
+    icon: "lock",
     chapter: CH,
     giver: "ananya",
     where: "sac",
@@ -125,6 +127,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-cup",
     title: "Freshers Cup",
+    icon: "trophy",
     chapter: CH,
     giver: "coach",
     where: "mainGround",
@@ -162,6 +165,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-flat",
     title: "Flat Tyre",
+    icon: "wrench",
     chapter: CH,
     giver: "rohan",
     where: "karavali",
@@ -216,6 +220,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-linux",
     title: "sudo make me a coffee",
+    icon: "terminal",
     chapter: CH,
     giver: "sid",
     where: "karavali",
@@ -243,6 +248,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-stars",
     title: "First Light",
+    icon: "telescope",
     chapter: CH,
     giver: "meera",
     where: "mainGround",
@@ -272,6 +278,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-ganesha",
     title: "Ganapati Bappa",
+    icon: "sparkles",
     chapter: CH,
     giver: "rohan",
     where: "karavali",
@@ -334,6 +341,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-spicmacay",
     title: "Raga at SJA",
+    icon: "music",
     chapter: CH,
     giver: "aditi",
     where: "sja",
@@ -382,6 +390,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-cleanup",
     title: "Not Me But You",
+    icon: "sea",
     chapter: CH,
     giver: "arjun",
     where: "beach",
@@ -437,6 +446,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-webclub",
     title: "CP League",
+    icon: "code",
     chapter: CH,
     giver: "ananya",
     where: "labDesk",
@@ -474,6 +484,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-nightrun",
     title: "Night Canteen Run",
+    icon: "moon",
     chapter: CH,
     giver: "raju",
     where: "nightCanteen",
@@ -517,6 +528,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-lsd",
     title: "Quiz Night",
+    icon: "mic",
     chapter: CH,
     giver: "farhan",
     where: "lhcD",
@@ -553,6 +565,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-wright",
     title: "Wright Flight",
+    icon: "plane",
     chapter: CH,
     giver: "keerthi",
     where: "mainGround",
@@ -603,6 +616,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-expose",
     title: "Expose",
+    icon: "camera",
     chapter: CH,
     giver: "arnav",
     where: "sac",
@@ -643,6 +657,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-incub8",
     title: "Pitch Deck",
+    icon: "idea",
     chapter: CH,
     giver: "vikram",
     where: "step",
@@ -689,6 +704,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-mural",
     title: "Underpass",
+    icon: "palette",
     chapter: CH,
     giver: "isha",
     where: "coop",
@@ -731,6 +747,7 @@ export const CHAPTER2: Mission[] = [
   {
     id: "ch2-musicalnight",
     title: "Musical Night",
+    icon: "guitar",
     chapter: CH,
     giver: "dev",
     where: "sac",

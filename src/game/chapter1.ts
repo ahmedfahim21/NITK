@@ -13,6 +13,7 @@ import type { Faction } from "./state";
 import type { CastId } from "./cast";
 import type { PlaceKey } from "./places";
 import type { Game } from "./index";
+import type { IconId } from "../ui/icons";
 import { sfx } from "./audio";
 import { hhmm, wait } from "./util";
 import { QUIZ } from "./quiz";
@@ -21,6 +22,8 @@ import { COURSES, level } from "./courses";
 export type Mission = {
   id: string;
   title: string;
+  /** Its icon on the map, the minimap and in the journal. */
+  icon: IconId;
   chapter: string;
   giver?: CastId;
   where?: PlaceKey;
@@ -48,6 +51,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-arrival",
     title: "Main Gate",
+    icon: "flag",
     chapter: CH,
     requires: [],
     reward: { rep: { Karavali: 5 } },
@@ -97,6 +101,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-mess",
     title: "Three Messes",
+    icon: "thali",
     chapter: CH,
     giver: "rohan",
     where: "karavali",
@@ -139,6 +144,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-cycle",
     title: "Wheels",
+    icon: "bike",
     chapter: CH,
     giver: "vikram",
     where: "nandini",
@@ -178,6 +184,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-iris",
     title: "Log in to IRIS",
+    icon: "code",
     chapter: CH,
     giver: "ananya",
     where: "computerCentre",
@@ -221,6 +228,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-induction",
     title: "Induction Week",
+    icon: "users",
     chapter: CH,
     giver: "prakash",
     where: "karavali",
@@ -273,6 +281,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-ncc",
     title: "Saturday Parade",
+    icon: "shield",
     chapter: CH,
     giver: "divya",
     where: "mainGround",
@@ -321,6 +330,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-library",
     title: "Library Card",
+    icon: "library",
     chapter: CH,
     giver: "librarian",
     where: "libraryDesk",
@@ -370,6 +380,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-labkit",
     title: "Lab Kit",
+    icon: "flask",
     chapter: CH,
     giver: "vikram",
     where: "coop",
@@ -416,6 +427,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-scholarship",
     title: "Scholarship Form",
+    icon: "scroll",
     chapter: CH,
     giver: "shetty",
     where: "lobby",
@@ -457,6 +469,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-class",
     title: "Roll Call",
+    icon: "grad",
     chapter: CH,
     giver: "hegde",
     where: "lhcC",
@@ -525,6 +538,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-maggi",
     title: "Maggi in the Rain",
+    icon: "coffee",
     chapter: CH,
     giver: "rohan",
     where: "lhc",
@@ -560,6 +574,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-sunset",
     title: "The Sunset Rule",
+    icon: "lighthouse",
     chapter: CH,
     giver: "prakash",
     where: "nescafe",
@@ -616,6 +631,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-hcc",
     title: "Monsoon Fever",
+    icon: "stethoscope",
     chapter: CH,
     giver: "rohan",
     where: "karavali",
@@ -660,6 +676,7 @@ export const CHAPTER1: Mission[] = [
   {
     id: "ch1-readingroom",
     title: "The Reading Room",
+    icon: "news",
     chapter: CH,
     giver: "ravi",
     where: "karavali",

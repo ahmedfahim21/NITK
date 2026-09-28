@@ -125,18 +125,38 @@
       /* Full map */
       #map-overlay { position: fixed; inset: 0; display: none; background: rgba(8, 11, 17, 0.72); backdrop-filter: blur(6px); padding: 24px; gap: 16px; z-index: 6; }
       #map-overlay.open { display: flex; }
-      #big-map-wrap { flex: 1; position: relative; min-width: 0; }
-      #big-map { width: 100%; height: 100%; border-radius: 18px; border: 1px solid var(--line-strong); cursor: crosshair; background: #9fc3cf; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); }
-      #map-side { width: 290px; display: flex; flex-direction: column; padding: 16px; gap: 10px; }
-      #map-side h2 { margin: 0; font: 400 26px var(--display); letter-spacing: 0.06em; }
-      #place-search { font: 400 14px "Noto Sans", sans-serif; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(255, 255, 255, 0.06); color: var(--text); outline: none; }
+      #big-map-wrap { flex: 1; position: relative; min-width: 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--line-strong); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); }
+      #big-map { width: 100%; height: 100%; display: block; cursor: grab; background: #12161c; touch-action: none; }
+      #big-map:active { cursor: grabbing; }
+      #map-tools { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; }
+      .map-tool { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--glass-strong); color: var(--text); cursor: pointer; }
+      .map-tool:hover { background: var(--gold); color: var(--ink); }
+      .map-tool .pm { font: 400 22px/1 var(--label); }
+      #map-tip { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--glass-strong); border: 1px solid var(--line); font: 400 14px var(--label); letter-spacing: 0.04em; color: var(--text); pointer-events: none; }
+      #map-credit { position: absolute; right: 12px; bottom: 8px; font-size: 10px; color: rgba(255, 255, 255, 0.55); pointer-events: none; }
+      #map-side { width: 300px; display: flex; flex-direction: column; padding: 16px; gap: 8px; min-height: 0; }
+      #map-side h2 { margin: 0 0 4px; font: 400 26px var(--display); letter-spacing: 0.06em; }
+      #map-side .cap { margin-top: 4px; }
+      #map-open { display: flex; flex-direction: column; gap: 1px; max-height: 30%; overflow: auto; margin: 0 -6px; }
+      #map-open .cap { margin: 0 6px 2px; }
+      #map-key { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 6px; margin: 0 -4px; }
+      .key-item { display: flex; align-items: center; gap: 7px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font: 400 13px "Noto Sans", sans-serif; text-align: left; cursor: pointer; }
+      .key-item:hover { background: rgba(255, 255, 255, 0.06); }
+      .key-item .n { margin-left: auto; font: 400 12px var(--label); color: var(--muted); }
+      .key-item.off { opacity: 0.38; }
+      .dot { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.5); }
+      #place-search { font: 400 14px "Noto Sans", sans-serif; padding: 9px 12px; margin-top: 4px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(255, 255, 255, 0.06); color: var(--text); outline: none; }
       #place-search:focus { border-color: var(--gold); }
-      #place-list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 1px; margin: 0 -6px; }
-      .place { text-align: left; font: 400 14px "Noto Sans", sans-serif; padding: 7px 10px; border: 0; background: transparent; color: var(--text); border-radius: 8px; cursor: pointer; }
+      #place-list { flex: 1; min-height: 80px; overflow: auto; display: flex; flex-direction: column; gap: 1px; margin: 0 -6px; }
+      #place-list .empty { padding: 8px 10px; color: var(--muted); font-size: 13px; }
+      .place { display: flex; align-items: center; gap: 9px; text-align: left; font: 400 14px "Noto Sans", sans-serif; padding: 6px 10px; border: 0; background: transparent; color: var(--text); border-radius: 8px; cursor: pointer; }
+      .place .ico { flex: none; display: grid; }
+      .place .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .place:hover { background: rgba(242, 184, 75, 0.16); color: var(--gold); }
       #map-side .hint { font-size: 12px; color: var(--muted); }
       #map-close { font: 400 14px var(--label); letter-spacing: 0.12em; text-transform: uppercase; padding: 9px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(255, 255, 255, 0.06); color: var(--text); cursor: pointer; }
       #map-close:hover { background: var(--gold); color: var(--ink); }
+      .label .ico, #near .ico { display: inline-grid; vertical-align: -2px; margin-right: 6px; }
 
       /* Loading */
       #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; background: radial-gradient(ellipse at 50% 35%, #1f3354, #0b0f17 70%); color: var(--text); gap: 12px; z-index: 10; transition: opacity 0.6s; }
@@ -191,6 +211,7 @@
         <span><kbd>Space</kbd> jump</span>
         <span><kbd>B</kbd> bell</span>
         <span><kbd>J</kbd> journal</span>
+        <span><kbd>Y</kbd> yearbook</span>
         <span><kbd>M</kbd> map</span>
         <span><kbd>F</kbd> drone</span>
         <span><kbd>T</kbd> skip time</span>
@@ -210,13 +231,21 @@
       <div id="source"></div>
     </div>
     <div id="map-overlay">
-      <div id="big-map-wrap"><canvas id="big-map"></canvas></div>
+      <div id="big-map-wrap">
+        <canvas id="big-map"></canvas>
+        <div id="map-tools"></div>
+        <div id="map-tip"></div>
+        <span id="map-credit">© OpenStreetMap contributors</span>
+      </div>
       <div id="map-side" class="panel">
         <div class="cap">Campus map</div>
-        <h2>Go to</h2>
+        <h2>NITK Surathkal</h2>
+        <div id="map-open"></div>
+        <div class="cap">Key</div>
+        <div id="map-key"></div>
         <input id="place-search" placeholder="Search places" autocomplete="off" />
         <div id="place-list"></div>
-        <div class="hint">Click anywhere on the map to teleport there.</div>
+        <div class="hint">Drag to move, scroll to zoom. Click the map or a place to teleport.</div>
         <button id="map-close">Close · M</button>
       </div>
     </div>
