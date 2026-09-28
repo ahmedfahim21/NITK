@@ -193,7 +193,7 @@ The journal lists your courses, levels, perks and the timetable.
 
 ### Journal and yearbook
 
-- **Journal (J):** the day at a glance (date, time, season, money, attendance), respect with each hostel and group in its colour, clubs, and every mission and campus job with its icon, state and hours.
+- **Journal (J):** the day at a glance (date, time, season, money, attendance), respect with each hostel and group in its colour, clubs, and the missions and campus jobs that have appeared so far, with their icons, state and hours. Nothing still locked is listed or counted, so it never spoils what's coming. The journal and yearbook take their look from NITK's alumni site: navy headings, one fresh green, Raleway, white cards with thin borders.
 - **Yearbook (Y, or from the journal):** everyone in the cast, grouped into friends and seniors, clubs, faculty and staff, and around campus. Each person unlocks when you walk up to them or they speak to you, and gets a portrait rendered from their own 3D model. Until then they are a silhouette with a hint of where to find them.
 
 The Bully-style systems:
@@ -315,6 +315,7 @@ src/
   game/ui.css        game overlays: dialogue, banners, journal, yearbook, quizzes
 scripts/fetch-osm.mjs  snapshot the extract into public/data (also run by CI)
 scripts/fetch-dem.mjs  snapshot the terrain into public/data
+scripts/render-og.mjs  render the link-preview image public/og.png from public/og.svg
 ```
 
 ## Working on the campus
@@ -343,6 +344,10 @@ Drop tracks into `public/music/` and list them in `public/music/manifest.json`:
 ```
 
 Moods: `title`, `day`, `rain`, `sunset`, `night`, `mission`.
+
+## Link preview
+
+`public/og.svg` is the Open Graph image: a text-free illustration of the lighthouse beam over the sunset sea with the campus towers behind. `npm run og:render` rasterises it to `public/og.png` (1200 x 630) with headless Chrome; set `CHROME` if the browser isn't at the usual macOS path. `vite.config.ts` adds the Open Graph and Twitter tags pointing at https://nitk-world.vercel.app. Set `VITE_SITE_URL` to point them somewhere else, such as a preview deployment.
 
 ## Credits
 
