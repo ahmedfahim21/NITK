@@ -180,13 +180,67 @@ export const perks = {
 /* ---------------- attending ---------------- */
 
 const OPENERS: Record<CourseId, string[]> = {
-  CS110: ["'Main returns int. It always returns int. Write that on your hand.'", "'Today: pointers. Half of you will leave this room confused. The other half will be wrong.'"],
-  CS111: ["'Log in, open a terminal, and do NOT type rm -rf anything.'", "'The lab record is due at five. The lab closes at five. Think about that.'"],
-  MA110: ["'Calculus is the study of change. Your attendance is the study of no change, please.'", "'Pens down. Mental maths first. Five questions. Go.'"],
-  CY110: ["'Chemistry is everywhere. Especially in the mess sambar.'", "'Quiz first, then enthalpy. You will remember neither.'"],
-  CY111: ["'Goggles. Coat. Phenolphthalein. If it goes deep pink you've gone too far, like my patience.'", "'Burette, pipette, conical flask. Faint pink, then STOP.'"],
-  WO110: ["'Free-body diagram first. Always. Even for your breakfast.'", "'Everything is in equilibrium until the mid-sems.'"],
-  CV110: ["'The Western Ghats catch the monsoon. This class catches you sleeping.'", "'One credit. Full attendance. Those are the rules.'"],
+  CS110: [
+    "'Main returns int. It always returns int. Write that on your hand.'",
+    "'Today: pointers. Half of you will leave this room confused. The other half will be wrong.'",
+    "'Segmentation fault is not an error message. It is the machine expressing disappointment.'",
+    "'Indentation is not optional. The compiler doesn't care. I do.'",
+    "'Arrays start at zero. So does your understanding. Let us begin.'",
+  ],
+  CS111: [
+    "'Log in, open a terminal, and do NOT type rm -rf anything.'",
+    "'The lab record is due at five. The lab closes at five. Think about that.'",
+    "'If it compiles on the first try, check whether you actually saved the file.'",
+    "'Ctrl+S. Then Ctrl+S again. I have watched grown men lose an hour to Ctrl+S.'",
+    "'Ashwin will come round. When he stands behind you, that is not a compliment.'",
+  ],
+  MA110: [
+    "'Calculus is the study of change. Your attendance is the study of no change, please.'",
+    "'Pens down. Mental maths first. Five questions. Go.'",
+    "'A limit is a promise to get close without ever quite arriving. Like your assignments.'",
+    "'Determinants: a number that tells you whether your matrix has any future.'",
+    "'Newton and Leibniz argued for years over this. You will argue for one tutorial.'",
+  ],
+  CY110: [
+    "'Chemistry is everywhere. Especially in the mess sambar.'",
+    "'Quiz first, then enthalpy. You will remember neither.'",
+    "'Le Chatelier's principle: disturb a system and it pushes back. Try it on a hostel warden.'",
+    "'Everything reacts with something. Most of you react with 8 AM.'",
+    "'Electrochemistry: the reason your phone dies at 20% and lies about it.'",
+  ],
+  CY111: [
+    "'Goggles. Coat. Phenolphthalein. If it goes deep pink you've gone too far, like my patience.'",
+    "'Burette, pipette, conical flask. Faint pink, then STOP.'",
+    "'Read the meniscus at eye level. Not from the door.'",
+    "'Rinse the burette with the solution first. Yes, first. I said first.'",
+    "'Nothing goes down the sink that I haven't seen. Yes, I can tell.'",
+  ],
+  WO110: [
+    "'Free-body diagram first. Always. Even for your breakfast.'",
+    "'Everything is in equilibrium until the mid-sems.'",
+    "'Friction is why the cycle stops. Also why your notes stay on the desk.'",
+    "'A beam supports load. You support the beam. Nobody supports the dean.'",
+    "'Draw the diagram. If your diagram looks like a spider, start again.'",
+  ],
+  CV110: [
+    "'The Western Ghats catch the monsoon. This class catches you sleeping.'",
+    "'One credit. Full attendance. Those are the rules.'",
+    "'Every plastic bottle in this room will outlive us all. Discuss.'",
+    "'The mangroves on this coast are doing more for you than the seawall. Pay attention.'",
+    "'Sustainability: doing what you can, without a lecture. Unlike this one.'",
+  ],
+};
+
+
+/** What the professor says as you leave, by course, for a pass and a miss. */
+const REACTIONS: Record<CourseId, { pass: string[]; fail: string[] }> = {
+  CS110: { pass: ["Compiled, ran, and printed the right thing. Rare.", "You read the pointer correctly. Do not let it go to your head."], fail: ["The code ran exactly as written. That was the problem.", "Trace it on paper first. The machine is not going to do it for you."] },
+  CS111: { pass: ["Ashwin initials the record without looking up. The highest compliment.", "Clean run. Save it before you touch anything."], fail: ["Ashwin, gently: 'Read the error message. It's usually right.'", "The bug was there the whole time. It's always there the whole time."] },
+  MA110: { pass: ["Dr. Bhat nods, once.", "Quick and correct. Dr. Bhat writes something small in his register."], fail: ["Dr. Bhat: 'Slower. Then faster. In that order.'", "Dr. Bhat sighs, audibly."] },
+  CY110: { pass: ["Dr. D'Souza: 'Someone reads the textbook.'", "Good. Now go and test it on the sambar."], fail: ["Dr. D'Souza: 'Page 42. Read it as if it were a story.'", "Half the class missed that one. You were in the half."] },
+  CY111: { pass: ["Shankar initials your record with a flourish.", "Faint pink. Exactly. Shankar puts down his tea to look."], fail: ["Shankar: 'Deep magenta. We use the sink. Not the floor.'", "Shankar hands you a fresh flask without a word."] },
+  WO110: { pass: ["Prof. Hegde: 'A clean diagram. Keep this up and I'll learn your name.'", "Correct, and you drew the arrows the right way round."], fail: ["Prof. Hegde: 'Your beam is falling. Draw the reactions.'", "Equilibrium requires effort. Yours needs more."] },
+  CV110: { pass: ["Dr. Kini smiles for the first time this semester.", "Good answer. Take a banana leaf home for the hostel."], fail: ["Dr. Kini: 'It's on the syllabus. It's also outside the window.'", "Look at the Ghats on your way out. They'll help."] },
 };
 
 export async function attend(g: Game, slot: Slot): Promise<void> {
@@ -203,11 +257,14 @@ export async function attend(g: Game, slot: Slot): Promise<void> {
   st.minutes = Math.max(st.minutes, slot.start + 5);
   await g.ui.fadeIn(400);
   const lv = level(st, c.id);
-  const lines = OPENERS[c.id];
-  await g.say([[c.prof, lines[(st.day + slot.start) % lines.length].replace(/^'|'$/g, "")]]);
+  const openers = OPENERS[c.id];
+  await g.say([[c.prof, openers[(st.day + slot.start) % openers.length].replace(/^'|'$/g, "")]]);
   const passed = await play(g.ui, c, lv);
   // A class takes the morning or the afternoon: out at 11, or at 4.
   st.minutes = slot.start + 120;
+  const rx = REACTIONS[c.id];
+  const lines = passed ? rx.pass : rx.fail;
+  g.ui.toast(`${c.prof}: ${lines[(st.day + slot.start) % lines.length]}`, passed ? "#1e6f5c" : "#c0392b");
   if (passed && lv < 5) {
     st.flags[`lvl:${c.id}`] = lv + 1;
     sfx.missionPassed();
@@ -229,6 +286,11 @@ function play(ui: GameUI, c: Course, lv: number): Promise<boolean> {
   const bank = BANKS[c.id as keyof typeof BANKS];
   const qs = pick(bank, lv, 3);
   return ui.quiz(`${c.id} ${c.title} — level ${lv + 1}`, qs).then((right) => right >= 2);
+}
+
+/** n first-tier questions for a quiz course, for one-off quizzes outside a class. */
+export function starterQuestions(id: "CS110" | "CY110" | "WO110" | "CV110", n: number): Q[] {
+  return pick(BANKS[id], 0, n);
 }
 
 type Q = { q: string; options: string[]; answer: number; code?: string; tier: 1 | 2 | 3 };
@@ -258,6 +320,15 @@ const BANKS: Record<"CS110" | "CY110" | "WO110" | "CV110", Q[]> = {
     { tier: 3, q: "What does this print?", code: 'int a = 5, *p = &a;\n*p = *p * 2;\nprintf("%d", a);', options: ["5", "10", "an address"], answer: 1 },
     { tier: 3, q: "What does this print?", code: 'char s[] = "NITK";\nprintf("%lu", sizeof(s));', options: ["4", "5", "8"], answer: 1 },
     { tier: 3, q: "What does this print?", code: 'int f(int n) { return n <= 1 ? 1 : n * f(n - 1); }\nprintf("%d", f(4));', options: ["24", "10", "4"], answer: 0 },
+    { tier: 1, q: "What does this print?", code: 'int a = 9, b = 4;\nprintf("%d", a % b);', options: ["1", "2", "5"], answer: 0 },
+    { tier: 1, q: "Which is the correct way to start a C program?", options: ["int main()", "void start()", "program main"], answer: 0 },
+    { tier: 1, q: "What does this print?", code: 'int x = 2;\nx *= 5;\nprintf("%d", x);', options: ["10", "7", "25"], answer: 0 },
+    { tier: 2, q: "What does this print?", code: 'int i = 0;\nwhile (i < 3) i++;\nprintf("%d", i);', options: ["3", "2", "0"], answer: 0 },
+    { tier: 2, q: "What does this print?", code: 'int a[3] = {1, 2, 3};\nprintf("%d", a[1] + a[2]);', options: ["5", "3", "4"], answer: 0 },
+    { tier: 2, q: "What does this print?", code: 'int x = 5;\nprintf("%d", x++ + 1);', options: ["6", "7", "5"], answer: 0 },
+    { tier: 3, q: "What does this print?", code: 'char s[] = "abc";\nprintf("%c", *(s + 1));', options: ["b", "a", "c"], answer: 0 },
+    { tier: 3, q: "What does this print?", code: 'int a = 1, b = 2;\nint *p = &a;\np = &b;\nprintf("%d", *p);', options: ["2", "1", "an address"], answer: 0 },
+    { tier: 3, q: "What does this print?", code: 'int f(int n) { return n < 2 ? n : f(n - 1) + f(n - 2); }\nprintf("%d", f(6));', options: ["8", "13", "6"], answer: 0 },
   ],
   CY110: [
     { tier: 1, q: "pH of pure water at 25 °C?", options: ["0", "7", "14"], answer: 1 },
@@ -269,6 +340,15 @@ const BANKS: Record<"CS110" | "CY110" | "WO110" | "CV110", Q[]> = {
     { tier: 3, q: "ΔG < 0 means a reaction is…", options: ["Spontaneous", "At equilibrium", "Impossible"], answer: 0 },
     { tier: 3, q: "Degree of unsaturation of benzene (C₆H₆)?", options: ["3", "4", "6"], answer: 1 },
     { tier: 3, q: "The Nernst equation relates cell potential to…", options: ["Concentration", "Colour", "Mass"], answer: 0 },
+    { tier: 1, q: "The chemical symbol for sodium is…", options: ["Na", "So", "Sd"], answer: 0 },
+    { tier: 1, q: "An acid turns blue litmus…", options: ["Red", "Green", "Colourless"], answer: 0 },
+    { tier: 1, q: "The most abundant gas in Earth's atmosphere is…", options: ["Nitrogen", "Oxygen", "Carbon dioxide"], answer: 0 },
+    { tier: 2, q: "A catalyst changes a reaction by…", options: ["Lowering the activation energy", "Raising the temperature", "Changing the equilibrium constant"], answer: 0 },
+    { tier: 2, q: "Which of these is a strong acid?", options: ["HCl", "CH₃COOH", "H₂CO₃"], answer: 0 },
+    { tier: 2, q: "Corrosion of iron needs…", options: ["Water and oxygen", "Only water", "Only oxygen"], answer: 0 },
+    { tier: 3, q: "For an exothermic reaction, ΔH is…", options: ["Negative", "Positive", "Zero"], answer: 0 },
+    { tier: 3, q: "A buffer solution resists changes in…", options: ["pH", "Colour", "Volume"], answer: 0 },
+    { tier: 3, q: "The hybridisation of carbon in ethene (C₂H₄) is…", options: ["sp²", "sp³", "sp"], answer: 0 },
   ],
   WO110: [
     { tier: 1, q: "A book lies on a table. The table pushes up with…", options: ["Zero force", "A force equal to its weight", "Twice its weight"], answer: 1 },
@@ -280,6 +360,15 @@ const BANKS: Record<"CS110" | "CY110" | "WO110" | "CV110", Q[]> = {
     { tier: 3, q: "The centroid of a triangle lies on each median, from the base, at…", options: ["1/3 of its height", "1/2 of its height", "2/3 of its height"], answer: 0 },
     { tier: 3, q: "A two-force member in equilibrium carries its forces…", options: ["Along the line joining the two points", "At right angles", "Anywhere"], answer: 0 },
     { tier: 3, q: "Moment of inertia of a rectangle b×h about its centroidal x-axis?", options: ["bh³/12", "bh³/3", "b³h/12"], answer: 0 },
+    { tier: 1, q: "The SI unit of force is the…", options: ["Newton", "Pascal", "Joule"], answer: 0 },
+    { tier: 1, q: "A scalar has…", options: ["Magnitude only", "Magnitude and direction", "Direction only"], answer: 0 },
+    { tier: 1, q: "Force × perpendicular distance is called…", options: ["Moment", "Work", "Power"], answer: 0 },
+    { tier: 2, q: "Three concurrent forces keep a body in equilibrium. Their vector sum is…", options: ["Zero", "Equal to the weight", "Infinite"], answer: 0 },
+    { tier: 2, q: "A cable-supported sign hangs still. Each cable carries…", options: ["Tension", "Compression", "Shear only"], answer: 0 },
+    { tier: 2, q: "The coefficient of friction is the ratio of…", options: ["Friction force to normal force", "Normal force to weight", "Weight to friction"], answer: 0 },
+    { tier: 3, q: "The centroid of a semicircle of radius r from its diameter is…", options: ["4r / 3π", "r / 2", "2r / π"], answer: 0 },
+    { tier: 3, q: "For a truss joint in equilibrium you may write…", options: ["ΣFx = 0 and ΣFy = 0", "ΣM = 0 only", "ΣF = weight"], answer: 0 },
+    { tier: 3, q: "Moment of inertia of a circle of diameter d about its centroid axis?", options: ["πd⁴ / 64", "πd⁴ / 16", "πd² / 4"], answer: 0 },
   ],
   CV110: [
     { tier: 1, q: "The Western Ghats run along India's…", options: ["West coast", "East coast", "Northern border"], answer: 0 },
@@ -291,6 +380,15 @@ const BANKS: Record<"CS110" | "CY110" | "WO110" | "CV110", Q[]> = {
     { tier: 3, q: "An ecological pyramid of energy is always…", options: ["Upright", "Inverted", "Spindle-shaped"], answer: 0 },
     { tier: 3, q: "CRZ rules in India regulate building near…", options: ["The coast", "Forests", "Airports"], answer: 0 },
     { tier: 3, q: "Ozone-depleting CFCs were phased out by the…", options: ["Montreal Protocol", "Kyoto Protocol", "Paris Agreement"], answer: 0 },
+    { tier: 1, q: "The main greenhouse gas from burning fossil fuels is…", options: ["Carbon dioxide", "Oxygen", "Helium"], answer: 0 },
+    { tier: 1, q: "The 3 R's of waste are reduce, reuse and…", options: ["Recycle", "Refuse", "Rebuild"], answer: 0 },
+    { tier: 1, q: "Which of these is a renewable source of energy?", options: ["Wind", "Coal", "Diesel"], answer: 0 },
+    { tier: 2, q: "Acid rain is caused mostly by…", options: ["Sulphur and nitrogen oxides", "Carbon monoxide", "Ozone"], answer: 0 },
+    { tier: 2, q: "Biodiversity hotspots include the…", options: ["Western Ghats", "Thar Desert", "Deccan Plateau"], answer: 0 },
+    { tier: 2, q: "Eutrophication is caused by excess…", options: ["Nutrients in water", "Salt in soil", "Sunlight"], answer: 0 },
+    { tier: 3, q: "The ozone layer lies in the…", options: ["Stratosphere", "Troposphere", "Mesosphere"], answer: 0 },
+    { tier: 3, q: "EIA stands for…", options: ["Environmental Impact Assessment", "Energy Input Analysis", "Emission Index Audit"], answer: 0 },
+    { tier: 3, q: "Which is a primary pollutant?", options: ["Carbon monoxide", "Ozone at ground level", "Smog"], answer: 0 },
   ],
 };
 
@@ -304,6 +402,13 @@ const BUGS: { title: string; lines: string[]; bug: number; why: string }[] = [
   { title: "Copy a string", lines: ["char dst[4];", 'char *src = "NITK";', "strcpy(dst, src);", 'printf("%s", dst);'], bug: 0, why: "\"NITK\" needs 5 bytes with the \\0." },
   { title: "Swap", lines: ["void swap(int a, int b) {", "    int t = a; a = b; b = t;", "}", "swap(x, y);"], bug: 0, why: "Pass pointers: swap(int *a, int *b)." },
   { title: "Average", lines: ["int total = 7, count = 2;", "float avg = total / count;", 'printf("%.1f", avg);', "return 0;"], bug: 1, why: "Integer division: 7 / 2 is 3, not 3.5." },
+  { title: "Loop that never ends", lines: ["int i = 0;", "while (i < 5) {", '    printf("%d ", i);', "}"], bug: 3, why: "i is never incremented; the loop never ends." },
+  { title: "Compare strings", lines: ['char a[] = "hi";', 'char b[] = "hi";', "if (a == b)", '    printf("same");'], bug: 2, why: "== compares addresses; use strcmp(a, b) == 0." },
+  { title: "Off by one", lines: ["int a[10];", "for (int i = 1; i <= 10; i++)", "    a[i] = i;", "return 0;"], bug: 1, why: "a[10] is out of bounds; indices run 0 to 9." },
+  { title: "Missing break", lines: ["switch (n) {", '  case 1: printf("one");', '  case 2: printf("two"); break;', "}"], bug: 1, why: "No break, so case 1 falls through into case 2." },
+  { title: "Factorial", lines: ["int fact(int n) {", "    return n * fact(n - 1);", "}", "fact(5);"], bug: 1, why: "No base case, so the recursion never stops." },
+  { title: "Malloc size", lines: ["int *p = malloc(5);", "for (int i = 0; i < 5; i++)", "    p[i] = i;", "free(p);"], bug: 0, why: "5 bytes, not 5 ints: malloc(5 * sizeof(int))." },
+  { title: "Semicolon trap", lines: ["for (int i = 0; i < 3; i++);", '    printf("hello\\n");', "return 0;", "}"], bug: 0, why: "The stray ; ends the loop, so printf runs once." },
 ];
 
 function bugHunt(ui: GameUI, lv: number): Promise<boolean> {
@@ -373,7 +478,7 @@ function bugHunt(ui: GameUI, lv: number): Promise<boolean> {
 
 function mathProblem(tier: number): { q: string; a: number } {
   const r = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo + 1));
-  const kind = r(0, tier >= 2 ? 4 : 2);
+  const kind = r(0, tier >= 2 ? 7 : 3);
   if (kind === 0) {
     const a = r(2, 6);
     const n = r(2, 3);
@@ -392,8 +497,22 @@ function mathProblem(tier: number): { q: string; a: number } {
     const n = r(5, 12);
     return { q: `1 + 2 + … + ${n}`, a: (n * (n + 1)) / 2 };
   }
-  const [a, b, c, d] = [r(1, 5), r(1, 5), r(1, 5), r(1, 5)];
-  return { q: `(${a}, ${b}) · (${c}, ${d})`, a: a * c + b * d };
+  if (kind === 4) {
+    const [a, b, c, d] = [r(1, 5), r(1, 5), r(1, 5), r(1, 5)];
+    return { q: `(${a}, ${b}) · (${c}, ${d})`, a: a * c + b * d };
+  }
+  if (kind === 5) {
+    const a = r(2, 6);
+    const b = r(1, 4);
+    return { q: `∫ from 0 to ${b} of ${2 * a}x dx`, a: a * b * b };
+  }
+  if (kind === 6) {
+    const a = r(2, 9);
+    const b = r(2, 9);
+    return { q: `Sum of the roots of x² − ${a + b}x + ${a * b} = 0`, a: a + b };
+  }
+  const n = r(3, 6);
+  return { q: `${n}!`, a: Array.from({ length: n }, (_, i) => i + 1).reduce((x, y) => x * y, 1) };
 }
 
 function mathSprint(ui: GameUI, lv: number): Promise<boolean> {

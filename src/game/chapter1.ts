@@ -16,8 +16,8 @@ import type { Game } from "./index";
 import type { IconId } from "../ui/icons";
 import { sfx } from "./audio";
 import { hhmm, wait } from "./util";
-import { QUIZ } from "./quiz";
-import { COURSES, level } from "./courses";
+import { QUIZ, DRILL, draw } from "./quiz";
+import { COURSES, level, starterQuestions } from "./courses";
 
 export type Mission = {
   id: string;
@@ -269,7 +269,7 @@ export const CHAPTER1: Mission[] = [
         g.ui.toast(stop.lore, "#1d3557");
         await g.say([["Prakash", stop.lore]]);
       }
-      const right = await g.ui.quiz("Induction — heritage quiz", [...QUIZ].sort(() => Math.random() - 0.5).slice(0, 3));
+      const right = await g.ui.quiz("Induction — heritage quiz", draw(QUIZ, 3));
       await g.say([
         ["Prakash", right >= 2 ? `${right} out of 3. You listened! Nobody listens.` : `${right} out of 3. The Director will be heartbroken. I won't tell him.`],
         ["Prakash", "This weekend the NCC does its enrolment parade. After that, classes. Welcome to NITK, properly."],
@@ -304,12 +304,7 @@ export const CHAPTER1: Mission[] = [
         ["Divya", "Fall in! Three ranks. Tallest on the right. …You. Right marker. Congratulations."],
         ["Divya", "Commands are in Hindi. Listen, then move. Get three of four right and I'll sign your enrolment."],
       ]);
-      const right = await g.ui.quiz("Drill — word of command", [
-        { q: "'Savdhan!'", options: ["Attention", "Stand at ease", "Dismiss"], answer: 0 },
-        { q: "'Vishram!'", options: ["Quick march", "Stand at ease", "About turn"], answer: 1 },
-        { q: "'Dahine mud!'", options: ["Left turn", "Right turn", "Salute"], answer: 1 },
-        { q: "'Tez chal!'", options: ["Halt", "Quick march", "Mark time"], answer: 1 },
-      ]);
+      const right = await g.ui.quiz("Drill — word of command", draw(DRILL, 4));
       if (right < 3) {
         await g.say([["Divya", `${right} out of 4. You turned left into the cadet on your left. Next weekend.`]]);
         return false;
@@ -508,11 +503,7 @@ export const CHAPTER1: Mission[] = [
         await g.say([["Prof. Hegde", "Absent. Twenty-eight?"]]);
       }
       await g.say([["Prof. Hegde", "Now. A small quiz. Not for marks. Everything is for marks."]]);
-      const right = await g.ui.quiz("WO110 Engineering Mechanics — first quiz", [
-        { q: "A book rests on a table. The table pushes up on it with a force equal to…", options: ["Zero", "The book's weight", "Twice its weight"], answer: 1 },
-        { q: "Two 10 N forces at right angles. The resultant is about…", options: ["20 N", "14.1 N", "10 N"], answer: 1 },
-        { q: "The moment of a 5 N force at 2 m from a pivot is…", options: ["10 N·m", "2.5 N·m", "7 N·m"], answer: 0 },
-      ]);
+      const right = await g.ui.quiz("WO110 Engineering Mechanics — first quiz", starterQuestions("WO110", 3));
       g.state.classesAttended++;
       g.state.classesHeld++;
       g.state.flags.classes = true;

@@ -232,7 +232,10 @@ export class GameUI {
       const card = el("div", undefined, "card plate");
       this.overlay.replaceChildren(card);
       const show = () => {
-        const q = questions[i];
+        const src = questions[i];
+        // Shuffle the options each time so the right answer isn't always first or second.
+        const order = src.options.map((_, k) => k).sort(() => Math.random() - 0.5);
+        const q = { ...src, options: order.map((k) => src.options[k]), answer: order.indexOf(src.answer) };
         card.innerHTML = `<h2>${title}</h2><div style="font-size:12px">Question ${i + 1} of ${questions.length}</div><div class="q"></div><div class="opts"></div>`;
         card.querySelector(".q")!.textContent = q.q;
         if (q.code) {

@@ -9,6 +9,7 @@ import { CLUBS } from "./stalls";
 import { penalties, terminal, stargazing } from "./minigames";
 import { hhmm, wait } from "./util";
 import { perks } from "./courses";
+import { draw, RAGA, CP, LSD } from "./quiz";
 import { sfx } from "./audio";
 
 const CH = "Chapter 2 · Recruitments";
@@ -182,7 +183,6 @@ export const CHAPTER2: Mission[] = [
         ["Rohan", "Bhai… your cycle. Both tyres. Flat as a dosa."],
         ["Rohan", "Someone saw Kiran from Aravali with a valve key and a very guilty face. Crescendo rivalry has started early."],
       ]);
-      const ar = g.places.get("aravali");
       const kiran = g.put("kiran", "aravali", 2, 2);
       kiran.marker.visible = false;
       if (!(await g.goTo("kiran", "Find Kiran at Aravali (2nd Block)", { radius: 9 }))) return false;
@@ -210,7 +210,6 @@ export const CHAPTER2: Mission[] = [
       }
       g.state.flags.flatTyres = false;
       g.ui.toast("Tyres pumped. Your cycle's rideable again.", "#1e6f5c");
-      void ar;
       kiran.hide();
       return true;
     },
@@ -364,12 +363,7 @@ export const CHAPTER2: Mission[] = [
         ["", "Forty minutes of alaap with no rhythm at all, and then the mridangam comes in and nine hundred people exhale at once."],
         ["Aditi", "After the concert the artist does a Q&A. Answer three of four and I'll introduce you. Listen properly."],
       ]);
-      const right = await g.ui.quiz("SPICMACAY — after the concert", [
-        { q: "The slow, unmetred opening of a raga is called…", options: ["Alaap", "Tihai", "Tillana"], answer: 0 },
-        { q: "The veena belongs to which tradition mostly?", options: ["Carnatic", "Hindustani", "Western"], answer: 0 },
-        { q: "The double-headed drum in a Carnatic concert is the…", options: ["Tabla", "Mridangam", "Dholak"], answer: 1 },
-        { q: "'Tala' means…", options: ["The melody", "The rhythmic cycle", "The lyrics"], answer: 1 },
-      ]);
+      const right = await g.ui.quiz("SPICMACAY — after the concert", draw(RAGA, 4));
       if (right < 2) {
         await g.say([["Aditi", `${right} out of 4. You clapped in the middle of a phrase. Everyone does it once. Come to the next one.`]]);
         return false;
@@ -462,11 +456,7 @@ export const CHAPTER2: Mission[] = [
       ]);
       const desks = g.places.within(/^Central Computer Cent/i, 4, 71, 4, "A free PC");
       if (desks.length && (await g.goToAny(desks, "Find a free PC in the CCC lab", { radius: 1.8 })) < 0) return false;
-      const right = await g.ui.quiz("WebClub CP League — STL & complexity", [
-        { q: "Time complexity of this loop?", code: "for (int i = 1; i < n; i *= 2)\n    count++;", options: ["O(n)", "O(log n)", "O(n log n)"], answer: 1 },
-        { q: "Which STL container keeps keys sorted and unique?", options: ["std::vector", "std::set", "std::unordered_map"], answer: 1 },
-        { q: "What does this print?", code: "vector<int> v = {5, 1, 4};\nsort(v.begin(), v.end());\ncout << v[1];", options: ["1", "4", "5"], answer: 1 },
-      ]);
+      const right = await g.ui.quiz("WebClub CP League — STL & complexity", draw(CP, 3));
       if (right < 2) {
         await g.say([["Ananya", `${right} out of 3. TLE on the first one, WA on the second. It happens to literally everyone.`]]);
         return false;
@@ -541,13 +531,7 @@ export const CHAPTER2: Mission[] = [
         ["Farhan", "LSD. Literary, Stage and Debating. Don't make the joke; every fresher makes the joke."],
         ["Farhan", "Tonight's the open prelims in LHC-D. Five questions, all on NITK and the coast. Three right and you're on a team for the finals."],
       ]);
-      const right = await g.ui.quiz("LSD Open Quiz · Prelims", [
-        { q: "NITK was founded in 1960 as KREC. What did KREC stand for?", options: ["Karnataka Regional Engineering College", "Konkan Railway Engineering College", "Karavali Regional Education Centre"], answer: 0 },
-        { q: "Which highway runs between the campus and the beach?", options: ["NH 48", "NH 66", "NH 75"], answer: 1 },
-        { q: "Engineer, NITK's technical fest, carries which tagline?", options: ["Think. Create. Engineer.", "Build the Future", "Code. Break. Repeat."], answer: 0 },
-        { q: "Incident is NITK's…", options: ["Sports fest", "Cultural fest", "Entrepreneurship summit"], answer: 1 },
-        { q: "The inter-hostel cultural fest run by the Reading Room Committee is…", options: ["Crescendo", "Phoenix", "Aurora"], answer: 0 },
-      ]);
+      const right = await g.ui.quiz("LSD Open Quiz · Prelims", draw(LSD, 5));
       if (right < 3) {
         await g.say([["Farhan", `${right} of 5. The Engineer tagline question gets everyone. Come back and try again.`]]);
         return false;
@@ -720,7 +704,7 @@ export const CHAPTER2: Mission[] = [
         ["Isha", "Paint's at the co-op. Pick it up, meet me there."],
       ]);
       if (!(await g.goTo("coop", "Pick up the paint at the co-op", { radius: 4 }))) return false;
-      const motif = await g.choose("Divya", "What goes on our wall?", [
+      const motif = await g.choose("Isha", "What goes on our wall?", [
         "Yakshagana: the crown, the painted face",
         "The lighthouse and the sunset crowd",
         "A giant surfboard and the Mangaluru coast",
