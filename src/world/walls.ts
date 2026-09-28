@@ -47,6 +47,57 @@ function inPoly(x: number, z: number, r: Pt[]): boolean {
 
 const ringArea = (r: Pt[]) => Math.abs(r.reduce((s, [x, z], i) => s + x * r[(i + 1) % r.length][1] - r[(i + 1) % r.length][0] * z, 0)) / 2;
 
+
+/** Convex hull (monotone chain). */
+function hull(pts: Pt[]): Pt[] {
+  const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o: Pt, a: Pt, b: Pt) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo: Pt[] = [];
+  for (const q of p) {
+    while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop();
+    lo.push(q);
+  }
+  const up: Pt[] = [];
+  for (const q of [...p].reverse()) {
+    while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop();
+    up.push(q);
+  }
+  return [...lo.slice(0, -1), ...up.slice(0, -1)];
+}
+
+/** Grow a convex ring outward by `d` metres (mitred corners). */
+function grow(ring: Pt[], d: number): Pt[] {
+  // The hull is counter-clockwise in x/z, so the outward normal of an edge (dx, dz) is (dz, -dx).
+  return ring.map((p, i) => {
+    const a = ring[(i + ring.length - 1) % ring.length];
+    const b = ring[(i + 1) % ring.length];
+    const n = (u: Pt, v: Pt): Pt => {
+      const dx = v[0] - u[0];
+      const dz = v[1] - u[1];
+      const l = Math.hypot(dx, dz) || 1;
+      return [dz / l, -dx / l];
+    };
+    const n1 = n(a, p);
+    const n2 = n(p, b);
+    const mx = n1[0] + n2[0];
+    const mz = n1[1] + n2[1];
+    const k = d / Math.max(0.5, 1 + n1[0] * n2[0] + n1[1] * n2[1]);
+    return [p[0] + mx * k, p[1] + mz * k] as Pt;
+  });
+}
+
+/** The walled girls' hostel area, or null if the map doesn't carry it. */
+const GIRLS_AREA = /^GH-\d|^girls hostel new$|^GH-3 Mess$/i;
+function girlsCompound(map: CampusMap): Pt[] | null {
+  const pts: Pt[] = [];
+  for (const b of map.buildings) if (b.name && GIRLS_AREA.test(b.name)) pts.push(...b.outer);
+  if (pts.length < 12) return null;
+  const h = hull(pts);
+  // Hull orientation depends on the z-down frame; make it counter-clockwise for grow().
+  const area = h.reduce((t, p, i) => t + p[0] * h[(i + 1) % h.length][1] - h[(i + 1) % h.length][0] * p[1], 0);
+  return grow(area < 0 ? [...h].reverse() : h, 4);
+}
+
 let cached: { map: CampusMap; walls: Wall[]; gates: Gate[] } | null = null;
 
 export function campusGates(map: CampusMap, region: Region): Gate[] {
@@ -110,8 +161,8 @@ export function campusWalls(map: CampusMap, region: Region): Wall[] {
   const inBuilding = (x: number, z: number) => buildings.some((b) => x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && inPoly(x, z, b.outer));
 
   const walls: Wall[] = [];
-  for (const ring of map.campus) {
-    if (ring.length < 4 || ringArea(ring) < MIN_RING) continue;
+  /** Walls and gates along one ring; `gateAt` says where it opens. */
+  const trace = (ring: Pt[], gateAt: (x: number, z: number) => boolean) => {
     // Sample the boundary every STEP metres, and why (if at all) each sample is open.
     const samples: { p: Pt; open: "" | "gate" | "other" }[] = [];
     for (let i = 0; i < ring.length; i++) {
@@ -126,7 +177,7 @@ export function campusWalls(map: CampusMap, region: Region): Wall[] {
         const nx = -(b[1] - a[1]) / (len || 1);
         const nz = (b[0] - a[0]) / (len || 1);
         const through = region.contains(x + nx * 3, z + nz * 3) && region.contains(x - nx * 3, z - nz * 3);
-        const open = through && atCrossing(x, z) ? "gate" : near(x, z, osmWalls) || inBuilding(x, z) ? "other" : "";
+        const open = through && gateAt(x, z) ? "gate" : near(x, z, osmWalls) || inBuilding(x, z) ? "other" : "";
         samples.push({ p: [x, z], open });
       }
     }
@@ -154,7 +205,7 @@ export function campusWalls(map: CampusMap, region: Region): Wall[] {
     const start = samples.findIndex((s) => s.open);
     if (start < 0) {
       walls.push({ pts: [...samples.map((s) => s.p), samples[0].p], gateAtStart: false, gateAtEnd: false });
-      continue;
+      return;
     }
     let run: Pt[] = [];
     let before: "" | "gate" | "other" = samples[start].open;
@@ -168,6 +219,49 @@ export function campusWalls(map: CampusMap, region: Region): Wall[] {
       run = [];
       before = s.open;
     }
+  };
+  for (const ring of map.campus) {
+    if (ring.length < 4 || ringArea(ring) < MIN_RING) continue;
+    trace(ring, atCrossing);
+  }
+
+  // The girls' hostel compound (GH-1 to GH-5, the new block, GH-3 mess; the girls'
+  // co-op and Nandini beside it are left outside) is walled all round. It opens only at the two
+  // gates that face GH-5 and the new girls' hostel: the road crossing the
+  // wall nearest each.
+  const compound = girlsCompound(map);
+  if (compound) {
+    const centre = (re: RegExp): Pt | null => {
+      const b = map.buildings.find((x) => x.name && re.test(x.name));
+      if (!b) return null;
+      return [b.outer.reduce((t, p) => t + p[0], 0) / b.outer.length, b.outer.reduce((t, p) => t + p[1], 0) / b.outer.length];
+    };
+    const hits: { x: number; z: number; r: number }[] = [];
+    for (let i = 0; i < compound.length; i++) {
+      const [e1, e2] = [compound[i], compound[(i + 1) % compound.length]];
+      for (const r of map.roads) {
+        if (r.kind === "trunk") continue;
+        for (let k = 1; k < r.pts.length; k++) {
+          const c = cross(r.pts[k - 1], r.pts[k], e1, e2);
+          if (c) hits.push({ x: c[0], z: c[1], r: Math.max(4, r.width / 2 + 2.5) });
+        }
+      }
+    }
+    const gatesAt: { x: number; z: number; r: number }[] = [];
+    for (const re of [/^GH-5\b/i, /^girls hostel new$/i]) {
+      const c = centre(re);
+      if (!c) continue;
+      const pool = hits.filter((h) => !gatesAt.includes(h));
+      const best = pool.sort((p, q) => Math.hypot(p.x - c[0], p.z - c[1]) - Math.hypot(q.x - c[0], q.z - c[1]))[0];
+      if (best) gatesAt.push(best);
+      else {
+        // No mapped road crosses here: open the wall at its point nearest the building.
+        let bp = compound[0];
+        for (const p of compound) if (Math.hypot(p[0] - c[0], p[1] - c[1]) < Math.hypot(bp[0] - c[0], bp[1] - c[1])) bp = p;
+        gatesAt.push({ x: bp[0], z: bp[1], r: 4.5 });
+      }
+    }
+    trace(compound, (x, z) => gatesAt.some((g) => Math.hypot(g.x - x, g.z - z) < g.r));
   }
   cached = { map, walls, gates };
   return walls;
