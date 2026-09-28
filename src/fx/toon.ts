@@ -10,9 +10,9 @@ import * as THREE from "three";
 export type RampName = "two" | "three" | "four" | "soft";
 
 const RAMPS: Record<RampName, number[]> = {
-  two: [96, 255],
-  three: [92, 178, 255],
-  four: [80, 142, 202, 255],
+  two: [130, 255],
+  three: [108, 186, 255],
+  four: [116, 166, 214, 255],
   soft: [172, 214, 255],
 };
 
@@ -54,7 +54,7 @@ function toonChunk(): string {
 }
 
 /** Shared by every cel material, so a time-of-day change retints the world at once. */
-export const shadowTint = { value: new THREE.Color(0x7f8fc4) };
+export const shadowTint = { value: new THREE.Color(0x7aa4b8) };
 
 /** Night lighting: windows and lamps read their emissive maps through this. */
 export const nightGlow = { value: 0 };
