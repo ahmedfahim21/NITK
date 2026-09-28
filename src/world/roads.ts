@@ -217,15 +217,22 @@ export function buildRoads(map: CampusMap): RoadRig {
   group.add(toMesh(marks, markMat));
   if (kerbs.idx.length) group.add(toMesh(kerbs, toon(0xffffff, { vertexColors: true, ramp: "soft", polygonOffset: 3 })));
 
-  for (const b of overbridges) group.add(overbridge(b));
+  // OSM maps the stair landings as their own tiny bridges; the span's own flights stand for them.
+  const spans = overbridges.filter((b) => Math.hypot(b.pts[b.pts.length - 1][0] - b.pts[0][0], b.pts[b.pts.length - 1][1] - b.pts[0][1]) > 10);
+  for (const b of spans) group.add(overbridge(b));
 
-  return { group, lamps, overbridges };
+  return { group, lamps, overbridges: spans };
 }
+
+/** The overbridge deck's height above the ground at its ends (walking surface is H + 0.2). */
+export const OVERBRIDGE_H = 6.2;
+/** How far each stair flight runs out beyond the span: 18 steps of 0.5 m. */
+export const OVERBRIDGE_STAIRS = 9;
 
 /** Covered steel foot overbridge with stair towers at both ends. */
 function overbridge(r: Road): THREE.Group {
   const g = new THREE.Group();
-  const H = 6.2;
+  const H = OVERBRIDGE_H;
   const a = r.pts[0];
   const b = r.pts[r.pts.length - 1];
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]);

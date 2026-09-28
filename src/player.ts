@@ -9,7 +9,7 @@
  */
 import * as THREE from "three";
 import type { Grid } from "./world/grid";
-import { groundHeight, surfaceAt } from "./world/terrain";
+import { bridgeHeight, groundHeight, surfaceAt } from "./world/terrain";
 import { HeroAnimator, makeHero } from "./hero";
 
 const WALK = 4.6;
@@ -167,6 +167,10 @@ export class Player {
   frozen = false;
   /** Extra obstacles (the crowd). */
   blockedExtra: ((x: number, z: number) => boolean) | null = null;
+  /** Somewhere you can't go at your current level (NH66 once it's closed); leaving it is always allowed. */
+  closedAt: ((x: number, z: number, y: number) => boolean) | null = null;
+  /** Set when a move was refused by closedAt, for the game to explain once. */
+  bumpedClosed = false;
   /** 0..1, slows the walker when exhausted. */
   tired = 0;
   /** The cycle being ridden, if any. */
@@ -411,7 +415,7 @@ export class Player {
       this.bikeSpeed = 0;
     }
     this.vel.set(vx, 0, vz);
-    this.pos.y = groundHeight(this.pos.x, this.pos.z);
+    this.pos.y = surfaceAt(this.pos.x, this.pos.z, this.pos.y);
     // Pedal and wheel animation.
     const c = this.riding!;
     const spin = (this.bikeSpeed * dt) / 0.34;
@@ -426,7 +430,25 @@ export class Player {
 
   private free(x: number, z: number, radius = RADIUS) {
     const g = this.grid;
+    // Up on an overbridge, what's on the ground below doesn't block you; the
+    // edges do (stepping off is a drop, refused below).
+    const here = this.drone ? null : bridgeHeight(this.pos.x, this.pos.z);
+    const aloft = here !== null && Math.abs(here - this.pos.y) < 0.6 && this.pos.y > groundHeight(this.pos.x, this.pos.z) + 0.6;
+    if (aloft) {
+      const b = bridgeHeight(x, z);
+      return b !== null && Math.abs(b - this.pos.y) <= 1;
+    }
     if (g.blocked(x, z)) return false;
+    if (!this.drone) {
+      // No stepping up or dropping more than a metre at once: off an overbridge,
+      // out of a culvert's side onto the road above, over a trench wall.
+      const next = surfaceAt(x, z, this.pos.y);
+      if (this.grounded && Math.abs(next - this.pos.y) > 1) return false;
+      if (this.closedAt?.(x, z, next) && !this.closedAt(this.pos.x, this.pos.z, this.pos.y)) {
+        this.bumpedClosed = true;
+        return false;
+      }
+    }
     // People only block if you're not already tangled up with them (never trap the player).
     if (this.blockedExtra?.(x, z) && !this.blockedExtra(this.pos.x, this.pos.z)) return false;
     for (let k = 0; k < 8; k++) {

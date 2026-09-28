@@ -42,6 +42,8 @@ export type Cut = {
   depthAt: number[];
   /** Points under a deck (the highway, or a road crossing over): a culvert, not an open trench. */
   covered: boolean[];
+  /** The road surface down the underpass, per point: the one profile the field, the floor and the player all use. */
+  floorAt: number[];
 };
 export const cuts: Cut[] = [];
 /** The NH66 carriageways, which stay up where the underpasses go under. */
@@ -93,14 +95,87 @@ export function floorHeight(x: number, z: number): number {
   return sample(field.floor, field, x, z);
 }
 
+/* ------------------------------------------------------------------ *
+ * Layers: the overbridges above the ground, the culverts below it
+ * ------------------------------------------------------------------ */
+
+type Span = { ax: number; az: number; ux: number; uz: number; len: number; h: number; stairs: number; ya: number; yb: number };
+let spans: Span[] = [];
+
+/** Registers the foot overbridges (after bakeTerrain): deck h above the ground at its ends, stair flights `stairs` long past each end. */
+export function setOverbridges(list: { a: Pt; b: Pt }[], h: number, stairs: number) {
+  spans = list.map(({ a, b }) => {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    // The deck is lifted like everything else: by the ground under each end of it.
+    const ux = (b[0] - a[0]) / len;
+    const uz = (b[1] - a[1]) / len;
+    const ya = groundHeight(a[0] + ux * 0, a[1] + uz * 0);
+    const yb = groundHeight(b[0], b[1]);
+    return { ax: a[0], az: a[1], ux, uz, len, h, stairs, ya, yb };
+  });
+}
+
+/** The walking surface of an overbridge (deck or stairs) at a point, or null off it. */
+export function bridgeHeight(x: number, z: number): number | null {
+  for (const s of spans) {
+    const dx = x - s.ax;
+    const dz = z - s.az;
+    const u = dx * s.ux + dz * s.uz;
+    const v = -dx * s.uz + dz * s.ux;
+    if (Math.abs(v) > 1.1 || u < -s.stairs || u > s.len + s.stairs) continue;
+    const top = s.h + 0.2;
+    if (u >= 0 && u <= s.len) return top + s.ya + (s.yb - s.ya) * (u / s.len);
+    // On a flight: down from the deck to the ground at its foot.
+    const out = u < 0 ? -u : u - s.len;
+    return groundHeight(x, z) + top * (1 - out / s.stairs);
+  }
+  return null;
+}
+
 /**
- * Where something at height y stands: the ground, or the culvert floor if
- * it's already down in an underpass (the highway deck is overhead).
+ * Inside an underpass (between its walls): the floor there, straight from
+ * the underpass's own profile (not the 2 m field, which blurs a 6 m trench),
+ * and whether a deck is overhead.
+ */
+export function underpassAt(x: number, z: number): { floor: number; covered: boolean } | null {
+  let best: { d: number; floor: number; covered: boolean } | null = null;
+  for (const c of cuts) {
+    for (let i = 1; i < c.pts.length; i++) {
+      if (c.depthAt[i] < 0.05 && c.depthAt[i - 1] < 0.05) continue;
+      const [a, b] = [c.pts[i - 1], c.pts[i]];
+      const dx = b[0] - a[0];
+      const dz = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1)));
+      const d = Math.hypot(x - a[0] - t * dx, z - a[1] - t * dz);
+      if (d > c.hw + 0.3 || (best && d >= best.d)) continue;
+      best = { d, floor: c.floorAt[i - 1] + (c.floorAt[i] - c.floorAt[i - 1]) * t, covered: c.covered[i - 1] || c.covered[i] };
+    }
+  }
+  return best && { floor: best.floor, covered: best.covered };
+}
+
+/**
+ * Where something at height y stands: on an overbridge if it's up there (or
+ * stepping onto its stairs); in an underpass, its floor (or, under the
+ * highway, whichever of the floor and the deck you're nearer); otherwise
+ * the ground.
  */
 export function surfaceAt(x: number, z: number, y: number): number {
   const g = groundHeight(x, z);
-  const fl = sample(field!.floor, field!, x, z);
-  return fl < g - 1 && y < g - 1.5 ? fl : g;
+  const b = bridgeHeight(x, z);
+  if (b !== null && y > b - 0.8) return b;
+  const u = underpassAt(x, z);
+  if (!u) return g;
+  if (!u.covered) return u.floor;
+  const deck = Math.max(g, u.floor + 3);
+  return Math.abs(y - u.floor) <= Math.abs(y - deck) ? u.floor : deck;
+}
+
+let highway: { ax: number; az: number; bx: number; bz: number; r: number }[] = [];
+
+/** On NH66's carriageways or the median between them. */
+export function onHighway(x: number, z: number): boolean {
+  return highway.some((s) => segDist(x, z, s.ax, s.az, s.bx, s.bz) < s.r);
 }
 
 /** The field as a float texture, and where it sits, for the displacement shader. */
@@ -273,6 +348,8 @@ export function bakeTerrain(map: CampusMap): void {
   // highway's own vertices never sample a cut cell (and the culvert roof
   // covers all of it).
   const trunkSegs = trunk.flatMap((r) => segsOf(r.pts, r.width / 2 + 4.5));
+  // The carriageways, wide enough between the pair to take in the median.
+  highway = trunk.flatMap((r) => segsOf(r.pts, r.width / 2 + 2.5));
   const trunkDist = (p: Pt) => Math.min(...trunkSegs.map((s) => segDist(p[0], p[1], s.ax, s.az, s.bx, s.bz) - s.r));
   const resample2 = (src: Pt[]) => {
     const out: Pt[] = [src[0]];
@@ -309,6 +386,35 @@ export function bakeTerrain(map: CampusMap): void {
       joined.add(o.id);
     }
     joined.add(t.id);
+    // One tunnel per direction, side by side, is one underpass: build it once,
+    // on their shared centreline, wide enough for both.
+    let width = t.width;
+    for (const o of tunnels) {
+      if (joined.has(o.id)) continue;
+      const op = resample2(o.pts);
+      const sep = op.map((p) => Math.min(...pts.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1]))));
+      const mean = sep.reduce((a, b) => a + b, 0) / sep.length;
+      if (mean > 14) continue;
+      // Same way round as this one, then pair the points by how far along each they are.
+      const d0 = Math.hypot(op[0][0] - pts[0][0], op[0][1] - pts[0][1]);
+      const d1 = Math.hypot(op[op.length - 1][0] - pts[0][0], op[op.length - 1][1] - pts[0][1]);
+      if (d1 < d0) op.reverse();
+      const n = Math.max(pts.length, op.length);
+      const at = (line: Pt[], f: number): Pt => {
+        const k = Math.min(line.length - 1.001, f * (line.length - 1));
+        const i = Math.floor(k);
+        const u = k - i;
+        return [line[i][0] + (line[i + 1][0] - line[i][0]) * u, line[i][1] + (line[i + 1][1] - line[i][1]) * u];
+      };
+      pts = Array.from({ length: n }, (_, i) => {
+        const a = at(pts, i / (n - 1));
+        const b = at(op, i / (n - 1));
+        return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as Pt;
+      });
+      width = mean + Math.max(t.width, o.width);
+      used.add(o.id);
+      joined.add(o.id);
+    }
     const covered = pts.length;
     // Out from each end along the road that carries on straightest, up to 45 m.
     const grow = (from: Pt, heading: Pt): Pt[] => {
@@ -357,7 +463,7 @@ export function bakeTerrain(map: CampusMap): void {
     };
     const before = grow(pts[0], unit(pts[1], pts[0])).reverse();
     const after = grow(pts[pts.length - 1], unit(pts[pts.length - 2], pts[pts.length - 1]));
-    lines.push({ pts: [...before, ...pts, ...after], width: t.width, used, tunnelFrom: before.length, tunnelTo: before.length + covered - 1 });
+    lines.push({ pts: [...before, ...pts, ...after], width, used, tunnelFrom: before.length, tunnelTo: before.length + covered - 1 });
   }
   // Anything else crossing a trench is carried over it on a small deck.
   const usedIds = new Set(lines.flatMap((l) => [...l.used]));
@@ -390,7 +496,13 @@ export function bakeTerrain(map: CampusMap): void {
       if (j < pts.length && (j - i) * 2 < 12) for (let q = i; q < j; q++) covered[q] = true;
       i = j;
     }
-    cuts.push({ pts, hw, depthAt, covered });
+    // The floor profile, from the ground as it was before any cutting.
+    const floorAt = pts.map((p, i) => {
+      const orig = sample(f.h, f, p[0], p[1]);
+      const depth = depthAt[i];
+      return depth < 0.05 ? orig : Math.min(orig, base - depth + (orig - base) * (1 - depth / CUT_DEPTH));
+    });
+    cuts.push({ pts, hw, depthAt, covered, floorAt });
     const xs = pts.map((p) => p[0]);
     const zs = pts.map((p) => p[1]);
     const c0 = Math.max(0, Math.floor((Math.min(...xs) - hw - f.minX) / CELL));
@@ -416,8 +528,7 @@ export function bakeTerrain(map: CampusMap): void {
         const k = rr * cols + cc;
         const depth = depthAt[bi];
         if (depth < 0.05) continue;
-        // The trench floor follows the road's own grade down from where it started.
-        const target = Math.min(f.h[k], base - depth + (sample(f.h, f, pts[bi][0], pts[bi][1]) - base) * (1 - depth / CUT_DEPTH));
+        const target = Math.min(f.h[k], Math.min(floorAt[bi - 1], floorAt[bi]));
         f.floor[k] = target;
         // Under a deck the ground stays; the culvert floor is below it.
         if (!covered[bi] && !covered[bi - 1]) f.h[k] = target;
@@ -431,6 +542,11 @@ export function bakeTerrain(map: CampusMap): void {
   texture.minFilter = THREE.NearestFilter;
   texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
+}
+
+/** Within r of an underpass's line (trench, culvert or ramp). */
+export function nearUnderpass(x: number, z: number, r: number): boolean {
+  return cuts.some((c) => c.pts.some((p, i) => c.depthAt[i] > 0.05 && Math.hypot(p[0] - x, p[1] - z) < r + c.hw));
 }
 
 /** True if (x, z) is in an underpass trench (outside the culvert under the highway). */

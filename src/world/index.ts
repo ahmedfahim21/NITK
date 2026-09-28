@@ -8,16 +8,17 @@ import type { CampusMap } from "../osm/types";
 import type { Preset } from "../fx/presets";
 import { CLEAR, Grid, PATH, ROAD, SOLID, WATER } from "./grid";
 import { buildGround } from "./ground";
-import { buildRoads } from "./roads";
+import { buildRoads, OVERBRIDGE_H, OVERBRIDGE_STAIRS } from "./roads";
 import { buildBuildings } from "./buildings";
 import { buildLandmarks } from "./landmarks";
 import { buildTrees } from "./trees";
 import { buildProps } from "./props";
-import { bakeTerrain, clearMounds, groundHeight, inCut } from "./terrain";
+import { bakeTerrain, clearMounds, cuts, groundHeight, inCut, setOverbridges } from "./terrain";
 import { displaceTree } from "./displace";
 import { campusRegion, type Region } from "./region";
 import { insideRuns, resample } from "./ground";
 import { buildUnderpasses } from "./underpass";
+import { campusGates, type Gate } from "./walls";
 import { ModelLayer } from "./models";
 import { buildInteriors, interiorBuildings } from "./interiors";
 
@@ -36,6 +37,10 @@ export type World = {
   /** The walk-in room the player is in (cutaway on), or null. */
   interior(pos: THREE.Vector3): string | null;
   apply(p: Preset): void;
+  /** Openings in the compound wall (the NH66 ones shut after the intro). */
+  gates: Gate[];
+  /** The NH66 gates in the compound wall: shut after the intro. */
+  setGatesClosed(closed: boolean): void;
   update(t: number, cam?: THREE.Vector3): void;
 };
 
@@ -115,6 +120,8 @@ export function buildWorld(fullMap: CampusMap): World {
 
   // The terrain: after the landmarks (the lighthouse knoll), before anything is placed on it.
   bakeTerrain(map);
+  // The underpass ramps are part of the world wherever they run.
+  for (const c of cuts) region.extend(c.pts, c.hw + 2);
 
   const ground = buildGround(map, region);
   // Underpass roads stop at the trench mouth; its own floor carries them down and under the highway.
@@ -136,6 +143,8 @@ export function buildWorld(fullMap: CampusMap): World {
       return out;
     }),
   });
+  // The foot overbridge's deck and stairs are walkable.
+  setOverbridges(roads.overbridges.map((r) => ({ a: r.pts[0], b: r.pts[r.pts.length - 1] })), OVERBRIDGE_H, OVERBRIDGE_STAIRS);
   const buildings = buildBuildings(map, new Set([...skip, ...roomIds]));
   // Each walk-in building's shell is its own mesh so the cutaway can hide it.
   const shells = new Map<number, THREE.Object3D>();
@@ -153,6 +162,18 @@ export function buildWorld(fullMap: CampusMap): World {
   const props = buildProps(map, roads.lamps, grid, region);
   const underpasses = buildUnderpasses(grid);
   group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, models.group, interiors.group, underpasses);
+
+  // Nothing stands in the way of the overbridge's stair flights (lamps and
+  // trees are placed before the flights claim their ground).
+  for (const r of roads.overbridges) {
+    const [a, b] = [r.pts[0], r.pts[r.pts.length - 1]];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const [ux, uz] = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+    for (let d = 0; d <= OVERBRIDGE_STAIRS + 2; d += 0.5) {
+      grid.carve(a[0] - ux * d, a[1] - uz * d, 1.3);
+      grid.carve(b[0] + ux * d, b[1] + uz * d, 1.3);
+    }
+  }
 
   // Everything built at ground level 0 goes up onto the terrain.
   for (const g of [ground.group, roads.group, buildings.group, landmarks.group, interiors.group, props.walls]) displaceTree(g);
@@ -219,8 +240,13 @@ export function buildWorld(fullMap: CampusMap): World {
       ground.apply(p);
       props.setGlow(p.glow);
     },
+    gates: campusGates(map, region),
+    setGatesClosed(closed) {
+      props.setGatesClosed(closed);
+    },
     update(t, cam) {
       ground.update(t);
+      props.update(t);
       if (cam) trees.cull(cam);
       landmarks.update(t, glow);
     },
