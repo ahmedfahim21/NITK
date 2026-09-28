@@ -14,6 +14,7 @@ import type { CampusMap } from "../osm/types";
 import type { Place } from "../world";
 import type { Player } from "../player";
 import { icon, iconImage, iconsReady, type IconId } from "./icons";
+import { campusWalls } from "../world/walls";
 import { drawMapBase, MAP_STYLE, mapRegion, PLACE_KINDS, placeKind, type PlaceKind, type Region } from "./mapKit";
 
 /** Pixels per metre on the minimap's pre-rendered base. */
@@ -55,6 +56,8 @@ export class Hud {
   private buildingKinds: (PlaceKind | null)[];
   /** The campus, the beach and the lighthouse hill; nothing else is mapped. */
   private region: Region;
+  /** OSM's walls and the generated campus wall, as lines. */
+  private walls: [number, number][][];
   private mapPlaces: MapPlace[];
   private hidden = new Set<PlaceKind>();
   /** Each named street once, at the middle of its longest straight run, turned to read along it. */
@@ -73,6 +76,7 @@ export class Hud {
   ) {
     const lh = places.find((p) => /lighthouse/i.test(p.name) && p.kind === "landmark") ?? null;
     this.region = mapRegion(map, lh);
+    this.walls = [...map.barriers.filter((b) => b.kind === "wall" || b.kind === "fence").map((b) => b.pts), ...campusWalls(map).map((w) => w.pts)];
     this.mapPlaces = places
       .filter((p) => this.region.contains(p.x, p.z))
       .filter((p) => !["neighbourhood", "place", "water_well", "charging_station"].includes(p.kind) || /gym|ground|sports|lhc|lecture|department|health|computer|auditorium/i.test(p.name))
@@ -363,9 +367,8 @@ export class Hud {
     drawMapBase(g, this.map, X, Z, scale, (i) => {
       const k = this.buildingKinds[i];
       return k && !this.hidden.has(k) ? k : null;
-    });
+    }, this.walls);
     g.restore();
-    this.drawEdge(g, X, Z);
     const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.hypot(w, h) / 2);
     vg.addColorStop(0, "rgba(0,0,0,0)");
     vg.addColorStop(1, MAP_STYLE.vignette);
@@ -474,21 +477,6 @@ export class Hud {
     this.drawYou(g, X(this.player.pos.x), Z(this.player.pos.z), -this.player.facing + Math.PI, 1);
   }
 
-  /** The campus wall, a faint gold line round the campus boundary. */
-  private drawEdge(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number) {
-    g.save();
-    g.beginPath();
-    for (const r of this.region.campus) {
-      r.forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
-      g.closePath();
-    }
-    g.strokeStyle = "rgba(242,184,75,0.45)";
-    g.lineWidth = 1.5;
-    g.setLineDash([6, 4]);
-    g.stroke();
-    g.restore();
-  }
-
   private drawYou(g: CanvasRenderingContext2D, x: number, y: number, rot: number, s: number) {
     g.save();
     g.translate(x, y);
@@ -525,9 +513,8 @@ export class Hud {
     g.beginPath();
     this.region.trace(g, X, Z);
     g.clip("nonzero");
-    drawMapBase(g, this.map, X, Z, MINI_RES, (i) => this.buildingKinds[i]);
+    drawMapBase(g, this.map, X, Z, MINI_RES, (i) => this.buildingKinds[i], this.walls);
     g.restore();
-    this.drawEdge(g, X, Z);
     return c;
   }
 

@@ -11,6 +11,7 @@ import type { Lamp } from "./roads";
 import { nightGlow, toon } from "../fx/toon";
 import { SOLID, type Grid } from "./grid";
 import { groundHeight } from "./terrain";
+import { campusWalls } from "./walls";
 
 export type PropRig = { group: THREE.Group; setGlow(g: number): void };
 
@@ -85,7 +86,21 @@ export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid): PropRig {
     return nn;
   };
   const pillarColour = new THREE.Color(0xe3dab8);
-  for (const b of map.barriers) {
+  // OSM's walls, then the campus compound wall where OSM has none.
+  const generated = campusWalls(map);
+  const barriers = [...map.barriers, ...generated.map((w) => ({ pts: w.pts, kind: "wall" as const }))];
+  for (const w of generated) {
+    // Gate pillars either side of every opening a road or path goes through.
+    for (const [on, p, q] of [[w.gateAtStart, w.pts[0], w.pts[1]], [w.gateAtEnd, w.pts[w.pts.length - 1], w.pts[w.pts.length - 2]]] as const) {
+      if (!on) continue;
+      const ang = -Math.atan2(q[1] - p[1], q[0] - p[0]);
+      wallParts.push(
+        colourise(new THREE.BoxGeometry(0.7, 2.9, 0.7).rotateY(ang).translate(p[0], 1.45, p[1]), pillarColour),
+        colourise(new THREE.BoxGeometry(0.86, 0.16, 0.86).rotateY(ang).translate(p[0], 2.98, p[1]), new THREE.Color(0xa65a3f))
+      );
+    }
+  }
+  for (const b of barriers) {
     const h = b.kind === "fence" ? 1.6 : b.kind === "hedge" ? 1.2 : 2.1;
     const t = b.kind === "fence" ? 0.08 : b.kind === "hedge" ? 0.8 : 0.25;
     let run = 0;
