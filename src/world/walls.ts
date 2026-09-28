@@ -1,11 +1,13 @@
 /**
  * The campus compound wall. OSM maps only a few stretches of it, so the rest
  * follows the campus boundary: broken wherever a road or a path crosses
- * (that's a gate), wherever OSM already has a wall, and wherever the
- * boundary runs through a building.
+ * into somewhere you can go (NH66, an underpass, the beach road; that's a
+ * gate), wherever OSM already has a wall, and wherever the boundary runs
+ * through a building. Everywhere else the world ends at the wall.
  */
 import type { CampusMap } from "../osm/types";
 import type { Pt } from "../geo";
+import type { Region } from "./region";
 
 const STEP = 2;
 /** Boundary rings smaller than this (m²) are enclaves, not the campus. */
@@ -36,7 +38,7 @@ const ringArea = (r: Pt[]) => Math.abs(r.reduce((s, [x, z], i) => s + x * r[(i +
 
 let cached: { map: CampusMap; walls: Wall[] } | null = null;
 
-export function campusWalls(map: CampusMap): Wall[] {
+export function campusWalls(map: CampusMap, region: Region): Wall[] {
   if (cached?.map === map) return cached.walls;
   const segs = (lines: { pts: Pt[]; r: number }[]) =>
     lines.flatMap(({ pts, r }) => pts.slice(1).map((b, i) => ({ ax: pts[i][0], az: pts[i][1], bx: b[0], bz: b[1], r })));
@@ -64,7 +66,11 @@ export function campusWalls(map: CampusMap): Wall[] {
       for (let k = 0; k < n; k++) {
         const x = a[0] + ((b[0] - a[0]) * k) / n;
         const z = a[1] + ((b[1] - a[1]) * k) / n;
-        const open = near(x, z, roads) ? "gate" : near(x, z, osmWalls) || inBuilding(x, z) ? "other" : "";
+        // A gate only where the region carries on past the wall.
+        const nx = -(b[1] - a[1]) / (len || 1);
+        const nz = (b[0] - a[0]) / (len || 1);
+        const through = region.contains(x + nx * 5, z + nz * 5) && region.contains(x - nx * 5, z - nz * 5);
+        const open = through && near(x, z, roads) ? "gate" : near(x, z, osmWalls) || inBuilding(x, z) ? "other" : "";
         samples.push({ p: [x, z], open });
       }
     }

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { loadCampus } from "./osm/load";
 import { buildWorld } from "./world";
+import { cuts, floorHeight, groundHeight, loadDem } from "./world/terrain";
 import { PRESETS, TIME_ORDER, type TimeOfDay } from "./fx/presets";
 import { shadowTint } from "./fx/toon";
 import { RenderPipeline, type Quality } from "./fx/render";
@@ -53,6 +54,8 @@ async function main() {
   }
 
   const map = await loadCampus(progress);
+  progress("Reading the lie of the land…");
+  await loadDem();
   applyArchetypes(map);
   applyOverrides(map, await loadOverrides());
   progress(`Building ${map.buildings.length} buildings and ${map.roads.length} roads…`);
@@ -89,7 +92,7 @@ async function main() {
     player.place(fx, fz, player.facing);
     if (player.drone) player.toggleDrone();
   };
-  const hud = new Hud(map, world.places, player, camera, teleport);
+  const hud = new Hud(map, world.places, player, camera, teleport, world.region);
 
   /* ---- time of day: driven by the game clock ---- */
   let time: TimeOfDay = "morning";
@@ -255,11 +258,11 @@ async function main() {
       });
       row.append(sel, rainBtn);
     }
-    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music } });
+    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music, terrain: { groundHeight, floorHeight, cuts } } });
   };
 
   // Expose for debugging and automated screenshots.
-  Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music } });
+  Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music, terrain: { groundHeight, floorHeight, cuts } } });
 
   const clock = new THREE.Clock();
   const fpsEl = document.getElementById("fps")!;

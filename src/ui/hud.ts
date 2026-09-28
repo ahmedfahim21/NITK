@@ -15,7 +15,8 @@ import type { Place } from "../world";
 import type { Player } from "../player";
 import { icon, iconImage, iconsReady, type IconId } from "./icons";
 import { campusWalls } from "../world/walls";
-import { drawMapBase, MAP_STYLE, mapRegion, PLACE_KINDS, placeKind, type PlaceKind, type Region } from "./mapKit";
+import { drawMapBase, MAP_STYLE, PLACE_KINDS, placeKind, type PlaceKind } from "./mapKit";
+import type { Region } from "../world/region";
 
 /** Pixels per metre on the minimap's pre-rendered base. */
 const MINI_RES = 1.25;
@@ -72,11 +73,11 @@ export class Hud {
     private places: Place[],
     private player: Player,
     private camera: THREE.PerspectiveCamera,
-    private teleport: (x: number, z: number) => void
+    private teleport: (x: number, z: number) => void,
+    region: Region
   ) {
-    const lh = places.find((p) => /lighthouse/i.test(p.name) && p.kind === "landmark") ?? null;
-    this.region = mapRegion(map, lh);
-    this.walls = [...map.barriers.filter((b) => b.kind === "wall" || b.kind === "fence").map((b) => b.pts), ...campusWalls(map).map((w) => w.pts)];
+    this.region = region;
+    this.walls = [...map.barriers.filter((b) => b.kind === "wall" || b.kind === "fence").map((b) => b.pts), ...campusWalls(map, region).map((w) => w.pts)];
     this.mapPlaces = places
       .filter((p) => this.region.contains(p.x, p.z))
       .filter((p) => !["neighbourhood", "place", "water_well", "charging_station"].includes(p.kind) || /gym|ground|sports|lhc|lecture|department|health|computer|auditorium/i.test(p.name))
@@ -332,6 +333,8 @@ export class Hud {
       // A click, not a drag: teleport there.
       if (e.type === "pointerup" && wasOne && moved < 6) {
         const [wx, wz] = this.toWorld(...local(e));
+        // Nothing exists outside the campus to go to.
+        if (!this.region.contains(wx, wz)) return;
         this.teleport(wx, wz);
         this.toggleMap(false);
       }

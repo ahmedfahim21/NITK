@@ -12,10 +12,16 @@ import { nightGlow, toon } from "../fx/toon";
 import { SOLID, type Grid } from "./grid";
 import { groundHeight } from "./terrain";
 import { campusWalls } from "./walls";
+import type { Region } from "./region";
 
-export type PropRig = { group: THREE.Group; setGlow(g: number): void };
+export type PropRig = {
+  group: THREE.Group;
+  /** The walls, built at ground level 0 for the terrain to lift (the lamps are already placed on it). */
+  walls: THREE.Group;
+  setGlow(g: number): void;
+};
 
-export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid): PropRig {
+export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid, region: Region): PropRig {
   const group = new THREE.Group();
   group.name = "props";
 
@@ -87,7 +93,7 @@ export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid): PropRig {
   };
   const pillarColour = new THREE.Color(0xe3dab8);
   // OSM's walls, then the campus compound wall where OSM has none.
-  const generated = campusWalls(map);
+  const generated = campusWalls(map, region);
   const barriers = [...map.barriers, ...generated.map((w) => ({ pts: w.pts, kind: "wall" as const }))];
   for (const w of generated) {
     // Gate pillars either side of every opening a road or path goes through.
@@ -139,21 +145,25 @@ export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid): PropRig {
     }
     grid.strokeLine(b.pts, Math.max(0.5, t), SOLID, h);
   }
+  const wallGroup = new THREE.Group();
+  wallGroup.name = "walls";
+  group.add(wallGroup);
   if (wallParts.length) {
     const walls = new THREE.Mesh(mergeGeometries(wallParts)!, toon(0xffffff, { vertexColors: true }));
     walls.castShadow = true;
     walls.receiveShadow = true;
-    group.add(walls);
+    wallGroup.add(walls);
   }
   if (jaliParts.length) {
     const jali = new THREE.Mesh(mergeGeometries(jaliParts)!, toon(0xffffff, { vertexColors: true, map: jaliTexture() }));
     jali.castShadow = true;
     jali.receiveShadow = true;
-    group.add(jali);
+    wallGroup.add(jali);
   }
 
   return {
     group,
+    walls: wallGroup,
     setGlow(g) {
       poolMat.opacity = g * 0.55;
       poolMesh.visible = g > 0.05;
