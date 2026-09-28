@@ -16,6 +16,8 @@
  * - LHC-A: exposed laterite with white window frames.
  * - Library, LHC-D, CRF, CIDS, SJA: white render with lavender-grey bands.
  * - Chemical Engineering: cream and mauve, curved entrance canopy.
+ * - Other departments (UG Programmes page photos): cream render, CSE terracotta,
+ *   Metallurgy and Civil khaki.
  * - EEE/IT and the International Hostel: saturated yellow, blue-glass stair
  *   strips, green portal porch.
  */
@@ -33,6 +35,15 @@ const LOOKS: [RegExp, Look][] = [
   [/^Silver Jubilee Auditorium$/i, { style: "modern", colour: "#f4f2ee" }],
   // The tour's EEE/IT blocks and the International Hostel: saturated yellow.
   [/Electrical and Electronics|Information Technology/i, { style: "academic", colour: "#e4cf55" }],
+  // The other departments, from the UG Programmes page photos (nitk.ac.in/UG_Programmes):
+  // mostly cream render, CSE the terracotta block, Metallurgy and Civil the warmer khaki.
+  [/^Department of Computer Science/i, { style: "academic", colour: "#d99a78" }],
+  [/^Department of Civil Engineering$/i, { style: "academic", colour: "#e3d6a2" }],
+  [/^Department of Electronics and Communication/i, { style: "academic", colour: "#e6dcc0" }],
+  [/^Department of Mathematics and Computing$/i, { style: "academic", colour: "#ddd0b0" }],
+  [/^Department of Mechanical Engineering$/i, { style: "academic", colour: "#f1ece0" }],
+  [/^Department of Metallurg/i, { style: "academic", colour: "#e2cf8a" }],
+  [/^Department of Mining Engineering$/i, { style: "academic", colour: "#eeeae0" }],
   [/^International Students Hostel$/i, { style: "hostel", colour: "#e8d35e" }],
 ];
 
@@ -44,7 +55,41 @@ function isOldHostel(b: Building): boolean {
   return b.type === "dormitory" || /\bblock\b|^GH-\d|hostel/i.test(b.name);
 }
 
+/**
+ * OSM maps Water Resources & Ocean Engineering as an amenity=university area
+ * with no building in it, so the block would be missing. Give it one on the
+ * same footprint (three floors, cream render) so the Civil overbridge has
+ * something to land on.
+ */
+function addWroe(map: CampusMap) {
+  const area = map.areas.find((a) => a.name && /^Department of Water Resources and Ocean/i.test(a.name));
+  if (!area || map.buildings.some((b) => b.name && /Water Resources and Ocean/i.test(b.name))) return;
+  let twice = 0;
+  for (let i = 0; i < area.outer.length; i++) {
+    const [x0, z0] = area.outer[i];
+    const [x1, z1] = area.outer[(i + 1) % area.outer.length];
+    twice += x0 * z1 - x1 * z0;
+  }
+  map.buildings.push({
+    id: area.id,
+    osmType: "way",
+    outer: area.outer,
+    holes: [],
+    height: 3 * 3.4,
+    minHeight: 0,
+    levels: 3,
+    name: area.name,
+    type: "university",
+    campus: true,
+    style: "academic",
+    colour: "#e6dcc0",
+    area: Math.abs(twice) / 2,
+    tags: { building: "university", name: area.name! },
+  });
+}
+
 export function applyArchetypes(map: CampusMap) {
+  addWroe(map);
   for (const b of map.buildings) {
     if (!b.name) continue;
     const hit = LOOKS.find(([re]) => re.test(b.name!));

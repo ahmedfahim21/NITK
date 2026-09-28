@@ -515,6 +515,82 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
       attach(b.id, g);
     }
   }
+  // Civil to Water Resources & Ocean Engineering: a covered first-floor
+  // walkway on splayed concrete piers along the Civil block's front (per the
+  // UG Programmes photo). Ends land on each building's nearest wall.
+  {
+    const a = findByName(map, /^Department of Civil Engineering$/i);
+    const b = findByName(map, /^Department of Water Resources and Ocean/i);
+    if (a && b) {
+      const nearest = (ring: Pt[], to: Pt): Pt => {
+        let best: Pt = ring[0];
+        let bd = Infinity;
+        for (let i = 0; i < ring.length; i++) {
+          const p = ring[i];
+          const q = ring[(i + 1) % ring.length];
+          const dx = q[0] - p[0];
+          const dz = q[1] - p[1];
+          const t = Math.max(0, Math.min(1, ((to[0] - p[0]) * dx + (to[1] - p[1]) * dz) / (dx * dx + dz * dz || 1)));
+          const c: Pt = [p[0] + dx * t, p[1] + dz * t];
+          const d = Math.hypot(c[0] - to[0], c[1] - to[1]);
+          if (d < bd) {
+            bd = d;
+            best = c;
+          }
+        }
+        return best;
+      };
+      const s0 = nearest(a.outer, centroid(b.outer));
+      const e0 = nearest(b.outer, centroid(a.outer));
+      const len = Math.hypot(e0[0] - s0[0], e0[1] - s0[1]);
+      if (len > 3 && len < 60) {
+        const ux = (e0[0] - s0[0]) / len;
+        const uz = (e0[1] - s0[1]) / len;
+        const g = new THREE.Group();
+        g.position.set((s0[0] + e0[0]) / 2, 0, (s0[1] + e0[1]) / 2);
+        g.rotation.y = Math.atan2(ux, uz) - Math.PI / 2;
+        // Local x runs along the walkway.
+        const W = 2.8;
+        const deckY = 4.6;
+        const wall = toon(0xe6dcc0);
+        const trim = toon(0xb9ab8c);
+        const glass = toon(0x2b3a4a, { ramp: "soft" });
+        const concrete = toon(0xc9c4b8);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(len, 2.6, W), wall);
+        box.position.y = deckY + 1.3;
+        const slab = new THREE.Mesh(new THREE.BoxGeometry(len + 0.4, 0.5, W + 0.5), trim);
+        slab.position.y = deckY - 0.25;
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(len + 0.6, 0.3, W + 0.8), trim);
+        roof.position.y = deckY + 2.75;
+        g.add(box, slab, roof);
+        // A continuous window band on both long sides.
+        for (const side of [-1, 1]) {
+          const band = new THREE.Mesh(new THREE.BoxGeometry(len - 0.6, 0.9, 0.06), glass);
+          band.position.set(0, deckY + 1.5, side * (W / 2 + 0.02));
+          g.add(band);
+        }
+        // Splayed piers in pairs, every ~8 m, each with a diagonal lean.
+        const bays = Math.max(1, Math.round(len / 8));
+        for (let k = 0; k <= bays; k++) {
+          const x = -len / 2 + (k / bays) * len;
+          for (const side of [-1, 1]) {
+            const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.55, deckY - 0.4, 4), concrete);
+            pier.rotation.y = Math.PI / 4;
+            pier.rotation.x = side * 0.09;
+            pier.position.set(x, (deckY - 0.4) / 2, side * (W / 2 + 0.25));
+            g.add(pier);
+            const w = new THREE.Vector3(pier.position.x, 0, pier.position.z);
+            g.updateMatrixWorld(true);
+            w.applyMatrix4(g.matrixWorld);
+            // Solid up to head height only, so you can walk under the deck.
+            grid.stampDisc(w.x, w.z, 0.5, SOLID, deckY - 0.4);
+          }
+        }
+        shadows(g);
+        group.add(g);
+      }
+    }
+  }
   // Central Library: grey louvre fins flank the entrance bay.
   {
     const b = findByName(map, /central library/i);
