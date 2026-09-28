@@ -193,7 +193,7 @@ The journal lists your courses, levels, perks and the timetable.
 
 ### Journal and yearbook
 
-- **Journal (J):** the day at a glance (date, time, season, money, attendance), respect with each hostel and group in its colour, clubs, and the missions and campus jobs that have appeared so far, with their icons, state and hours. Nothing still locked is listed or counted, so it never spoils what's coming. The journal and yearbook take their look from NITK's alumni site: navy headings, one fresh green, Raleway, white cards with thin borders.
+- **Journal (J):** the day at a glance (date, time, season, money, attendance), respect with each hostel and group in its colour, clubs, and the missions and campus jobs that have appeared so far, with their icons, state and hours. Nothing still locked is listed or counted, so it never spoils what's coming. On phones and narrow screens the journal becomes a near full-screen sheet with You / Missions / Studies tabs, one column at a time.
 - **Yearbook (Y, or from the journal):** everyone in the cast, grouped into friends and seniors, clubs, faculty and staff, and around campus. Each person unlocks when you walk up to them or they speak to you, and gets a portrait rendered from their own 3D model. Until then they are a silhouette with a hint of where to find them.
 
 The Bully-style systems:
@@ -262,6 +262,7 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 - **Time of day.** Morning, noon, Arabian-Sea sunset and night, with lit windows, street-lamp pools and stars.
 - **Compound wall.** OSM maps only a few stretches, so the rest follows the campus boundary in the jali-panel style. It opens where a road or path crosses into somewhere you can go (NH66, an underpass, the beach road), with a gate pillar on each side, and skips stretches OSM already walls and any that run through buildings. The map draws the walls as cream lines.
 - **HUD.** A rotating minimap, a full map, floating building labels, and a "you are near" banner.
+- **UI style.** Everything takes its look from NITK's alumni site: white translucent cards with thin navy-tinted borders, navy text, one fresh green accent, and Raleway throughout. Hierarchy comes from size and colour, not weight. The title and loading screens are navy. The full map stays dark in SADAK's style. The tokens live in `src/styles.css`.
 - **Map (M).** Styled after SADAK's map: a dark vector map of the campus only, plus the coast (a band following the beach's shoreline) and the lighthouse knoll, with NH66, its two underpasses, the foot overbridge and the beach road as connectors. Buildings are tinted by kind. Places carry Lucide icons in their category colours (hand-drawn where Lucide has none: hostel, thali, sea, Yakshagana crown). There is a key you can filter by, street names when zoomed in, gold story and teal job markers, and an "Open now" list. Drag to pan, scroll to zoom, click to teleport.
 
 ## Controls
