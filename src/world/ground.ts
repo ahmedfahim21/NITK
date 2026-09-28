@@ -7,7 +7,7 @@ import type { AreaKind, CampusMap } from "../osm/types";
 import { toon } from "../fx/toon";
 import type { Preset } from "../fx/presets";
 import { pointIn, type Region } from "./region";
-import { inCut } from "./terrain";
+import { groundHeight, inCut } from "./terrain";
 
 /** Points every `step` metres or closer along a polyline. */
 export function resample(pts: Pt[], step: number): Pt[] {
@@ -259,7 +259,8 @@ export function buildGround(map: CampusMap, region: Region): GroundRig {
     z0 = rb.minZ,
     x1 = rb.maxX,
     z1 = rb.maxZ,
-    fine?: (cx: number, cz: number) => boolean
+    fine?: (cx: number, cz: number) => boolean,
+    terrainSplit = false
   ) => {
     const x0Lat = x0;
     const z0Lat = z0;
@@ -267,6 +268,46 @@ export function buildGround(map: CampusMap, region: Region): GroundRig {
     const rows = Math.ceil((z1 - z0) / step) + 1;
     const vx = (c: number) => x0 + c * step;
     const vz = (r: number) => z0 + r * step;
+    // Where the 2 m heightfield bends faster than a 4 m quad's two triangles can follow
+    // (pad edges, steep blends), split the quad so the ground mesh and groundHeight agree.
+    const level: number[] = new Array((rows - 1) * (cols - 1)).fill(1);
+    if (terrainSplit) {
+      for (let r = 0; r < rows - 1; r++) {
+        for (let c = 0; c < cols - 1; c++) {
+          const qx = vx(c);
+          const qz = vz(r);
+          if (!keep(qx + step / 2, qz + step / 2)) continue;
+          const h00 = groundHeight(qx, qz);
+          const h10 = groundHeight(qx + step, qz);
+          const h01 = groundHeight(qx, qz + step);
+          const h11 = groundHeight(qx + step, qz + step);
+          let dev = 0;
+          for (const u of [0.25, 0.5, 0.75]) {
+            for (const v of [0.25, 0.5, 0.75]) {
+              // The lattice's own triangles: (0,0)(0,1)(1,0) and (1,0)(0,1)(1,1).
+              const chord = u + v <= 1 ? h00 + (h10 - h00) * u + (h01 - h00) * v : h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
+              dev = Math.max(dev, Math.abs(chord - groundHeight(qx + u * step, qz + v * step)));
+            }
+          }
+          level[r * (cols - 1) + c] = dev > 0.3 ? 4 : dev > 0.05 ? 2 : 1;
+        }
+      }
+      // Neighbours of a split quad split at least once, so their shared edge has matching vertices.
+      const own = level.slice();
+      for (let r = 0; r < rows - 1; r++) {
+        for (let c = 0; c < cols - 1; c++) {
+          let around = 1;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const rr = r + dr;
+              const cc = c + dc;
+              if (rr >= 0 && cc >= 0 && rr < rows - 1 && cc < cols - 1) around = Math.max(around, own[rr * (cols - 1) + cc]);
+            }
+          }
+          level[r * (cols - 1) + c] = Math.max(own[r * (cols - 1) + c], Math.min(2, around));
+        }
+      }
+    }
     const vcol: THREE.Color[] = [];
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) vcol.push(new THREE.Color(colour(vx(c), vz(r))));
     const out = { green: { pos: [] as number[], col: [] as number[] }, plain: { pos: [] as number[], col: [] as number[] } };
@@ -275,7 +316,7 @@ export function buildGround(map: CampusMap, region: Region): GroundRig {
         const cx = vx(c) + step / 2;
         const cz = vz(r) + step / 2;
         // Near a fine edge (an underpass), split the quad into 1 m pieces and test each.
-        const n = fine && fine(cx, cz) ? step : 1;
+        const n = fine && fine(cx, cz) ? step : level[r * (cols - 1) + c];
         const sub = step / n;
         const tgt = green(cx, cz) ? out.green : out.plain;
         for (let sr = 0; sr < n; sr++) {
@@ -328,7 +369,8 @@ export function buildGround(map: CampusMap, region: Region): GroundRig {
     rb.minZ,
     rb.maxX,
     rb.maxZ,
-    (x, z) => inCut(x, z, 6)
+    (x, z) => inCut(x, z, 6),
+    true
   );
   // Beyond the wall: coarse scrubland out to the edge of the map, just under the region's ground.
   const mb = map.bounds;

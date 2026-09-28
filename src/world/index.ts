@@ -46,12 +46,12 @@ export type World = {
 
 /**
  * The map cut down to the region: buildings, areas and places inside it,
- * roads, walls and streams split to the runs inside it (resampled to 3 m so
+ * roads, walls and streams split to the runs inside it (resampled to 2 m (the heightfield's cell) so
  * they bend with the terrain).
  */
 function clipToRegion(map: CampusMap, region: Region): CampusMap {
   const inside = (p: Pt) => region.contains(p[0], p[1]);
-  const runs = (pts: Pt[]) => insideRuns(resample(pts, 3), region).filter((r) => r.length >= 2);
+  const runs = (pts: Pt[]) => insideRuns(resample(pts, 2), region).filter((r) => r.length >= 2);
   return {
     ...map,
     buildings: map.buildings.filter((b) => inside(centroid(b.outer))),
