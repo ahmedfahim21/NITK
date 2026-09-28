@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "osm:fetch": "node scripts/fetch-osm.mjs"
+    "osm:fetch": "node scripts/fetch-osm.mjs",
+    "dem:fetch": "node scripts/fetch-dem.mjs"
   },
   "dependencies": {
     "lucide": "^1.48.0",
