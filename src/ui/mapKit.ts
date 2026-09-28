@@ -131,7 +131,15 @@ const AREA_ORDER: AreaKind[] = ["campus", "residential", "commercial", "farmland
  * pixels per metre: ground and sea, green spaces and pitches, the roads in
  * their casings, buildings tinted by what they are, landmarks in gold.
  */
-export function drawMapBase(g: CanvasRenderingContext2D, map: CampusMap, X: (x: number) => number, Z: (z: number) => number, scale: number, buildingKind: (i: number) => PlaceKind | null) {
+export function drawMapBase(
+  g: CanvasRenderingContext2D,
+  map: CampusMap,
+  X: (x: number) => number,
+  Z: (z: number) => number,
+  scale: number,
+  buildingKind: (i: number) => PlaceKind | null,
+  walls: [number, number][][]
+) {
   const path = (pts: [number, number][], close: boolean) => {
     pts.forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
     if (close) g.closePath();
@@ -223,6 +231,19 @@ export function drawMapBase(g: CanvasRenderingContext2D, map: CampusMap, X: (x: 
     g.lineWidth = k === "landmark" ? Math.max(1, 0.5 * scale) : 1;
     g.stroke();
   });
+
+  // Compound walls: cream, like the real ones, over a dark casing.
+  g.lineCap = "butt";
+  for (const [colour, w] of [[MAP_STYLE.casing, Math.max(2.4, 0.9 * scale)], ["#e6dfcb", Math.max(1.2, 0.45 * scale)]] as const) {
+    g.strokeStyle = colour;
+    g.lineWidth = w;
+    for (const pts of walls) {
+      g.beginPath();
+      path(pts, false);
+      g.stroke();
+    }
+  }
+  g.lineCap = "round";
 }
 
 /* ------------------------------------------------------------------ *
@@ -231,13 +252,21 @@ export function drawMapBase(g: CanvasRenderingContext2D, map: CampusMap, X: (x: 
 
 export type Region = {
   polys: [number, number][][];
-  /** Just the campus boundary, for the dashed wall line. */
-  campus: [number, number][][];
   bounds: { minX: number; minZ: number; maxX: number; maxZ: number };
   contains(x: number, z: number): boolean;
   /** Adds the region to the current path, every ring wound the same way so a nonzero clip is their union. */
   trace(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number): void;
 };
+
+function pointIn(x: number, z: number, r: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const [xi, zi] = r[i];
+    const [xj, zj] = r[j];
+    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
 
 const signedArea = (r: [number, number][]) => r.reduce((s, [x, z], i) => {
   const [x2, z2] = r[(i + 1) % r.length];
@@ -253,17 +282,50 @@ const signedArea = (r: [number, number][]) => r.reduce((s, [x, z], i) => {
  */
 export function mapRegion(map: CampusMap, lighthouse: { x: number; z: number } | null): Region {
   const polys: [number, number][][] = map.campus.map((c) => [...c]);
+  // The coast: the beach itself, the lighthouse knoll, and a band of sea
+  // that follows the shoreline between them.
   const beach = map.areas.find((a) => a.kind === "sand" && /beach/i.test(a.name ?? ""));
-  if (beach || lighthouse) {
-    const xs = [...(beach?.outer.map((p) => p[0]) ?? []), ...(lighthouse ? [lighthouse.x] : [])];
-    const zs = [...(beach?.outer.map((p) => p[1]) ?? []), ...(lighthouse ? [lighthouse.z] : [])];
-    const minX = Math.min(...xs) - 220;
-    const maxX = Math.max(...xs) + 30;
-    const minZ = Math.min(...zs) - 40;
-    const maxZ = lighthouse ? lighthouse.z + 140 : Math.max(...zs);
-    polys.push([[minX, minZ], [maxX, minZ], [maxX, maxZ], [minX, maxZ]]);
+  const circle = (x: number, z: number, r: number): [number, number][] => Array.from({ length: 24 }, (_, i) => [x + Math.cos((i / 24) * Math.PI * 2) * r, z + Math.sin((i / 24) * Math.PI * 2) * r]);
+  if (beach) {
+    const zs = beach.outer.map((p) => p[1]);
+    const zTop = Math.min(...zs) - 30;
+    const zEnd = lighthouse ? lighthouse.z + 160 : Math.max(...zs);
+    polys.push(beach.outer.map((p) => [p[0], Math.min(zEnd, p[1])] as [number, number]));
+    // A band along the beach's own outline: out to sea on its sea side,
+    // a strip of the dunes and casuarinas on its land side, tapering to
+    // nothing at the two ends so the coast doesn't end in a straight cut.
+    const inSea = (x: number, z: number) => map.sea.some((r) => pointIn(x, z, r));
+    const taper = (z: number) => Math.max(0, Math.min(1, (z - zTop) / 150, (zEnd - z) / 150));
+    const ring = beach.outer;
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      if (Math.min(a[1], b[1]) > zEnd) continue;
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len < 0.5) continue;
+      const nx = -(b[1] - a[1]) / len;
+      const nz = (b[0] - a[0]) / len;
+      const mx = (a[0] + b[0]) / 2;
+      const mz = (a[1] + b[1]) / 2;
+      // Which way is out of the sand, and is that the sea?
+      const sx = pointIn(mx + nx * 3, mz + nz * 3, ring) ? -1 : 1;
+      const seaward = inSea(mx + sx * nx * 25, mz + sx * nz * 25);
+      const reach = (p: [number, number]) => (seaward ? 140 : 40) * taper(Math.min(p[1], zEnd));
+      const clampZ = (p: [number, number]): [number, number] => [p[0], Math.min(zEnd, p[1])];
+      const [pa, pb] = [clampZ(a), clampZ(b)];
+      polys.push([
+        pa,
+        pb,
+        [pb[0] + sx * nx * reach(pb), pb[1] + sx * nz * reach(pb)],
+        [pa[0] + sx * nx * reach(pa), pa[1] + sx * nz * reach(pa)],
+      ]);
+    }
   }
+  // The lighthouse knoll.
+  if (lighthouse) polys.push(circle(lighthouse.x, lighthouse.z, 90));
   if (!polys.length) throw new Error("[map] OSM has no campus boundary to map");
+  // The campus and the coast frame the map; the connectors don't widen it.
+  const framed = polys.length;
 
   // Connectors: a corridor a few metres either side of each way.
   const segDist = (x: number, z: number, a: [number, number], b: [number, number]) => {
@@ -306,28 +368,18 @@ export function mapRegion(map: CampusMap, lighthouse: { x: number; z: number } |
   }
   if (!connectors) console.warn("[map] no NH66, underpass or overbridge ways found to connect the campus halves");
   for (const r of polys) if (signedArea(r) < 0) r.reverse();
-  const campus = polys.slice(0, map.campus.length);
-  const all = [...campus, ...polys.slice(campus.length, campus.length + 1)].flat();
+  const all = polys.slice(0, framed).flat();
   const bounds = {
     minX: Math.min(...all.map((p) => p[0])) - 40,
     maxX: Math.max(...all.map((p) => p[0])) + 40,
     minZ: Math.min(...all.map((p) => p[1])) - 40,
     maxZ: Math.max(...all.map((p) => p[1])) + 40,
   };
-  const inPoly = (x: number, z: number, r: [number, number][]) => {
-    let inside = false;
-    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
-      const [xi, zi] = r[i];
-      const [xj, zj] = r[j];
-      if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
-    }
-    return inside;
-  };
+
   return {
     polys,
-    campus,
     bounds,
-    contains: (x, z) => polys.some((r) => inPoly(x, z, r)),
+    contains: (x, z) => polys.some((r) => pointIn(x, z, r)),
     trace(g, X, Z) {
       for (const r of polys) {
         r.forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
