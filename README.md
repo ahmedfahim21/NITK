@@ -109,7 +109,13 @@ NITK sits on a laterite plateau. The beach is at sea level, the land climbs abou
 - **Heightfield:** `src/world/terrain.ts` smooths the elevation data to take out tree canopy, pins the sea and the beach, and bakes one 2 m heightfield. Every building, ground, car park and pond stands on a level pad blended into the slope.
 - **Lift:** the static world is built at height 0 and lifted onto the terrain in the vertex shader (`src/world/displace.ts`), shadows included. Buildings, landmarks and interiors rise as rigid blocks because their pads are flat. The ground is one 4 m lattice (1 m next to the underpasses) that bends with the slope.
 - **Matching heights:** `groundHeight()` reads the same field on the CPU, so the player, cast, crowd and trees stand exactly on what's drawn.
-- **Underpasses:** these come from OSM's `tunnel=yes` ways under NH66 (`src/world/underpass.ts`). Each ramps down about 5 m between laterite retaining walls with a concrete parapet, then runs under the highway in a box culvert with headwalls at each portal. A road crossing a ramp deep enough gets its own culvert. The first underpass is twin-cell, one per direction; the second joins Fresher's Street to the beach road.
+- **Underpasses:** these come from OSM's `tunnel=yes` ways under NH66 (`src/world/underpass.ts`). Each ramps down about 5 m between laterite retaining walls with a concrete parapet, then runs under the highway in a box culvert with headwalls at each portal. A road crossing a ramp deep enough gets its own culvert. The first underpass is OSM's two tunnels, one per direction, built as one wide underpass; the second joins Fresher's Street to the beach road. Inside an underpass the player stands on the underpass's own floor profile. Under the deck, they stay on whichever of the floor and the road above is nearer.
+- **Foot overbridge:** the covered steel bridge over NH66 is walkable, up either stair flight and across the deck. Nothing on the ground below blocks you up there, and you can't step off the sides.
+- **One step at a time:** the player can't step up or drop more than a metre in one move, so there's no walking off a deck, out of a culvert's side or over a trench wall.
+
+## NH66 after the intro
+
+Once the arrival mission is done (outside Explore), the steel grille gates in the compound wall onto NH66 swing shut and become solid, the Main Gate included. You cross by an underpass or the footbridge, and the gate to the beach road stays open. The carriageways themselves are also closed at road level, but not in the culverts under them or on the bridge over them. So there's no walking onto NH66 from the beach-road side, where no wall stands. Bump into it and a toast points you to the crossings.
 
 ## The game
 
