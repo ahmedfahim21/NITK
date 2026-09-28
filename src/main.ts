@@ -299,17 +299,17 @@ async function main() {
     const c = S / 2;
     const R = c - 4;
     ctx.clearRect(0, 0, S, S);
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.strokeStyle = "rgba(255,255,255,0.22)";
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(22,41,78,0.18)";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(c, c, R, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    // Today's marks on the rim (by hour on the 12-hour dial), in gold.
+    // Today's marks on the rim (by hour on the 12-hour dial), in green.
     for (const [t] of marks) {
       const a = ((t / 60) % 12) / 12 * Math.PI * 2 - Math.PI / 2;
-      ctx.strokeStyle = "#f2b84b";
+      ctx.strokeStyle = "#50bd77";
       ctx.lineWidth = 6;
       ctx.beginPath();
       ctx.arc(c, c, R - 3, a - 0.13, a + 0.13);
@@ -318,7 +318,7 @@ async function main() {
     for (let k = 0; k < 12; k++) {
       const a = (k / 12) * Math.PI * 2;
       const long = k % 3 === 0;
-      ctx.strokeStyle = long ? "rgba(243,238,228,0.9)" : "rgba(243,238,228,0.45)";
+      ctx.strokeStyle = long ? "rgba(22,41,78,0.85)" : "rgba(22,41,78,0.35)";
       ctx.lineWidth = long ? 4 : 2.5;
       ctx.beginPath();
       ctx.moveTo(c + Math.sin(a) * (R - (long ? 16 : 11)), c - Math.cos(a) * (R - (long ? 16 : 11)));
@@ -335,9 +335,9 @@ async function main() {
       ctx.stroke();
     };
     const h = (minutes / 60) % 12;
-    hand((h / 12) * Math.PI * 2, R * 0.5, 7, late ? "#ef6a57" : "#f3eee4");
-    hand(((minutes % 60) / 60) * Math.PI * 2, R * 0.78, 4.5, "#f3eee4");
-    ctx.fillStyle = "#f2b84b";
+    hand((h / 12) * Math.PI * 2, R * 0.5, 7, late ? "#d64545" : "#16294e");
+    hand(((minutes % 60) / 60) * Math.PI * 2, R * 0.78, 4.5, "#16294e");
+    ctx.fillStyle = "#50bd77";
     ctx.beginPath();
     ctx.arc(c, c, 6, 0, Math.PI * 2);
     ctx.fill();

@@ -411,7 +411,7 @@ export class Hud {
       // Names: landmarks always, the rest once you've zoomed in.
       if (p.pk !== "landmark" && scale < 1.6) continue;
       const fs = p.pk === "landmark" ? 14 : 12;
-      g.font = `400 ${fs}px 'Barlow Condensed', system-ui, sans-serif`;
+      g.font = `500 ${fs}px 'Raleway', system-ui, sans-serif`;
       const tw = g.measureText(p.name).width;
       const tx = px + r + 4;
       if (!free(tx + tw / 2, py, tw, fs + 2)) continue;
@@ -605,12 +605,12 @@ export class Hud {
     const r = S / 2 - 12;
     const nx = S / 2 + Math.sin(this.player.yaw) * r;
     const ny = S / 2 - Math.cos(this.player.yaw) * r;
-    ctx.fillStyle = "rgba(15,19,28,0.85)";
+    ctx.fillStyle = "rgba(255,255,255,0.94)";
     ctx.beginPath();
     ctx.arc(nx, ny, 11, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#f2b84b";
-    ctx.font = "500 14px 'Barlow Condensed', system-ui, sans-serif";
+    ctx.fillStyle = "#2f8a52";
+    ctx.font = "500 13px 'Raleway', system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("N", nx, ny + 1);

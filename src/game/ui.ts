@@ -2,7 +2,7 @@
  * Game UI: banners for chapters and mission results, a lower-third dialogue,
  * an objective tracker with a timer, the status card, interaction prompts,
  * toasts, and paper cards for the journal, quizzes and minigames. Styled in
- * ui.css on the tokens in src/styles.css (dark glass HUD, one gold accent).
+ * ui.css on the tokens in src/styles.css (white cards, navy text, one green accent).
  */
 import { sfx } from "./audio";
 import "./ui.css";
@@ -99,12 +99,9 @@ export class GameUI {
   }
 
   /** A short note in the corner; `colour` is its accent rule. */
-  toast(text: string, colour = "#f2b84b") {
+  toast(text: string, colour = "#50bd77") {
     const t = el("div", undefined, "toast plate", this.toasts);
-    // Callers pass the old paper-UI colours; the darkest ones vanish on glass, so they turn gold.
-    const n = parseInt(colour.replace("#", ""), 16);
-    const lum = ((n >> 16) & 255) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11;
-    t.style.setProperty("--accent", Number.isNaN(n) || lum < 70 ? "#f2b84b" : colour);
+    t.style.setProperty("--accent", colour);
     t.textContent = text;
     setTimeout(() => t.classList.add("out"), 3000);
     setTimeout(() => t.remove(), 3400);
