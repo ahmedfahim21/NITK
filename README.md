@@ -235,8 +235,9 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 - **Vegetation.** Coconut palms, broadleaf canopy and casuarinas, scattered by land use. On campus: columnar Ashoka trees, rain-tree avenues arching over the roads, and bare laterite soil in their shade.
 - **Street furniture.** Black-and-white painted kerbs and white globe lamps on campus roads; compound walls with a laterite plinth, jali screen and pillars.
 - **Time of day.** Morning, noon, Arabian-Sea sunset and night, with lit windows, street-lamp pools and stars.
+- **Compound wall.** OSM maps only a few stretches, so the rest follows the campus boundary in the jali-panel style. It opens where roads and paths cross, with a gate pillar on each side, and skips stretches OSM already walls and any that run through buildings. The map draws the walls as cream lines.
 - **HUD.** A rotating minimap, a full map, floating building labels, and a "you are near" banner.
-- **Map (M).** Styled after SADAK's map: a dark vector map of the campus only, plus the beach and lighthouse hill, with NH66, its two underpasses and the foot overbridge as connectors. Buildings are tinted by kind. Places carry Lucide icons in their category colours (hand-drawn where Lucide has none: hostel, thali, sea, Yakshagana crown). There is a key you can filter by, street names when zoomed in, gold story and teal job markers, and an "Open now" list. Drag to pan, scroll to zoom, click to teleport.
+- **Map (M).** Styled after SADAK's map: a dark vector map of the campus only, plus the coast (a band following the beach's shoreline) and the lighthouse knoll, with NH66, its two underpasses and the foot overbridge as connectors. Buildings are tinted by kind. Places carry Lucide icons in their category colours (hand-drawn where Lucide has none: hostel, thali, sea, Yakshagana crown). There is a key you can filter by, street names when zoomed in, gold story and teal job markers, and an "Open now" list. Drag to pan, scroll to zoom, click to teleport.
 
 ## Controls
 
