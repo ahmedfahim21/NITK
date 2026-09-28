@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "osm:fetch": "node scripts/fetch-osm.mjs",
-    "dem:fetch": "node scripts/fetch-dem.mjs"
+    "dem:fetch": "node scripts/fetch-dem.mjs",
+    "og:render": "node scripts/render-og.mjs"
   },
   "dependencies": {
     "lucide": "^1.48.0",

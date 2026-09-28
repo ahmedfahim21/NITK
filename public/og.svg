@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- NITK World link preview: sunset over the Arabian Sea from the lighthouse
+       knoll, the campus on the plateau behind. Graphics only, no text.
+       Palette after NITK's alumni site: navy, fresh green, lighthouse gold. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16294e"/>
+      <stop offset="0.45" stop-color="#3b4f86"/>
+      <stop offset="0.75" stop-color="#e9906b"/>
+      <stop offset="1" stop-color="#f7c46a"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f6f9e"/>
+      <stop offset="1" stop-color="#1b4f78"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f7d27a" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#f7d27a" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff1c2" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#fff1c2" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="frame"><rect width="1200" height="630"/></clipPath>
+  </defs>
+  <g clip-path="url(#frame)">
+    <!-- sky and sun -->
+    <rect width="1200" height="630" fill="url(#sky)"/>
+    <circle cx="610" cy="398" r="120" fill="url(#glow)"/>
+    <circle cx="610" cy="398" r="54" fill="#fbd98a"/>
+    <!-- stars fading into the dusk -->
+    <g fill="#ffffff" opacity="0.8">
+      <circle cx="120" cy="60" r="2"/><circle cx="260" cy="110" r="1.5"/><circle cx="410" cy="48" r="2"/>
+      <circle cx="560" cy="90" r="1.4"/><circle cx="720" cy="40" r="1.8"/><circle cx="880" cy="96" r="1.5"/>
+      <circle cx="1010" cy="54" r="2"/><circle cx="1140" cy="120" r="1.4"/><circle cx="330" cy="170" r="1.2"/>
+      <circle cx="960" cy="176" r="1.2"/>
+    </g>
+    <!-- low clouds, cel-flat -->
+    <g fill="#f3b089" opacity="0.85">
+      <path d="M760 300 q24 -22 52 -6 q20 -20 46 -2 q28 -8 34 16 z"/>
+      <path d="M380 262 q20 -18 44 -4 q18 -16 40 0 q22 -6 28 12 z"/>
+    </g>
+    <!-- sea, with the sun's glitter -->
+    <rect y="398" width="1200" height="232" fill="url(#sea)"/>
+    <g fill="#fbd98a">
+      <rect x="560" y="410" width="100" height="5" rx="2.5"/>
+      <rect x="575" y="426" width="70" height="4" rx="2"/>
+      <rect x="548" y="442" width="124" height="4" rx="2"/>
+      <rect x="590" y="458" width="40" height="3" rx="1.5"/>
+      <rect x="566" y="474" width="88" height="3" rx="1.5"/>
+    </g>
+    <g stroke="#6fa9d1" stroke-width="3" stroke-linecap="round" opacity="0.7" fill="none">
+      <path d="M90 440 h60 M200 470 h80 M360 430 h50 M760 452 h70 M900 430 h40 M1010 480 h90"/>
+    </g>
+    <!-- surf and beach sweeping in from the left -->
+    <path d="M0 520 C220 500 420 540 640 560 C820 576 1000 566 1200 548 L1200 630 L0 630 Z" fill="#f2f6f8" opacity="0.85"/>
+    <path d="M0 530 C220 512 420 552 640 572 C820 588 1000 578 1200 560 L1200 630 L0 630 Z" fill="#ecd9a8"/>
+    <!-- the campus plateau behind, right: the Mega Hostel towers and the Main Building block -->
+    <path d="M640 630 C720 540 840 478 1200 456 L1200 630 Z" fill="#3e7d4f"/>
+    <g fill="#1f3563">
+      <rect x="940" y="408" width="34" height="120"/>
+      <rect x="966" y="394" width="26" height="130"/>
+      <rect x="1004" y="400" width="36" height="120"/>
+      <rect x="1060" y="424" width="92" height="90"/>
+      <rect x="1086" y="410" width="40" height="100"/>
+    </g>
+    <!-- the glass stair cores, lit -->
+    <g fill="#8fd0ff" opacity="0.9">
+      <rect x="966" y="400" width="6" height="96"/>
+      <rect x="1018" y="408" width="6" height="88"/>
+    </g>
+    <g fill="#f7d27a">
+      <rect x="946" y="420" width="4" height="4"/><rect x="956" y="440" width="4" height="4"/><rect x="948" y="462" width="4" height="4"/>
+      <rect x="1010" y="430" width="4" height="4"/><rect x="1030" y="452" width="4" height="4"/><rect x="1070" y="440" width="4" height="4"/>
+      <rect x="1100" y="424" width="4" height="4"/><rect x="1134" y="456" width="4" height="4"/><rect x="1112" y="470" width="4" height="4"/>
+    </g>
+    <path d="M680 630 C760 556 880 500 1200 482 L1200 630 Z" fill="#50bd77"/>
+    <!-- palms on the plateau edge -->
+    <g fill="#1d4d33">
+      <path d="M820 600 q6 -60 -4 -118 l8 0 q10 58 4 118 z"/>
+      <path d="M820 484 q-40 -6 -64 18 q34 -24 64 -12 z"/>
+      <path d="M820 484 q40 -10 66 12 q-34 -20 -66 -6 z"/>
+      <path d="M820 484 q-18 -30 -52 -34 q34 10 50 36 z"/>
+      <path d="M820 484 q20 -32 56 -30 q-36 8 -54 32 z"/>
+      <path d="M1168 560 q4 -50 -4 -98 l7 0 q8 48 3 98 z"/>
+      <path d="M1167 464 q-36 -4 -56 16 q30 -20 56 -10 z"/>
+      <path d="M1167 464 q34 -8 58 10 q-30 -18 -58 -4 z"/>
+      <path d="M1167 464 q-14 -28 -44 -30 q30 8 42 32 z"/>
+    </g>
+    <!-- the lighthouse knoll, left -->
+    <path d="M0 470 C80 420 190 400 300 412 C400 424 470 490 560 630 L0 630 Z" fill="#a6553c"/>
+    <path d="M0 486 C80 440 190 422 296 432 C392 444 452 504 530 630 L0 630 Z" fill="#3e7d4f"/>
+    <!-- the beam, swinging out over the sea -->
+    <path d="M232 200 L1200 90 L1200 250 Z" fill="url(#beam)"/>
+    <!-- the lighthouse: square, red and white, as it is -->
+    <g>
+      <path d="M214 432 L222 214 L262 214 L270 432 Z" fill="#f4f1e8"/>
+      <path d="M216.6 372 L268.4 372 L266.2 312 L218.8 312 Z" fill="#c0392b"/>
+      <path d="M219.9 272 L264.1 272 L262.6 232 L221.4 232 Z" fill="#c0392b"/>
+      <rect x="214" y="206" width="56" height="10" fill="#2b2f36"/>
+      <rect x="224" y="178" width="36" height="28" fill="#fbd98a"/>
+      <rect x="238" y="182" width="8" height="20" fill="#fff7dd"/>
+      <path d="M220 178 L242 156 L264 178 Z" fill="#c0392b"/>
+      <rect x="240" y="146" width="4" height="12" fill="#2b2f36"/>
+      <rect x="236" y="392" width="12" height="40" fill="#2b2f36" opacity="0.5"/>
+    </g>
+    <!-- birds -->
+    <g fill="none" stroke="#16294e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M340 150 q10 -10 20 0 q10 -10 20 0"/>
+      <path d="M404 118 q8 -8 16 0 q8 -8 16 0"/>
+      <path d="M470 168 q7 -7 14 0 q7 -7 14 0"/>
+    </g>
+  </g>
+</svg>
