@@ -139,7 +139,7 @@ Chapter 2, **Recruitments**, is a few weeks later, in the post-monsoon. Club sta
 
 ### Campus jobs
 
-Like Bully's odd jobs: small paid errands, once a day each, in their hours. They never complete; the journal lists them with **Now**, **Later**, **Done** or **Locked**.
+Like Bully's odd jobs: small paid errands, once a day each, in their hours. They never complete; the journal lists them with **Open**, **Later**, **Done** or **Locked**.
 
 | Job | Giver, hours | Pay | What happens |
 |---|---|---|---|
@@ -165,6 +165,11 @@ Your Semester I courses are NITK's real CSE plan. Turn up in the room when one i
 | **CV110** Environmental Studies | LHC-C | the Karnataka coast and environment | Clubs respect |
 
 The journal lists your courses, levels, perks and the timetable.
+
+### Journal and yearbook
+
+- **Journal (J):** the day at a glance (date, time, season, money, attendance), respect with each hostel and group in its colour, clubs, and every mission and campus job with its icon, state and hours.
+- **Yearbook (Y, or from the journal):** everyone in the cast, grouped into friends and seniors, clubs, faculty and staff, and around campus. Each person unlocks when you walk up to them or they speak to you, and gets a portrait rendered from their own 3D model. Until then they are a silhouette with a hint of where to find them.
 
 The Bully-style systems:
 
@@ -230,7 +235,8 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 - **Vegetation.** Coconut palms, broadleaf canopy and casuarinas, scattered by land use. On campus: columnar Ashoka trees, rain-tree avenues arching over the roads, and bare laterite soil in their shade.
 - **Street furniture.** Black-and-white painted kerbs and white globe lamps on campus roads; compound walls with a laterite plinth, jali screen and pillars.
 - **Time of day.** Morning, noon, Arabian-Sea sunset and night, with lit windows, street-lamp pools and stars.
-- **HUD.** A rotating minimap, a full map with click-to-teleport and place search, floating building labels, and a "you are near" banner.
+- **HUD.** A rotating minimap, a full map, floating building labels, and a "you are near" banner.
+- **Map (M).** Styled after SADAK's map: a dark vector map of the campus only, plus the beach and lighthouse hill, with NH66, its two underpasses and the foot overbridge as connectors. Buildings are tinted by kind. Places carry Lucide icons in their category colours (hand-drawn where Lucide has none: hostel, thali, sea, Yakshagana crown). There is a key you can filter by, street names when zoomed in, gold story and teal job markers, and an "Open now" list. Drag to pan, scroll to zoom, click to teleport.
 
 ## Controls
 
@@ -240,6 +246,7 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 | `E` | talk, interact, get on or off your cycle |
 | `B` | cycle bell (students jump aside) |
 | `J` | journal |
+| `Y` | yearbook |
 | `N` | next music track |
 | drag / double-click | look around / lock the mouse |
 | `←` `→` / wheel | turn / zoom |
@@ -260,7 +267,9 @@ src/
   world/             ground & sea, roads, buildings, landmarks, trees, props, grid
   fx/                toon materials, cel/ink pass, sky, time-of-day presets
   player.ts          walker, cyclist, drone, camera
-  ui/hud.ts          minimap, map, labels, objective blips
+  ui/hud.ts          minimap, full map, labels, objective blips
+  ui/mapKit.ts       map style, place kinds, the campus-only region
+  ui/icons.ts        Lucide + hand-drawn icons, for HTML and canvas
   game/              the game: mission runner (index.ts), chapter1.ts, chapter2.ts, jobs.ts,
                      minigames, club stalls, journal, cast, crowd, cycles,
                      rain/beacon/bees, UI, save state,
