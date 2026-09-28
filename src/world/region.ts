@@ -131,6 +131,24 @@ export function campusRegion(map: CampusMap): Region {
     }
   }
   if (!connectors) console.warn("[map] no NH66, underpass or overbridge ways found to connect the campus halves");
+
+  // From the end of the beach road, follow the real roads on to the sand and
+  // up to the lighthouse, so the coast joins the campus by the way you'd walk it.
+  if (beachRoad && beach) {
+    const ends = [beachRoad.pts[0], beachRoad.pts[beachRoad.pts.length - 1]];
+    const sandDist = (p: [number, number]) => (pointIn(p[0], p[1], beach.outer) ? 0 : Math.min(...beach.outer.map((a, i) => segDist(p[0], p[1], a, beach.outer[(i + 1) % beach.outer.length]))));
+    const from = sandDist(ends[0]) < sandDist(ends[1]) ? ends[0] : ends[1];
+    const targets: { name: string; done: (p: [number, number]) => boolean }[] = [{ name: "the beach", done: (p) => sandDist(p) < 3 }];
+    if (lighthouse) targets.push({ name: "the lighthouse", done: (p) => Math.hypot(p[0] - lighthouse.x, p[1] - lighthouse.z) < 45 });
+    for (const t of targets) {
+      const path = roadPath(map, from, t.done);
+      if (!path) {
+        console.warn(`[region] no road from the beach road to ${t.name}`);
+        continue;
+      }
+      for (let i = 1; i < path.length; i++) corridor(path[i - 1].p, path[i].p, path[i].half);
+    }
+  }
   for (const r of polys) if (signedArea(r) < 0) r.reverse();
   const all = polys.slice(0, framed).flat();
   const bounds = {
@@ -190,4 +208,72 @@ function pickBeachRoad(map: CampusMap, sand: [number, number][]) {
   }
   if (!best) console.warn("[region] no road found from the campus to the beach");
   return best?.road ?? null;
+}
+
+/**
+ * The shortest walk along mapped roads (not NH66) from a point to the first
+ * road point that satisfies `done`, as the points passed with each way's
+ * corridor half-width; null if none is reachable.
+ */
+function roadPath(map: CampusMap, from: [number, number], done: (p: [number, number]) => boolean): { p: [number, number]; half: number }[] | null {
+  const key = (p: [number, number]) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+  const nodes = new Map<string, { p: [number, number]; edges: { to: string; w: number; half: number }[] }>();
+  const node = (p: [number, number]) => {
+    const k = key(p);
+    if (!nodes.has(k)) nodes.set(k, { p, edges: [] });
+    return k;
+  };
+  for (const r of map.roads) {
+    if (r.kind === "trunk" || r.kind === "steps") continue;
+    const half = r.width / 2 + 4;
+    for (let i = 1; i < r.pts.length; i++) {
+      const a = node(r.pts[i - 1]);
+      const b = node(r.pts[i]);
+      const w = Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]);
+      nodes.get(a)!.edges.push({ to: b, w, half });
+      nodes.get(b)!.edges.push({ to: a, w, half });
+    }
+  }
+  let start = "";
+  let sd = Infinity;
+  for (const [k, n] of nodes) {
+    const d = Math.hypot(n.p[0] - from[0], n.p[1] - from[1]);
+    if (d < sd) {
+      sd = d;
+      start = k;
+    }
+  }
+  if (!start || sd > 10) return null;
+  const dist = new Map<string, number>([[start, 0]]);
+  const prev = new Map<string, { k: string; half: number }>();
+  const open = new Set<string>([start]);
+  while (open.size) {
+    let k = "";
+    let best = Infinity;
+    for (const o of open) {
+      const d = dist.get(o)!;
+      if (d < best) {
+        best = d;
+        k = o;
+      }
+    }
+    open.delete(k);
+    const n = nodes.get(k)!;
+    if (done(n.p)) {
+      const out: { p: [number, number]; half: number }[] = [];
+      for (let c: string | undefined = k; c; c = prev.get(c)?.k) out.unshift({ p: nodes.get(c)!.p, half: prev.get(c)?.half ?? 6 });
+      return out;
+    }
+    // Nobody walks to the beach by a 1.5 km detour.
+    if (best > 1500) continue;
+    for (const e of n.edges) {
+      const d = best + e.w;
+      if (d < (dist.get(e.to) ?? Infinity)) {
+        dist.set(e.to, d);
+        prev.set(e.to, { k, half: e.half });
+        open.add(e.to);
+      }
+    }
+  }
+  return null;
 }

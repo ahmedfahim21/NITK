@@ -99,7 +99,7 @@ The map square is set in `src/area.json`: 13.0005–13.0205 N, 74.7815–74.8060
 Like Bully's or GTA's maps, only the playable region exists (`src/world/region.ts`, shared by the world and the map):
 - the campus inside its OSM boundary
 - the coast: a band along the beach's shoreline, and the lighthouse knoll
-- narrow corridors for what joins them: NH66 along the campus wall, the two underpasses, the foot overbridge, and the one road out to the beach
+- narrow corridors for what joins them: NH66 along the campus wall, the two underpasses, the foot overbridge, the one road out to the beach, and the roads on from it to the sand and up to the lighthouse (found by a shortest walk over the OSM road network)
 
 Outside it there are no buildings or roads, just scrub and trees on the real terrain. You can't walk past the edge, and the map ignores clicks out there.
 
