@@ -79,6 +79,8 @@ export const CelShader = {
     uVignetteRadius: { value: 0.8 },
     /** Ordered-dither amplitude, in 8-bit output steps. See mat/dither.ts. */
     uDither: { value: 1 },
+    /** Paper grain amplitude in output steps; a light print texture over flat cel fills. */
+    uGrain: { value: 3.2 },
   },
 
   vertexShader: FULLSCREEN_VERT,
@@ -106,7 +108,7 @@ export const CelShader = {
     uniform vec3 uLift, uGamma, uGain;
     uniform float uSaturation, uTemperature;
     uniform float uVignetteStrength, uVignetteRadius;
-    uniform float uDither;
+    uniform float uDither, uGrain;
 
     varying vec2 vUv;
 
@@ -150,8 +152,9 @@ export const CelShader = {
         edge *= 1.0 - smoothstep( uInkFadeStart, uInkFadeEnd, dc );
         edge *= uInkStrength;
 
-        // The line keeps a whisper of the surface hue so it never looks pasted on.
-        vec3 line = mix( uInkColor, col * 0.4, 0.22 );
+        // Coloured pencil: the line is mostly the surface hue, darkened, so
+        // outlines read as drawn in the fill's own colour rather than in black.
+        vec3 line = mix( uInkColor, col * 0.5, 0.6 );
         col = mix( col, line, clamp( edge, 0.0, 1.0 ) );
 
         // --- depth haze: exponential-squared against view distance. The
@@ -198,6 +201,13 @@ export const CelShader = {
 
       // --- ordered dither, pinned to the display grid.
       col += ( bayer8( gl_FragCoord.xy ) - 0.5 ) * ( uDither / 255.0 );
+
+      // --- paper grain: coarse (2px) hash noise, stronger in midtones so
+      // flat fills feel printed rather than digital.
+      vec2 gp = floor( gl_FragCoord.xy * 0.5 );
+      float g = fract( sin( dot( gp, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+      float mid = 1.0 - abs( dot( col, vec3( 0.333 ) ) - 0.5 ) * 1.4;
+      col += ( g - 0.5 ) * ( uGrain / 255.0 ) * mid;
 
       gl_FragColor = vec4( col, 1.0 );
     }
