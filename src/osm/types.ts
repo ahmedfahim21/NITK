@@ -37,6 +37,8 @@ export type Road = {
   /** Higher draws on top where roads overlap. */
   rank: number;
   bridge: boolean;
+  /** Runs under something (the NH66 underpasses are tunnel=yes under the highway). */
+  tunnel: boolean;
 };
 
 export type AreaKind =

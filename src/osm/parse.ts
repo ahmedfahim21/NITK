@@ -290,6 +290,7 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
           oneway,
           rank: hw.rank,
           bridge: t.bridge === "yes",
+          tunnel: t.tunnel === "yes",
         });
       }
       return;
