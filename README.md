@@ -92,6 +92,25 @@ The OpenStreetMap extract **ships with the game** as `public/data/nitk-osm.json`
 
 The map square is set in `src/area.json`: 13.0005–13.0205 N, 74.7815–74.8060 E. It covers the whole campus on both sides of NH66, the beach and the lighthouse.
 
+**Terrain** ships the same way, as `public/data/nitk-dem.json`: a 30 m grid of heights, the mean of SRTM and ASTER via the public [OpenTopoData](https://www.opentopodata.org/) API. Refresh it with `npm run dem:fetch` (about 2.5 minutes, one request a second).
+
+## The world ends at the campus
+
+Like Bully's or GTA's maps, only the playable region exists (`src/world/region.ts`, shared by the world and the map):
+- the campus inside its OSM boundary
+- the coast: a band along the beach's shoreline, and the lighthouse knoll
+- narrow corridors for what joins them: NH66 along the campus wall, the two underpasses, the foot overbridge, and the one road out to the beach
+
+Outside it there are no buildings or roads, just scrub and trees on the real terrain. You can't walk past the edge, and the map ignores clicks out there.
+
+## Terrain
+
+NITK sits on a laterite plateau. The beach is at sea level, the land climbs about 20 m to NH66 and the Main Building (~23 m), then falls east towards the lake.
+- **Heightfield:** `src/world/terrain.ts` smooths the elevation data to take out tree canopy, pins the sea and the beach, and bakes one 2 m heightfield. Every building, ground, car park and pond stands on a level pad blended into the slope.
+- **Lift:** the static world is built at height 0 and lifted onto the terrain in the vertex shader (`src/world/displace.ts`), shadows included. Buildings, landmarks and interiors rise as rigid blocks because their pads are flat. The ground is one 4 m lattice (1 m next to the underpasses) that bends with the slope.
+- **Matching heights:** `groundHeight()` reads the same field on the CPU, so the player, cast, crowd and trees stand exactly on what's drawn.
+- **Underpasses:** these come from OSM's `tunnel=yes` ways under NH66 (`src/world/underpass.ts`). Each ramps down about 5 m between laterite retaining walls with a concrete parapet, then runs under the highway in a box culvert with headwalls at each portal. A road crossing a ramp deep enough gets its own culvert. The first underpass is twin-cell, one per direction; the second joins Fresher's Street to the beach road.
+
 ## The game
 
 Chapters 1 and 2 are playable. You're a first-year **B.Tech Computer Science & Engineering** student, section S7. Mission details come from NITK's own sites (nitk.ac.in, IRIS, WebClub) and its virtual tour.
@@ -235,9 +254,9 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 - **Vegetation.** Coconut palms, broadleaf canopy and casuarinas, scattered by land use. On campus: columnar Ashoka trees, rain-tree avenues arching over the roads, and bare laterite soil in their shade.
 - **Street furniture.** Black-and-white painted kerbs and white globe lamps on campus roads; compound walls with a laterite plinth, jali screen and pillars.
 - **Time of day.** Morning, noon, Arabian-Sea sunset and night, with lit windows, street-lamp pools and stars.
-- **Compound wall.** OSM maps only a few stretches, so the rest follows the campus boundary in the jali-panel style. It opens where roads and paths cross, with a gate pillar on each side, and skips stretches OSM already walls and any that run through buildings. The map draws the walls as cream lines.
+- **Compound wall.** OSM maps only a few stretches, so the rest follows the campus boundary in the jali-panel style. It opens where a road or path crosses into somewhere you can go (NH66, an underpass, the beach road), with a gate pillar on each side, and skips stretches OSM already walls and any that run through buildings. The map draws the walls as cream lines.
 - **HUD.** A rotating minimap, a full map, floating building labels, and a "you are near" banner.
-- **Map (M).** Styled after SADAK's map: a dark vector map of the campus only, plus the coast (a band following the beach's shoreline) and the lighthouse knoll, with NH66, its two underpasses and the foot overbridge as connectors. Buildings are tinted by kind. Places carry Lucide icons in their category colours (hand-drawn where Lucide has none: hostel, thali, sea, Yakshagana crown). There is a key you can filter by, street names when zoomed in, gold story and teal job markers, and an "Open now" list. Drag to pan, scroll to zoom, click to teleport.
+- **Map (M).** Styled after SADAK's map: a dark vector map of the campus only, plus the coast (a band following the beach's shoreline) and the lighthouse knoll, with NH66, its two underpasses, the foot overbridge and the beach road as connectors. Buildings are tinted by kind. Places carry Lucide icons in their category colours (hand-drawn where Lucide has none: hostel, thali, sea, Yakshagana crown). There is a key you can filter by, street names when zoomed in, gold story and teal job markers, and an "Open now" list. Drag to pan, scroll to zoom, click to teleport.
 
 ## Controls
 
@@ -269,7 +288,7 @@ src/
   fx/                toon materials, cel/ink pass, sky, time-of-day presets
   player.ts          walker, cyclist, drone, camera
   ui/hud.ts          minimap, full map, labels, objective blips
-  ui/mapKit.ts       map style, place kinds, the campus-only region
+  ui/mapKit.ts       map style, place kinds
   ui/icons.ts        Lucide + hand-drawn icons, for HTML and canvas
   game/              the game: mission runner (index.ts), chapter1.ts, chapter2.ts, jobs.ts,
                      minigames, club stalls, journal, cast, crowd, cycles,
@@ -281,7 +300,15 @@ src/
   world/interiors.ts walk-in ground floors and the cutaway
   world/overrides.ts per-building overrides (public/data/overrides.json)
   world/models.ts    custom .glb models on OSM footprints
+  world/region.ts    the playable region (campus, coast, connectors)
+  world/terrain.ts   elevation, level pads, underpass cuts, the baked heightfield
+  world/displace.ts  lifts static meshes onto the terrain in the vertex shader
+  world/underpass.ts retaining walls, trench floors, culverts
+  world/walls.ts     the generated compound wall and its gates
+  styles.css         page shell: HUD panels, map, title card, loading
+  game/ui.css        game overlays: dialogue, banners, journal, yearbook, quizzes
 scripts/fetch-osm.mjs  snapshot the extract into public/data (also run by CI)
+scripts/fetch-dem.mjs  snapshot the terrain into public/data
 ```
 
 ## Working on the campus
@@ -313,6 +340,6 @@ Moods: `title`, `day`, `rain`, `sunset`, `night`, `mission`.
 
 ## Credits
 
-Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, ODbL 1.0.
+Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, ODbL 1.0. Elevation: SRTM (NASA/USGS, public domain) and ASTER GDEM (NASA/METI), via OpenTopoData.
 
 The cel pipeline (toon ramp patch, ink/grade pass, painted sky) is ported from SADAK. SADAK adapted it from [sakura-crossing](https://github.com/Kenton-GMI/sakura-crossing), MIT License, © 2026 Kenton Wang.
