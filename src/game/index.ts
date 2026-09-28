@@ -33,6 +33,7 @@ import { Festivals } from "./festivals";
 import type { Season } from "./seasons";
 import type { Music, Mood } from "./music";
 import { ROAD } from "../world/grid";
+import { groundHeight, onHighway } from "../world/terrain";
 
 type Target = Spot | PlaceKey | CastId;
 
@@ -101,6 +102,7 @@ export class Game {
   private saveTimer = 0;
   private chatTimer = 3;
   private bumpCooldown = 0;
+  private highwayHintT = 0;
   private bubbles: { el: HTMLDivElement; i: number; x: number; z: number; ttl: number }[] = [];
   private beeTimer = 0;
   cutscene = false;
@@ -157,9 +159,18 @@ export class Game {
     );
     this.group.add(this.festivals.group);
     player.blockedExtra = (x, z) => this.crowd.blocked(x, z) || this.cast.blocked(x, z);
+    // After the bus drops you off, NH66 is off limits on foot: cross it by an
+    // underpass or the footbridge. (Closed at road level only: the culverts
+    // under it and the bridge over it stay open.)
+    player.closedAt = (x, z, y) => this.nh66Closed && onHighway(x, z) && Math.abs(y - groundHeight(x, z)) < 2;
     this.registerInteractables();
     window.addEventListener("pointerdown", unlockAudio);
     window.addEventListener("keydown", unlockAudio);
+  }
+
+  /** NH66 closes to walkers once the intro (getting off the bus) is done. */
+  get nh66Closed(): boolean {
+    return !this.explore && this.state.completed.has("ch1-arrival");
   }
 
   /* ================= mission API ================= */
@@ -811,6 +822,16 @@ export class Game {
       if (!this.active && !this.explore) this.refreshGivers();
     }
     if (!this.explore && !this.active && !this.cutscene) this.tickCurfew(dt);
+    // The NH66 gates stand open for the intro and swing shut once you're in.
+    this.world.setGatesClosed(this.nh66Closed);
+    this.highwayHintT -= dt;
+    if (this.player.bumpedClosed) {
+      this.player.bumpedClosed = false;
+      if (this.highwayHintT <= 0) {
+        this.highwayHintT = 12;
+        this.ui.toast("NH66 is no place to walk. Take an underpass or the footbridge.", "#c0392b");
+      }
+    }
     const hourNow = Math.floor(st.minutes / 60) + st.day * 24;
     if (hourNow !== this.lastHour) {
       const first = this.lastHour < 0;

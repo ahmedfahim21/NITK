@@ -13,6 +13,8 @@ export type Region = {
   polys: [number, number][][];
   bounds: { minX: number; minZ: number; maxX: number; maxZ: number };
   contains(x: number, z: number): boolean;
+  /** Grows the region by a corridor along a line (the underpass ramps, known only once the terrain is baked). */
+  extend(pts: [number, number][], half: number): void;
   /** Adds the region to the current path, every ring wound the same way so a nonzero clip is their union. */
   trace(g: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number): void;
 };
@@ -123,7 +125,8 @@ export function campusRegion(map: CampusMap): Region {
       const b = r.pts[i];
       // NH66 only where it runs along the campus wall.
       if (nh66 && !(nearCampus(a, 45) && nearCampus(b, 45))) continue;
-      corridor(a, b, r.width / 2 + (nh66 ? 4 : 6));
+      // NH66 takes in its verges and the service roads either side, up to the campus walls.
+      corridor(a, b, r.width / 2 + (nh66 ? 14 : 6));
       connectors++;
     }
   }
@@ -142,6 +145,14 @@ export function campusRegion(map: CampusMap): Region {
   const mask = new Grid(mb.minX, mb.minZ, mb.maxX, mb.maxZ, 2);
   for (const r of polys) mask.fillPolygon([r], 1);
   return {
+    extend(line, half) {
+      const before = polys.length;
+      for (let i = 1; i < line.length; i++) corridor(line[i - 1], line[i], half);
+      for (const r of polys.slice(before)) {
+        if (signedArea(r) < 0) r.reverse();
+        mask.fillPolygon([r], 1);
+      }
+    },
     polys,
     bounds,
     contains: (x, z) => {

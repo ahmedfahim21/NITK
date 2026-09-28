@@ -5,13 +5,14 @@
  * above, pillars every three metres (from the virtual tour).
  */
 import * as THREE from "three";
+import type { Pt } from "../geo";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { CampusMap } from "../osm/types";
 import type { Lamp } from "./roads";
 import { nightGlow, toon } from "../fx/toon";
 import { SOLID, type Grid } from "./grid";
 import { groundHeight } from "./terrain";
-import { campusWalls } from "./walls";
+import { campusGates, campusWalls } from "./walls";
 import type { Region } from "./region";
 
 export type PropRig = {
@@ -19,6 +20,9 @@ export type PropRig = {
   /** The walls, built at ground level 0 for the terrain to lift (the lamps are already placed on it). */
   walls: THREE.Group;
   setGlow(g: number): void;
+  /** Swing the NH66 gates shut (solid) or open. */
+  setGatesClosed(closed: boolean): void;
+  update(t: number): void;
 };
 
 export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid, region: Region): PropRig {
@@ -161,9 +165,103 @@ export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid, region: Re
     wallGroup.add(jali);
   }
 
+  /* ---- the NH66 gates: steel grille leaves, open for the intro, shut after ---- */
+  const gateMat = toon(0x2f4a3a);
+  const leaves: { pivot: THREE.Group; shut: number; open: number }[] = [];
+  const gateCells: number[] = [];
+  /** The cells a shut gate made solid (and only those clear when it opens). */
+  const madeSolid: number[] = [];
+  const leafGeo = (w: number) => {
+    const H = 2.3;
+    const parts: THREE.BufferGeometry[] = [
+      new THREE.BoxGeometry(w, 0.1, 0.08).translate(w / 2, 0.15, 0),
+      new THREE.BoxGeometry(w, 0.1, 0.08).translate(w / 2, H - 0.05, 0),
+      new THREE.BoxGeometry(w, 0.06, 0.06).translate(w / 2, H * 0.55, 0),
+      new THREE.BoxGeometry(0.1, H, 0.1).translate(0.05, H / 2, 0),
+      new THREE.BoxGeometry(0.1, H, 0.1).translate(w - 0.05, H / 2, 0),
+    ];
+    for (let x = 0.2; x < w - 0.1; x += 0.16) parts.push(new THREE.BoxGeometry(0.035, H - 0.1, 0.035).translate(x, H / 2, 0));
+    return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => (g.deleteAttribute("uv"), g)))!;
+  };
+  const postParts: THREE.BufferGeometry[] = [];
+  for (const gate of campusGates(map, region)) {
+    if (!gate.nh66) continue;
+    const w = Math.hypot(gate.b[0] - gate.a[0], gate.b[1] - gate.a[1]);
+    if (w < 2) continue;
+    // Wide openings get several double gates side by side, each up to 8 m.
+    const sections = Math.ceil(w / 8);
+    for (let sec = 0; sec < sections; sec++) {
+      const p0: Pt = [gate.a[0] + ((gate.b[0] - gate.a[0]) * sec) / sections, gate.a[1] + ((gate.b[1] - gate.a[1]) * sec) / sections];
+      const p1: Pt = [gate.a[0] + ((gate.b[0] - gate.a[0]) * (sec + 1)) / sections, gate.a[1] + ((gate.b[1] - gate.a[1]) * (sec + 1)) / sections];
+      const sw = w / sections;
+      if (sec > 0) {
+        // A post between sections, like the pillars at the ends.
+        postParts.push(colourise(new THREE.BoxGeometry(0.5, 2.6, 0.5).translate(p0[0], 1.3, p0[1]), pillarColour));
+      }
+      for (const [hinge, other] of [[p0, p1], [p1, p0]] as const) {
+        const pivot = new THREE.Group();
+        pivot.position.set(hinge[0], 0, hinge[1]);
+        const shut = -Math.atan2(other[1] - hinge[1], other[0] - hinge[0]);
+        // Open: swung round to lie against the inside of the wall.
+        const open = -Math.atan2(gate.inward[1], gate.inward[0]);
+        const mesh = new THREE.Mesh(leafGeo(sw / 2 - 0.05), gateMat);
+        mesh.castShadow = true;
+        pivot.add(mesh);
+        pivot.rotation.y = open;
+        wallGroup.add(pivot);
+        leaves.push({ pivot, shut, open });
+      }
+    }
+    // The cells a shut gate fills.
+    const n = Math.ceil(w / 0.25);
+    const seen = new Set<number>();
+    for (let i = 0; i <= n; i++) {
+      for (const off of [-0.35, 0, 0.35]) {
+        const x = gate.a[0] + ((gate.b[0] - gate.a[0]) * i) / n + gate.inward[0] * off;
+        const z = gate.a[1] + ((gate.b[1] - gate.a[1]) * i) / n + gate.inward[1] * off;
+        const k = grid.idx(x, z);
+        if (k < 0 || seen.has(k)) continue;
+        seen.add(k);
+        gateCells.push(k);
+      }
+    }
+  }
+  if (postParts.length) {
+    const posts = new THREE.Mesh(mergeGeometries(postParts)!, toon(0xffffff, { vertexColors: true }));
+    posts.castShadow = true;
+    wallGroup.add(posts);
+  }
+  let gatesShut = false;
+  let lastT = 0;
+
   return {
     group,
     walls: wallGroup,
+    setGatesClosed(closed) {
+      if (closed === gatesShut) return;
+      gatesShut = closed;
+      if (closed) {
+        for (const k of gateCells) {
+          if (grid.flags[k] & SOLID) continue;
+          grid.flags[k] |= SOLID;
+          madeSolid.push(k);
+        }
+      } else {
+        for (const k of madeSolid) grid.flags[k] &= ~SOLID;
+        madeSolid.length = 0;
+      }
+    },
+    update(t) {
+      const dt = Math.min(0.1, Math.max(0, t - lastT));
+      lastT = t;
+      // Swing towards shut or open, about a second and a half end to end.
+      for (const l of leaves) {
+        const target = gatesShut ? l.shut : l.open;
+        let d = target - l.pivot.rotation.y;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        l.pivot.rotation.y += Math.sign(d) * Math.min(Math.abs(d), dt * 1.2);
+      }
+    },
     setGlow(g) {
       poolMat.opacity = g * 0.55;
       poolMesh.visible = g > 0.05;
