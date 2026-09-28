@@ -247,8 +247,9 @@ export const CHAPTER1: Mission[] = [
       if (!(await g.goTo("sjaHall", "Find a seat in the Silver Jubilee Auditorium", { radius: 5, timeLimit: 240 }))) return false;
       await g.say([
         ["", "Twelve hundred seats, nine hundred freshers, one projector that works on the second try."],
-        ["The Director", "Welcome to NITK. Karnataka Regional Engineering College, 1960; NITK since 2002; an Institute of National Importance since 2007. Two hundred and ninety-five acres between the highway and the sea."],
-        ["The Director", "You are here to learn. The beach will still be there after your mid-sems. Mostly."],
+        ["Prof. B. Ravi (Director)", "Welcome to NITK. Karnataka Regional Engineering College, 1960; NITK since 2002; an Institute of National Importance since 2007. Two hundred and ninety-five acres between the highway and the sea."],
+        ["Prof. B. Ravi (Director)", "More than forty-five thousand alumni sat in these seats before you. Some of them come back every year to tell us how it went. Make it a good story."],
+        ["Prof. B. Ravi (Director)", "You are here to learn. The beach will still be there after your mid-sems. Mostly."],
         ["Anti-ragging committee", "Ragging is a crime. Not a tradition, not a joke: a crime. Helpline numbers are on the back of your ID card. Use them."],
         ["Anti-ragging committee", "Your seniors will help you find the mess. That is the only thing they are allowed to make you do."],
       ]);
@@ -615,6 +616,7 @@ export const CHAPTER1: Mission[] = [
         ["Prakash", "Made it. Look at that."],
         ["Ananya", "Every single day, and it never gets old. Don't tell anyone I said that."],
         ["Vikram", "Four years of this. You'll forget the formulas. You won't forget this."],
+        ["Vikram", "When you graduate they give you a silver ring with the NITK emblem and your year on it. Mine says 2026. Yours will say whatever year you survive to."],
         ["Rohan", "Bhai, Lucknow doesn't have a sea. Lucknow doesn't have ANY of this."],
         ["Prakash", "Welcome to Srinivasnagar, fresher. Tomorrow: club recruitments. Most of them won't even let you in."],
       ]);
