@@ -120,20 +120,25 @@ export function openJournal(g: Game): Promise<void> {
       <div class="jr-top">
         <div><div class="jr-cap">Semester I · B.Tech CSE · Section ${st.flags.section ?? "S7"}</div><h2>Journal</h2></div>
         <div class="jr-actions">
-          <button class="jr-btn" data-yearbook>${icon("id", 16)}Yearbook<span class="jr-count">${met.met}/${met.total}</span><kbd>Y</kbd></button>
-          <button class="jr-btn" data-close>${icon("x", 16)}Close<kbd>J</kbd></button>
+          <button class="jr-btn" data-yearbook>${icon("id", 16)}<span class="lbl">Yearbook</span><span class="jr-count">${met.met}/${met.total}</span><kbd>Y</kbd></button>
+          <button class="jr-btn" data-close aria-label="Close">${icon("x", 16)}<span class="lbl">Close</span><kbd>J</kbd></button>
         </div>
       </div>
       <div class="jr-tiles">${tiles}</div>
+      <div class="jr-tabs" role="tablist">
+        <button role="tab" data-tab="you">You</button>
+        <button role="tab" data-tab="missions">Missions</button>
+        <button role="tab" data-tab="studies">Studies</button>
+      </div>
       <div class="jr-cols">
-        <div class="jr-col">
+        <div class="jr-col" data-col="you">
           <div class="jr-sec">${H("users", "Respect")}${respect}</div>
           <div class="jr-sec">${H("flag", "Clubs")}<div class="jr-pills">${clubPills}</div></div>
           <div class="jr-sec">${H("calendar", "Next year")}${next.length ? `<div class="jr-pills">${next.map((n) => `<span class="jr-pill ghost">${n}</span>`).join("")}</div>` : `<span class="jr-muted">Nothing yet</span>`}</div>
           <div class="jr-sec">${H("thali", "Mess")}<span>${st.flags.mess ? String(st.flags.mess).replace(/^./, (c) => c.toUpperCase()) : `<span class="jr-muted">Not registered</span>`}</span> <span class="jr-muted">· ${Number(st.flags.prep ?? 0)} quiz answers right</span></div>
         </div>
-        <div class="jr-col">${chapters || `<div class="jr-sec">${H("scroll", "Missions")}<span class="jr-muted">Nothing yet. Look for a gold marker.</span></div>`}${jobList.length ? `<div class="jr-sec">${H("briefcase", "Campus jobs", `<span class="jr-muted small">once a day</span>`)}${jobs}</div>` : ""}</div>
-        <div class="jr-col">
+        <div class="jr-col" data-col="missions">${chapters || `<div class="jr-sec">${H("scroll", "Missions")}<span class="jr-muted">Nothing yet. Look for a gold marker.</span></div>`}${jobList.length ? `<div class="jr-sec">${H("briefcase", "Campus jobs", `<span class="jr-muted small">once a day</span>`)}${jobs}</div>` : ""}</div>
+        <div class="jr-col" data-col="studies">
           <div class="jr-sec">${H("grad", "Courses")}<div class="jr-courses">${courses}</div></div>
           <div class="jr-sec">${H("clock", "Timetable", `<span class="jr-muted small">weekdays</span>`)}${week}</div>
         </div>
@@ -159,6 +164,13 @@ export function openJournal(g: Game): Promise<void> {
       e.preventDefault();
       close();
     };
+    // On narrow screens one column shows at a time, picked by the tabs; missions first.
+    const setTab = (tab: string) => {
+      card.dataset.tab = tab;
+      card.querySelectorAll<HTMLButtonElement>(".jr-tabs [data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+    };
+    setTab("missions");
+    card.querySelectorAll<HTMLButtonElement>(".jr-tabs [data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab!)));
     card.querySelector("[data-close]")!.addEventListener("click", () => close());
     card.querySelector("[data-yearbook]")!.addEventListener("click", toYearbook);
     // Defer so the J that opened it doesn't close it.

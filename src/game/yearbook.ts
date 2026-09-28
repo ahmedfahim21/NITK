@@ -47,7 +47,7 @@ export function openYearbook(g: Game): Promise<void> {
         <div><div class="jr-cap">NITK Surathkal · Class of the fresher year</div><h2>Yearbook</h2></div>
         <div class="jr-actions">
           <span class="jr-count big">${met} of ${total} met</span>
-          <button class="jr-btn" data-close>${icon("x", 16)}Close<kbd>Y</kbd></button>
+          <button class="jr-btn" data-close aria-label="Close">${icon("x", 16)}<span class="lbl">Close</span><kbd>Y</kbd></button>
         </div>
       </div>
       <div class="jr-prog"><i style="width:${(met / total) * 100}%"></i></div>
