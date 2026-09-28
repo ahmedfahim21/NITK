@@ -157,9 +157,24 @@ export function buildWorld(fullMap: CampusMap): World {
   const interiors = buildInteriors(map, grid, shells, landmarks.attached);
   const models = new ModelLayer(map);
   void models.sync((k, err) => console.warn(`[models] ${k}:`, err));
+  // Nothing stands in the footbridge's way: no lamp or tree through its stairs or deck.
+  const bridgeLines = roads.overbridges.map((r) => {
+    const [a, b] = [r.pts[0], r.pts[r.pts.length - 1]];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const [ux, uz] = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+    const ext = OVERBRIDGE_STAIRS + 1;
+    return [a[0] - ux * ext, a[1] - uz * ext, b[0] + ux * ext, b[1] + uz * ext] as const;
+  });
+  const clearOfBridges = (x: number, z: number, margin = 2.5) =>
+    bridgeLines.every(([ax, az, bx, bz]) => {
+      const dx = bx - ax;
+      const dz = bz - az;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+      return Math.hypot(x - ax - t * dx, z - az - t * dz) > margin;
+    });
   // Trees from the whole map: beyond the wall they're the scrub forest the world ends in.
-  const trees = buildTrees(fullMap, grid);
-  const props = buildProps(map, roads.lamps, grid, region);
+  const trees = buildTrees(fullMap, grid, (x, z) => clearOfBridges(x, z, 4));
+  const props = buildProps(map, roads.lamps.filter((l) => clearOfBridges(l.x, l.z)), grid, region);
   const underpasses = buildUnderpasses(grid);
   group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, models.group, interiors.group, underpasses);
 

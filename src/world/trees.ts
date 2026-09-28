@@ -211,7 +211,8 @@ const TILE = 320;
 
 export type TreeRig = { group: THREE.Group; count: number; cull(cam: THREE.Vector3): void; setSeason(foliage: [number, number, number], blossom: boolean): void };
 
-export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
+/** `keep` can veto a spot (nothing grows through the footbridge). */
+export function buildTrees(map: CampusMap, grid: Grid, keep: (x: number, z: number) => boolean = () => true, seed = 1729): TreeRig {
   const rand = mulberry32(seed);
   const b = map.bounds;
 
@@ -334,6 +335,7 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
     placed.push({ x, z, kind: rand() < 0.6 ? "palm" : "broad", s: 0.9 + rand() * 0.5, r: rand() * 6.28, v: 0, far: true });
   }
 
+  for (let i = placed.length - 1; i >= 0; i--) if (!keep(placed[i].x, placed[i].z)) placed.splice(i, 1);
   for (const p of placed) if (p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ) grid.stampDisc(p.x, p.z, 0.45, SOLID, 8);
 
   /* ---- instancing by tile and kind ---- */
