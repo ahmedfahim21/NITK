@@ -4,7 +4,7 @@ A *Bully*-style college game set on the real NITK Surathkal campus, built from O
 
 ![The sunset finale of Chapter 1 on the lighthouse hill](docs/ch1-sunset.png)
 
-It follows [SADAK](https://github.com/mittal-parth/sadak)'s approach: the whole world is generated in code from an OSM extract (no models, no textures to download), and it uses SADAK's cel-shaded look with toon ramps, tinted shadows and an ink-line pass.
+It follows [SADAK](https://github.com/mittal-parth/sadak)'s approach: the whole world is generated in code from an OSM extract (no models, no textures to download), and it borrows SADAK's cel pipeline (toon ramps, tinted shadows, ink-line pass) but grades it softer: coloured-pencil outlines, teal shadows, bright saturated colour and a light paper grain.
 
 ```bash
 npm install
