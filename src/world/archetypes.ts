@@ -10,7 +10,7 @@
  *   continuous concrete sunshade ribbons over recessed windows; the Main
  *   Building's wings add vertical fins, an egg-crate front.
  * - Mega Hostel towers: tan frame, cream panels, small grilled windows,
- *   a blue-glass stair core.
+ *   a blue-glass stair core in each of the four inner corners between wings.
  * - Old boys' blocks and girls' hostels: khaki render, sunshade ledges,
  *   louvred windows; flat roofs unless OSM says pitched (blocks 1-5).
  * - LHC-A: exposed laterite with white window frames.

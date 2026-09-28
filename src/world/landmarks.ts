@@ -409,12 +409,46 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
   }
 
   /* ---------------- façade pieces, from photographs ---------------- */
-  // Mega Hostel towers and the EEE/IT blocks (virtual tour): a blue-glass
-  // stair core stands proud of each front; the EEE block's porch is a green
-  // portal frame.
+  // Mega Hostel towers (virtual tour): four wings round a centre, with a
+  // blue-glass stair core set into each of the four inner corners where the
+  // wings meet, full height.
   for (const b of map.buildings) {
-    if (!b.name || !/^Mega Hostel|Electrical and Electronics|Information Technology/i.test(b.name)) continue;
-    const eee = !/^Mega Hostel/i.test(b.name);
+    if (!b.name || !/^Mega Hostel/i.test(b.name)) continue;
+    const h = b.height + 1.2;
+    const floors = Math.max(1, Math.round(h / FLOOR_H));
+    const side = 4.5;
+    const glass = toon(0xffffff, { map: curtainWall(3, floors * 2), glow: 0x9fd0ff, emissiveMap: curtainWall(3, floors * 2) });
+    const corners = innerCorners(b.outer, 4);
+    if (corners.length < 4) console.warn(`[landmarks] ${b.name}: found ${corners.length} of 4 inner corners for the glass cores`);
+    for (const c of corners) {
+      // A square core tucked into the crook: its sides along the two wing
+      // walls (about 45 degrees either side of the crook's direction), its
+      // back corner a little inside the building.
+      const core = new THREE.Mesh(new THREE.BoxGeometry(side, h, side), glass);
+      const k = side / Math.SQRT2 - 0.4;
+      const cx = c.p[0] + c.dir[0] * k;
+      const cz = c.p[1] + c.dir[1] * k;
+      core.position.set(cx, h / 2, cz);
+      core.rotation.y = -(Math.atan2(c.dir[1], c.dir[0]) + Math.PI / 4);
+      shadows(core);
+      group.add(core);
+      attach(b.id, core);
+      grid.stampDisc(cx, cz, side / 2, SOLID, h);
+    }
+    // The entrance canopy stays at the front.
+    const f = frontOf(map, b);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(Math.min(11, f.width * 0.4), 0.35, 3), toon(0xc8976f));
+    canopy.position.set(f.x + f.nx * 1.6, 3.2, f.z + f.nz * 1.6);
+    canopy.rotation.y = Math.atan2(f.nx, f.nz);
+    shadows(canopy);
+    group.add(canopy);
+    attach(b.id, canopy);
+  }
+  // The EEE/IT blocks: a blue-glass stair core stands proud of the front,
+  // and the EEE block's porch is a green portal frame.
+  for (const b of map.buildings) {
+    if (!b.name || !/Electrical and Electronics|Information Technology/i.test(b.name)) continue;
+    const eee = true;
     const f = frontOf(map, b);
     const w = Math.min(8, f.width * 0.3);
     const h = b.height + 1.2;
@@ -422,7 +456,7 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
     const core = new THREE.Mesh(new THREE.BoxGeometry(w, h, 1.6), toon(0xffffff, { map: curtainWall(5, floors * 2), glow: 0x9fd0ff, emissiveMap: curtainWall(5, floors * 2) }));
     core.position.set(f.x + f.nx * 0.7, h / 2, f.z + f.nz * 0.7);
     core.rotation.y = Math.atan2(f.nx, f.nz);
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(w + 3, 0.35, 3), toon(eee ? 0x5f9e3a : 0xc8976f));
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(w + 3, 0.35, 3), toon(0x5f9e3a));
     canopy.position.set(f.x + f.nx * 2, 3.2, f.z + f.nz * 2);
     canopy.rotation.y = core.rotation.y;
     shadows(core);
@@ -981,4 +1015,63 @@ function flagpole(x: number, z: number, updaters: ((t: number, glow: number) => 
     geo.attributes.position.needsUpdate = true;
   });
   return g;
+}
+
+/**
+ * The inner corners of a winged plan (the crooks where the wings meet). The
+ * OSM outlines are stepped and noisy, so this reads the plan's shape instead
+ * of its vertices: the outline's distance from the centre, all the way round,
+ * peaks along each wing and dips at each crook. Returns the `count` deepest
+ * dips (at least 50 degrees apart), each as the point on the outline and the
+ * direction out of the crook.
+ */
+function innerCorners(ring: Pt[], count: number): { p: Pt; dir: Pt }[] {
+  const pts = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? ring.slice(0, -1) : ring;
+  const n = pts.length;
+  // Area centroid (a vertex average leans towards the busier, stepped sides).
+  let a2 = 0;
+  let cx = 0;
+  let cz = 0;
+  for (let i = 0; i < n; i++) {
+    const [p, q] = [pts[i], pts[(i + 1) % n]];
+    const c = p[0] * q[1] - q[0] * p[1];
+    a2 += c;
+    cx += (p[0] + q[0]) * c;
+    cz += (p[1] + q[1]) * c;
+  }
+  cx /= 3 * a2;
+  cz /= 3 * a2;
+  // How far the outline reaches along a ray from the centre.
+  const reach = (th: number) => {
+    const dx = Math.cos(th);
+    const dz = Math.sin(th);
+    let best = 0;
+    for (let i = 0; i < n; i++) {
+      const [p, q] = [pts[i], pts[(i + 1) % n]];
+      const ex = q[0] - p[0];
+      const ez = q[1] - p[1];
+      const den = dx * ez - dz * ex;
+      if (Math.abs(den) < 1e-9) continue;
+      const t = ((p[0] - cx) * ez - (p[1] - cz) * ex) / den;
+      const u = ((p[0] - cx) * dz - (p[1] - cz) * dx) / den;
+      if (t > 0 && u >= 0 && u <= 1) best = Math.max(best, t);
+    }
+    return best;
+  };
+  const N = 180;
+  const r = Array.from({ length: N }, (_, k) => reach((2 * Math.PI * k) / N));
+  const sm = r.map((_, k) => [-2, -1, 0, 1, 2].reduce((acc, j) => acc + r[(k + j + N) % N], 0) / 5);
+  const dips = sm.map((_, k) => k).filter((k) => sm[k] <= sm[(k - 1 + N) % N] && sm[k] <= sm[(k + 1) % N]);
+  dips.sort((p, q) => sm[p] - sm[q]);
+  const out: number[] = [];
+  for (const k of dips) {
+    if (out.some((o) => Math.min(Math.abs(k - o), N - Math.abs(k - o)) < 25)) continue;
+    out.push(k);
+    if (out.length === count) break;
+  }
+  return out.map((k) => {
+    const th = (2 * Math.PI * k) / N;
+    const dir: Pt = [Math.cos(th), Math.sin(th)];
+    return { p: [cx + dir[0] * r[k], cz + dir[1] * r[k]] as Pt, dir };
+  });
 }

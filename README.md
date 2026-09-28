@@ -232,7 +232,7 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 - **Buildings.** Heights come from `height` or `building:levels` when OSM has them, otherwise from sensible defaults. Façades are matched to photographs of the campus and NITK's [virtual tour](https://vtour.nitk.ac.in/) (`src/world/archetypes.ts`, by OSM name):
   - the Main Building and the old departments: khaki-yellow render with continuous concrete sunshade ledges over recessed windows; the Main Building's wings add vertical fins (an egg-crate front)
   - the old hostel blocks: khaki render, sunshade ledges, louvred windows; tiled roofs only where OSM says pitched
-  - the Mega Hostel towers: tan frame, cream panels, small grilled windows, a blue-glass stair core
+  - the Mega Hostel towers: four wings round a centre, tan frame, cream panels, small grilled windows, and a full-height blue-glass stair core in each of the four inner corners where the wings meet
   - LHC-A: exposed laterite; the Library, LHC-D, CRF, CIDS and SJA: white render with lavender-grey bands
   - pastel houses with Mangalore-tile hip roofs and black rooftop water tanks, and shopfronts with rolling shutters off campus
 
