@@ -70,34 +70,39 @@ export function openJournal(g: Game): Promise<void> {
     const met = metCount(st);
 
     /* ---- missions ---- */
-    const row = (m: Mission, state: "done" | "open" | "later" | "locked", colour: string, note: string) => {
-      const d = state === "done" ? disc("check", "#1e6f5c") : state === "open" ? disc(m.icon, colour) : state === "later" ? disc(m.icon, "#a9a59a") : disc("lock", "#c9c5bb");
-      const chip = { done: "Done", open: "Open", later: "Later", locked: "Locked" }[state];
+    // Only what's appeared so far: done, or unlocked (open now, or later today).
+    // Nothing still locked is listed or counted, so the journal never spoils what's coming.
+    const row = (m: Mission, state: "done" | "open" | "later", colour: string, note: string) => {
+      const d = state === "done" ? disc("check", "#50bd77") : state === "open" ? disc(m.icon, colour) : disc(m.icon, "#a9b1bf");
+      const chip = { done: "Done", open: "Open", later: "Later" }[state];
       return `<div class="jr-m ${state}">${d}<div class="t"><div>${m.title}<span class="chip ${state === "later" ? "locked" : state}">${chip}</span></div>${note ? `<div class="sub">${note}</div>` : ""}</div></div>`;
     };
     const chapters = CHAPTERS.map((ch) => {
-      const ms = MISSIONS.filter((m) => m.chapter === ch.name);
+      const ms = MISSIONS.filter((m) => m.chapter === ch.name && (st.completed.has(m.id) || unlocked.has(m.id)));
       if (!ms.length) return "";
       const done = ms.filter((m) => st.completed.has(m.id)).length;
-      const rows = ms
+      // Open ones first, then later today, then the done ones.
+      const rank = (m: Mission) => (st.completed.has(m.id) ? 2 : openNow(st, m) ? 0 : 1);
+      const rows = [...ms]
+        .sort((a, b) => rank(a) - rank(b))
         .map((m) => {
           if (st.completed.has(m.id)) return row(m, "done", STORY_COLOUR, "");
-          if (!unlocked.has(m.id)) return row(m, "locked", STORY_COLOUR, "");
           const who = m.giver ? ` · ${CAST[m.giver].name}` : "";
           return row(m, openNow(st, m) ? "open" : "later", STORY_COLOUR, `${hoursText(m)}${who}`);
         })
         .join("");
-      return `<div class="jr-sec">${H("scroll", ch.name, `<span class="jr-count">${done}/${ms.length}</span>`)}<div class="jr-prog"><i style="width:${(done / ms.length) * 100}%"></i></div>${rows}</div>`;
+      return `<div class="jr-sec">${H("scroll", ch.name, `<span class="jr-count">${done} done</span>`)}${rows}</div>`;
     }).join("");
-    const jobs = JOBS.map((m) => {
-      const isUnlocked = m.requires.every((r) => st.completed.has(r));
-      const doneToday = st.flags[`job:${m.id}`] === st.day;
-      const pay = m.reward?.money ? `₹${m.reward.money} · ` : "";
-      const when = `${pay}${hoursText(m)}${m.id === "job-films" ? " (Fridays)" : ""}${m.giver ? ` · ${CAST[m.giver].name}` : ""}`;
-      if (doneToday) return row(m, "done", JOB_COLOUR, "Done for today. Back tomorrow.");
-      if (!isUnlocked) return row(m, "locked", JOB_COLOUR, "");
-      return row(m, unlocked.has(m.id) && openNow(st, m) ? "open" : "later", JOB_COLOUR, when);
-    }).join("");
+    const jobList = JOBS.filter((m) => m.requires.every((r) => st.completed.has(r)));
+    const jobs = jobList
+      .map((m) => {
+        const doneToday = st.flags[`job:${m.id}`] === st.day;
+        const pay = m.reward?.money ? `₹${m.reward.money} · ` : "";
+        const when = `${pay}${hoursText(m)}${m.id === "job-films" ? " (Fridays)" : ""}${m.giver ? ` · ${CAST[m.giver].name}` : ""}`;
+        if (doneToday) return row(m, "done", JOB_COLOUR, "Done for today. Back tomorrow.");
+        return row(m, unlocked.has(m.id) && openNow(st, m) ? "open" : "later", JOB_COLOUR, when);
+      })
+      .join("");
 
     /* ---- courses ---- */
     const courses = (Object.keys(COURSES) as CourseId[])
@@ -127,7 +132,7 @@ export function openJournal(g: Game): Promise<void> {
           <div class="jr-sec">${H("calendar", "Next year")}${next.length ? `<div class="jr-pills">${next.map((n) => `<span class="jr-pill ghost">${n}</span>`).join("")}</div>` : `<span class="jr-muted">Nothing yet</span>`}</div>
           <div class="jr-sec">${H("thali", "Mess")}<span>${st.flags.mess ? String(st.flags.mess).replace(/^./, (c) => c.toUpperCase()) : `<span class="jr-muted">Not registered</span>`}</span> <span class="jr-muted">· ${Number(st.flags.prep ?? 0)} quiz answers right</span></div>
         </div>
-        <div>${chapters}<div class="jr-sec">${H("briefcase", "Campus jobs", `<span class="jr-muted small">once a day</span>`)}${jobs}</div></div>
+        <div>${chapters || `<div class="jr-sec">${H("scroll", "Missions")}<span class="jr-muted">Nothing yet. Look for a gold marker.</span></div>`}${jobList.length ? `<div class="jr-sec">${H("briefcase", "Campus jobs", `<span class="jr-muted small">once a day</span>`)}${jobs}</div>` : ""}</div>
       </div>
       <div class="jr-sec">${H("grad", "Courses")}<div class="jr-courses">${courses}</div></div>
       <div class="jr-sec">${H("clock", "Timetable", `<span class="jr-muted small">weekdays, once classes start</span>`)}${week}</div>`;
