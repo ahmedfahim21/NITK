@@ -1,102 +1,161 @@
 /**
- * The journal (J): the day, your stats and standing with every group, what
- * you've joined, the Next Year list, your courses and timetable, and every
- * mission by chapter.
+ * The journal (J): the day at a glance, your standing with every group,
+ * what you've joined, every mission by chapter and the campus jobs, your
+ * courses and the timetable. The yearbook (Y) is one click away.
  */
 import type { Game } from "./index";
-import { CHAPTERS, MISSIONS } from "./index";
+import { CHAPTERS, JOB_COLOUR, MISSIONS, STORY_COLOUR } from "./index";
 import { CLUBS } from "./stalls";
 import type { Faction } from "./state";
+import type { Mission } from "./chapter1";
 import { COURSES, TIMETABLE, level, type CourseId } from "./courses";
-import { hhmm } from "./util";
 import { hoursText, openNow } from "./schedule";
-import { JOBS } from "./jobs";
 import { CAST } from "./cast";
+import { JOBS } from "./jobs";
+import { icon, type IconId } from "../ui/icons";
+import { metCount, openYearbook } from "./yearbook";
+
+export const FACTIONS: Record<Faction, { colour: string; icon: IconId; about: string }> = {
+  Karavali: { colour: "#2f6fd6", icon: "hostel", about: "1st Block, your hostel" },
+  Aravali: { colour: "#d9731f", icon: "hostel", about: "2nd Block, the rivals" },
+  Sahyadri: { colour: "#2e9a52", icon: "hostel", about: "7th Block" },
+  Seniors: { colour: "#b8860b", icon: "award", about: "Everyone above first year" },
+  IRIS: { colour: "#7b5bd0", icon: "code", about: "The IRIS team" },
+  Clubs: { colour: "#c9489a", icon: "users", about: "Every club on campus" },
+};
 
 /** Clubs you join through a mission rather than at a recruitment stall. */
-const MISSION_CLUBS: [string, string][] = [["farc", "Flying and Robotics Club"]];
+const MISSION_CLUBS: { id: string; name: string; colour: string }[] = [{ id: "farc", name: "Flying and Robotics Club", colour: "#16a085" }];
 
-const FACTIONS: Faction[] = ["Karavali", "Aravali", "Sahyadri", "Seniors", "IRIS", "Clubs"];
+const COURSE_ICON: Record<CourseId, IconId> = { CS110: "code", CS111: "terminal", MA110: "sigma", CY110: "flask", CY111: "flask", WO110: "wrench", CV110: "leaf" };
+const COURSE_COLOUR: Record<CourseId, string> = { CS110: "#2f6fd6", CS111: "#1d3557", MA110: "#7b5bd0", CY110: "#16a085", CY111: "#138d75", WO110: "#b85c3e", CV110: "#2e9a52" };
+
+const SEASON_ICON: Record<string, IconId> = { monsoon: "rain", postmonsoon: "leaf", winter: "snow", summer: "flower" };
+
+/** A small coloured disc with an icon in it. */
+export const disc = (ic: IconId, colour: string, size = 26) =>
+  `<span class="jr-disc" style="width:${size}px;height:${size}px;background:${colour}">${icon(ic, Math.round(size * 0.56), { color: "#fff", stroke: 2.2 })}</span>`;
 
 export function openJournal(g: Game): Promise<void> {
   return new Promise((resolve) => {
     const st = g.state;
-    // Section headings: small caps, not bold.
-    const H = (t: string) => `<div style="font:400 12px var(--label);letter-spacing:.14em;text-transform:uppercase;color:#8a5a00;margin-bottom:3px">${t}</div>`;
-    const card = g.ui.openOverlay(720);
-    // Courses and two chapters make it tall: scroll inside the card.
-    card.style.maxHeight = "calc(100vh - 40px)";
-    card.style.overflowY = "auto";
-    const bar = (v: number) => `<div style="flex:1;height:9px;border:1.5px solid #1b1f2a;border-radius:5px;background:#fff;overflow:hidden"><i style="display:block;height:100%;width:${Math.max(0, Math.min(100, v * 2))}%;background:#1d3557"></i></div>`;
-    const clubs = [...CLUBS.map((c) => [c.id, c.name] as [string, string]), ...MISSION_CLUBS].filter(([id]) => st.flags[`club:${id}`]).map(([, name]) => name);
+    const H = (ic: IconId, t: string, extra = "") => `<div class="jr-h">${icon(ic, 15)}<span>${t}</span>${extra}</div>`;
+    const card = g.ui.openOverlay(820);
+    card.classList.add("jr");
+    const unlocked = new Set(g.available().map((m) => m.id));
+
+    /* ---- the day at a glance ---- */
+    const att = Math.round(st.attendance);
+    const tile = (ic: IconId, colour: string, big: string, small: string) =>
+      `<div class="jr-tile"><span class="jr-tile-ic" style="color:${colour}">${icon(ic, 20)}</span><div><div class="big">${big}</div><div class="small">${small}</div></div></div>`;
+    const tiles = [
+      tile("calendar", "#2f6fd6", st.dateText(), "Semester I"),
+      tile("clock", "#b8860b", st.clockText(), st.raining ? "Raining" : "Dry"),
+      tile(SEASON_ICON[st.seasonId] ?? "sun", "#16a085", st.season.name, "Season"),
+      tile("wallet", "#2e9a52", `₹${Math.round(st.money)}`, "In your UPI"),
+      tile("grad", att < 75 ? "#c0392b" : "#1e6f5c", `${att}%`, `${st.classesAttended}/${st.classesHeld} classes`),
+    ].join("");
+
+    /* ---- standing ---- */
+    const respect = (Object.keys(FACTIONS) as Faction[])
+      .map((f) => {
+        const v = st.rep[f] ?? 0;
+        const look = FACTIONS[f];
+        return `<div class="jr-rep" title="${look.about}">${disc(look.icon, look.colour, 22)}<span class="nm">${f}</span><span class="bar"><i style="width:${Math.max(0, Math.min(100, v * 2))}%;background:${look.colour}"></i></span><span class="n">${v}</span></div>`;
+      })
+      .join("");
+    const clubs = [...CLUBS.map((c) => ({ id: c.id, name: c.name, colour: c.colour })), ...MISSION_CLUBS].filter((c) => st.flags[`club:${c.id}`]);
+    const clubPills = clubs.length ? clubs.map((c) => `<span class="jr-pill" style="background:${c.colour}">${c.name}</span>`).join("") : `<span class="jr-muted">None yet. Recruitment Week is in Chapter 2.</span>`;
     const next = String(st.flags.nextYear ?? "").split("|").filter(Boolean);
+    const met = metCount(st);
+
+    /* ---- missions ---- */
+    const row = (m: Mission, state: "done" | "open" | "later" | "locked", colour: string, note: string) => {
+      const d = state === "done" ? disc("check", "#1e6f5c") : state === "open" ? disc(m.icon, colour) : state === "later" ? disc(m.icon, "#a9a59a") : disc("lock", "#c9c5bb");
+      const chip = { done: "Done", open: "Open", later: "Later", locked: "Locked" }[state];
+      return `<div class="jr-m ${state}">${d}<div class="t"><div>${m.title}<span class="chip ${state === "later" ? "locked" : state}">${chip}</span></div>${note ? `<div class="sub">${note}</div>` : ""}</div></div>`;
+    };
     const chapters = CHAPTERS.map((ch) => {
       const ms = MISSIONS.filter((m) => m.chapter === ch.name);
       if (!ms.length) return "";
-      const unlocked = new Set(g.available().map((m) => m.id));
+      const done = ms.filter((m) => st.completed.has(m.id)).length;
       const rows = ms
         .map((m) => {
-          const done = st.completed.has(m.id);
-          const open = !done && unlocked.has(m.id);
-          const chip = done ? `<span class="chip done">Done</span>` : open ? `<span class="chip open">Open</span>` : `<span class="chip locked">Locked</span>`;
-          const when = open && m.giver ? `<div style="margin-left:66px;font-size:11.5px;color:#6b6f78">${hoursText(m)} · ${CAST[m.giver].name}</div>` : "";
-          return `<div style="margin:3px 0;opacity:${done || open ? 1 : 0.55}">${chip}${m.title}</div>${when}`;
+          if (st.completed.has(m.id)) return row(m, "done", STORY_COLOUR, "");
+          if (!unlocked.has(m.id)) return row(m, "locked", STORY_COLOUR, "");
+          const who = m.giver ? ` · ${CAST[m.giver].name}` : "";
+          return row(m, openNow(st, m) ? "open" : "later", STORY_COLOUR, `${hoursText(m)}${who}`);
         })
         .join("");
-      return `<div style="margin-top:10px">${H(ch.name)}${rows}</div>`;
+      return `<div class="jr-sec">${H("scroll", ch.name, `<span class="jr-count">${done}/${ms.length}</span>`)}<div class="jr-prog"><i style="width:${(done / ms.length) * 100}%"></i></div>${rows}</div>`;
     }).join("");
-    // Jobs: once a day each. "Now" when the giver's out, "Done" when you've done it today.
-    const unlockedJobs = new Set(g.available().map((m) => m.id));
-    const jobRows = JOBS.map((m) => {
+    const jobs = JOBS.map((m) => {
+      const isUnlocked = m.requires.every((r) => st.completed.has(r));
       const doneToday = st.flags[`job:${m.id}`] === st.day;
-      const unlocked = m.requires.every((r) => st.completed.has(r));
-      const now = unlocked && !doneToday && unlockedJobs.has(m.id) && openNow(st, m);
-      const chip = doneToday ? `<span class="chip done">Done</span>` : now ? `<span class="chip open">Now</span>` : `<span class="chip locked">${unlocked ? "Later" : "Locked"}</span>`;
-      const pay = m.reward?.money ? ` <span style="opacity:.7">₹${m.reward.money}</span>` : "";
-      const when = unlocked && m.giver ? `<div style="margin-left:66px;font-size:11.5px;color:#6b6f78">${hoursText(m)}${m.id === "job-films" ? " (Fridays)" : ""} · ${CAST[m.giver].name}</div>` : "";
-      return `<div style="margin:3px 0;opacity:${unlocked ? 1 : 0.55}">${chip}${m.title}${pay}</div>${when}`;
+      const pay = m.reward?.money ? `₹${m.reward.money} · ` : "";
+      const when = `${pay}${hoursText(m)}${m.id === "job-films" ? " (Fridays)" : ""}${m.giver ? ` · ${CAST[m.giver].name}` : ""}`;
+      if (doneToday) return row(m, "done", JOB_COLOUR, "Done for today. Back tomorrow.");
+      if (!isUnlocked) return row(m, "locked", JOB_COLOUR, "");
+      return row(m, unlocked.has(m.id) && openNow(st, m) ? "open" : "later", JOB_COLOUR, when);
     }).join("");
-    const jobs = `<div style="margin-top:10px">${H("Campus jobs · once a day")}${jobRows}</div>`;
-    const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-    const pips = (n: number) => "●".repeat(n) + "○".repeat(5 - n);
+
+    /* ---- courses ---- */
     const courses = (Object.keys(COURSES) as CourseId[])
       .map((id) => {
         const c = COURSES[id];
         const lv = level(st, id);
-        return `<div title="${c.perks.map((p, i) => `L${i + 1}: ${p}`).join("&#10;")}"><span style="display:inline-block;width:52px">${id}</span><span style="display:inline-block;width:190px">${c.title}</span><span style="color:#b85c3e;letter-spacing:1px">${pips(lv)}</span> <span style="opacity:.7">${lv ? c.perks[lv - 1] : "not started"}</span></div>`;
+        const pips = Array.from({ length: 5 }, (_, i) => `<i style="background:${i < lv ? COURSE_COLOUR[id] : "transparent"};border-color:${COURSE_COLOUR[id]}"></i>`).join("");
+        return `<div class="jr-course" title="${c.perks.map((p, i) => `L${i + 1}: ${p}`).join("&#10;")}">${disc(COURSE_ICON[id], COURSE_COLOUR[id], 30)}<div class="t"><div><span class="code">${id}</span> ${c.title}</div><div class="pips">${pips}</div><div class="sub">${lv ? c.perks[lv - 1] : `Not started · ${c.roomName}`}</div></div></div>`;
       })
       .join("");
-    const week = TIMETABLE.map((day, i) => `<div><span style="display:inline-block;width:34px">${DAYS[i]}</span>${day.map(([t, id]) => `${hhmm(t).replace(":00", "")} ${id} <span style="opacity:.6">(${COURSES[id].roomName})</span>`).join(" · ")}</div>`).join("");
+    const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+    const week = `<div class="jr-week"><span></span><span class="hd">9 AM</span><span class="hd">2 PM</span>${TIMETABLE.map((day, i) => `<span class="hd">${DAYS[i]}</span>${day.map(([, id]) => `<span class="slot" style="border-left-color:${COURSE_COLOUR[id]}">${id}<em>${COURSES[id].roomName}</em></span>`).join("")}`).join("")}</div>`;
+
     card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0">Journal</h2><span style="font-size:12px">J or Esc to close</span></div>
-      <div style="font-size:13px;margin:2px 0 10px">${st.dateText()} · ${st.clockText()} · Semester I · ${st.season.name} · ₹${Math.round(st.money)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px">
-        <div>
-          ${H("You")}
-          <div>Attendance: <span style="color:${st.attendance < 75 ? "#c0392b" : "#1e6f5c"}">${Math.round(st.attendance)}%</span> (${st.classesAttended}/${st.classesHeld} classes)</div>
-          <div>Quiz answers right: ${Number(st.flags.prep ?? 0)}</div>
-          <div>Mess: ${st.flags.mess ? String(st.flags.mess).replace(/^./, (c) => c.toUpperCase()) : "not registered"}</div>
-          <div style="margin-top:10px">${H("Respect")}</div>
-          ${FACTIONS.map((f) => `<div style="display:flex;gap:6px;align-items:center"><span style="width:70px">${f}</span>${bar(st.rep[f] ?? 0)}<span style="width:24px;text-align:right">${st.rep[f] ?? 0}</span></div>`).join("")}
-          <div style="margin-top:10px">${H("Clubs")}${clubs.length ? clubs.join(", ") : "None yet"}</div>
-          <div style="margin-top:8px">${H("Next year")}${next.length ? next.join(", ") : "Nothing yet"}</div>
+      <div class="jr-top">
+        <div><div class="jr-cap">Semester I · B.Tech CSE · Section ${st.flags.section ?? "S7"}</div><h2>Journal</h2></div>
+        <div class="jr-actions">
+          <button class="jr-btn" data-yearbook>${icon("id", 16)}Yearbook<span class="jr-count">${met.met}/${met.total}</span><kbd>Y</kbd></button>
+          <button class="jr-btn" data-close>${icon("x", 16)}Close<kbd>J</kbd></button>
         </div>
-        <div>${chapters}${jobs}</div>
       </div>
-      <div style="margin-top:12px;font-size:12.5px">
-        ${H(`B.Tech Computer Science &amp; Engineering · Semester I · Section ${st.flags.section ?? "S7"}`)}
-        <div style="margin-top:4px">${courses}</div>
-        <div style="margin-top:10px">${H("Timetable · 9 AM and 2 PM, weekdays, once classes start")}</div>
-        ${week}
-      </div>`;
-    const close = (e: KeyboardEvent) => {
+      <div class="jr-tiles">${tiles}</div>
+      <div class="jr-cols">
+        <div>
+          <div class="jr-sec">${H("users", "Respect")}${respect}</div>
+          <div class="jr-sec">${H("flag", "Clubs")}<div class="jr-pills">${clubPills}</div></div>
+          <div class="jr-sec">${H("calendar", "Next year")}${next.length ? `<div class="jr-pills">${next.map((n) => `<span class="jr-pill ghost">${n}</span>`).join("")}</div>` : `<span class="jr-muted">Nothing yet</span>`}</div>
+          <div class="jr-sec">${H("thali", "Mess")}<span>${st.flags.mess ? String(st.flags.mess).replace(/^./, (c) => c.toUpperCase()) : `<span class="jr-muted">Not registered</span>`}</span> <span class="jr-muted">· ${Number(st.flags.prep ?? 0)} quiz answers right</span></div>
+        </div>
+        <div>${chapters}<div class="jr-sec">${H("briefcase", "Campus jobs", `<span class="jr-muted small">once a day</span>`)}${jobs}</div></div>
+      </div>
+      <div class="jr-sec">${H("grad", "Courses")}<div class="jr-courses">${courses}</div></div>
+      <div class="jr-sec">${H("clock", "Timetable", `<span class="jr-muted small">weekdays, once classes start</span>`)}${week}</div>`;
+
+    let closed = false;
+    const close = (then?: () => void) => {
+      if (closed) return;
+      closed = true;
+      window.removeEventListener("keydown", onKey);
+      g.ui.closeOverlay();
+      if (then) then();
+      else resolve();
+    };
+    const toYearbook = () => close(() => void openYearbook(g).then(resolve));
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === "KeyY") {
+        e.preventDefault();
+        toYearbook();
+        return;
+      }
       if (e.code !== "KeyJ" && e.code !== "Escape") return;
       e.preventDefault();
-      window.removeEventListener("keydown", close);
-      g.ui.closeOverlay();
-      resolve();
+      close();
     };
+    card.querySelector("[data-close]")!.addEventListener("click", () => close());
+    card.querySelector("[data-yearbook]")!.addEventListener("click", toYearbook);
     // Defer so the J that opened it doesn't close it.
-    setTimeout(() => window.addEventListener("keydown", close), 50);
+    setTimeout(() => window.addEventListener("keydown", onKey), 50);
   });
 }
+
