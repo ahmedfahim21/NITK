@@ -144,6 +144,33 @@
 .yb-met { margin-top: 5px; font: 400 11px var(--label); letter-spacing: 0.1em; text-transform: uppercase; color: #8a5a00; }
 @media (max-width: 720px) { .jr-tiles { grid-template-columns: repeat(2, 1fr); } .jr-cols { grid-template-columns: 1fr; } }
 
+/* Journal and yearbook: after NITK's own alumni site. Navy headings, one
+   fresh green, Raleway, white cards on a pale page with thin grey borders,
+   big green numerals. Hierarchy from size and colour, never weight. */
+#overlay .card.jr { --nitk-navy: #16294e; --nitk-green: #50bd77; --nitk-line: #e5e5e5; --nitk-soft: #64748b; --raleway: "Raleway", "Noto Sans", system-ui, sans-serif; background: #f8f9fb; color: #1f2937; border-radius: 18px; border: 1px solid var(--nitk-line); font-family: var(--raleway); }
+#overlay .jr h2 { font: 500 34px/1.1 var(--raleway); letter-spacing: 0; color: var(--nitk-navy); }
+#overlay .jr .jr-cap { font: 500 12px var(--raleway); letter-spacing: 0.12em; color: var(--nitk-green); }
+#overlay .jr .jr-btn { font: 500 14px var(--raleway); letter-spacing: 0; color: var(--nitk-navy); border: 1px solid var(--nitk-green); border-radius: 8px; background: #fff; }
+#overlay .jr .jr-btn:hover { background: var(--nitk-green); color: #fff; border-color: var(--nitk-green); }
+#overlay .jr .jr-btn kbd { background: var(--nitk-navy); }
+#overlay .jr .jr-count { font: 500 12px var(--raleway); letter-spacing: 0; background: #eaf7ef; color: #2f8a52; }
+#overlay .jr .jr-h { font: 500 16px var(--raleway); letter-spacing: 0; text-transform: none; color: var(--nitk-navy); border-bottom: 1px solid var(--nitk-line); padding-bottom: 7px; margin-bottom: 9px; }
+#overlay .jr .jr-h > .ic { color: var(--nitk-green); }
+#overlay .jr .jr-tile { background: #fff; border: 1px solid var(--nitk-line); border-radius: 14px; padding: 12px; box-shadow: 0 1px 2px rgba(22, 41, 78, 0.04); }
+#overlay .jr .jr-tile .big { font: 500 18px/1.15 var(--raleway); color: var(--nitk-green); letter-spacing: 0; white-space: normal; overflow: visible; }
+#overlay .jr .jr-tile .small { color: var(--nitk-soft); }
+#overlay .jr .jr-muted { color: var(--nitk-soft); }
+#overlay .jr .jr-m .sub, #overlay .jr .jr-course .sub, #overlay .jr .jr-course .code, #overlay .jr .jr-week .slot em { color: var(--nitk-soft); }
+#overlay .jr .chip.done { background: #eaf7ef; color: #2f8a52; }
+#overlay .jr .jr-course, #overlay .jr .jr-week .slot { background: #fff; border: 1px solid var(--nitk-line); }
+#overlay .jr .jr-week .slot { border-left-width: 4px; }
+#overlay .jr .jr-week .hd { font-family: var(--raleway); letter-spacing: 0.06em; color: var(--nitk-soft); }
+#overlay .jr .jr-rep .n { font-family: var(--raleway); color: var(--nitk-navy); }
+#overlay .jr .yb-card { border: 1px solid var(--nitk-line); box-shadow: 0 2px 10px rgba(22, 41, 78, 0.08); }
+#overlay .jr .yb-name { font: 500 17px/1.15 var(--raleway); letter-spacing: 0; color: var(--nitk-navy); }
+#overlay .jr .yb-met { font-family: var(--raleway); letter-spacing: 0.08em; color: var(--nitk-green); }
+#overlay .jr .yb-loading { font-family: var(--raleway); color: var(--nitk-soft); }
+
 /* Speech bubbles over the crowd */
 #bubbles .bubble { position: absolute; left: 0; top: 0; max-width: 230px; padding: 6px 10px; font-size: 12.5px; line-height: 1.35; background: #fff; color: var(--ink); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.22); white-space: normal; will-change: transform; }
 #bubbles .bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; transform: translateX(-50%); }
@@ -165,3 +192,4 @@
 body.talking #help, body.talking #controls { display: none; }
 body.titling #title, body.titling #clock, body.titling #minimap-wrap, body.titling #help, body.titling #controls, body.titling #stats, body.titling #fps { visibility: hidden; }
 @media (max-width: 700px) { #prompt { bottom: 380px; } #stats { top: 72px; width: 190px; } #tracker { top: 196px; width: 220px; } #toasts { top: 150px; } #dialogue .txt { font-size: 16px; } }
+#overlay .jr .jr-prog { background: #e8edf3; } #overlay .jr .jr-prog i { background: var(--nitk-green); }
