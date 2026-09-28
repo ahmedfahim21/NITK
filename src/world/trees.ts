@@ -1,7 +1,9 @@
 /**
  * Vegetation. Coastal Karnataka is coconut palms over everything, with
  * mango/jackfruit/acacia canopy between and a casuarina belt behind the
- * beach. Mapped trees are placed exactly; the rest are scattered by land use
+ * beach. The campus itself (from the virtual tour, vtour.nitk.ac.in) is
+ * columnar Ashoka trees lining the Main Building's lawns and huge rain trees
+ * arching over the roads, with bare red laterite soil in their shade. Mapped trees are placed exactly; the rest are scattered by land use
  * on free ground. Instances are bucketed into tiles so the camera and the
  * shadow pass only draw the tiles they can see.
  */
@@ -12,8 +14,9 @@ import type { AreaKind, CampusMap, Tree } from "../osm/types";
 import { toon } from "../fx/toon";
 import { CLEAR, Grid, PATH, ROAD, SOLID, WATER } from "./grid";
 import { groundHeight } from "./terrain";
+import { mainAxis } from "./landmarks";
 
-type Kind = Tree["kind"];
+type Kind = Tree["kind"] | "ashoka" | "raintree";
 
 function colourise(g: THREE.BufferGeometry, c: number): THREE.BufferGeometry {
   const geo = g.index ? g.toNonIndexed() : g;
@@ -113,6 +116,50 @@ function casuarinaGeometry(): THREE.BufferGeometry {
   return mergeGeometries(parts)!;
 }
 
+/** Polyalthia longifolia: a tall, narrow, drooping dark-green column. */
+function ashokaGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const trunk = new THREE.CylinderGeometry(0.12, 0.2, 1.6, 5);
+  trunk.translate(0, 0.8, 0);
+  parts.push(colourise(trunk, 0x5e4a3a));
+  const tiers = 6;
+  for (let i = 0; i < tiers; i++) {
+    const r = 1.35 - i * 0.17;
+    const c = new THREE.ConeGeometry(r, 2.6, 7);
+    c.translate(0, 2.4 + i * 1.55, 0);
+    parts.push(colourise(c, i % 2 ? 0x2e6530 : 0x3a7536));
+  }
+  return mergeGeometries(parts)!;
+}
+
+/** Samanea saman: a short thick trunk under a wide, flat umbrella of canopy. */
+function raintreeGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const trunk = new THREE.CylinderGeometry(0.38, 0.6, 4.2, 7);
+  trunk.translate(0, 2.1, 0);
+  parts.push(colourise(trunk, 0x5b4636));
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2;
+    const limb = new THREE.CylinderGeometry(0.1, 0.22, 3.4, 5);
+    limb.rotateZ(0.65);
+    limb.rotateY(a);
+    limb.translate(Math.cos(a) * 1, 5.6, -Math.sin(a) * 1);
+    parts.push(colourise(limb, 0x5b4636));
+  }
+  const rand = mulberry32(41);
+  const greens = [0x5a9a3e, 0x4f8c38, 0x66a647];
+  for (let i = 0; i < 7; i++) {
+    const r = 2.8 + rand() * 1.2;
+    const b = new THREE.IcosahedronGeometry(r, 0);
+    b.scale(1, 0.5, 1);
+    const a = (i / 7) * Math.PI * 2 + rand() * 0.4;
+    const d = i === 0 ? 0 : 3.6 + rand() * 1.2;
+    b.translate(Math.cos(a) * d, 7.4 + rand() * 0.9 + (i === 0 ? 0.7 : 0), Math.sin(a) * d);
+    parts.push(colourise(b, greens[i % greens.length]));
+  }
+  return mergeGeometries(parts)!;
+}
+
 const DENSITY: Partial<Record<AreaKind, number>> = {
   forest: 1 / 55,
   scrub: 1 / 160,
@@ -164,7 +211,8 @@ const TILE = 320;
 
 export type TreeRig = { group: THREE.Group; count: number; cull(cam: THREE.Vector3): void; setSeason(foliage: [number, number, number], blossom: boolean): void };
 
-export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
+/** `keep` can veto a spot (nothing grows through the footbridge). */
+export function buildTrees(map: CampusMap, grid: Grid, keep: (x: number, z: number) => boolean = () => true, seed = 1729): TreeRig {
   const rand = mulberry32(seed);
   const b = map.bounds;
 
@@ -216,8 +264,64 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
       const pz = z + (rand() - 0.5) * step;
       if (!free(px, pz, 2.2)) continue;
       const palmShare = leaf === "palm" ? 0.95 : leaf === "needle" ? 0 : kind ? PALM[kind] ?? 0.4 : 0.55;
-      const kindOf: Kind = leaf === "needle" ? "casuarina" : rand() < palmShare ? "palm" : "broad";
+      let kindOf: Kind = leaf === "needle" ? "casuarina" : rand() < palmShare ? "palm" : "broad";
+      // On campus, a share of the canopy is rain trees and Ashoka columns.
+      if (kindOf === "broad" && (kind === "campus" || kind === "grass" || kind === "park" || kind === "garden")) {
+        const pick = rand();
+        kindOf = pick < 0.3 ? "raintree" : pick < 0.5 ? "ashoka" : "broad";
+      }
       placed.push({ x: px, z: pz, kind: kindOf, s: 0.75 + rand() * 0.55, r: rand() * 6.28, v: Math.floor(rand() * 3) });
+    }
+  }
+
+  // Planted trees keep their distance from each other (4 m cells).
+  const taken = new Set<number>();
+  const cell = (x: number, z: number) => Math.floor(x / 4) * 100003 + Math.floor(z / 4);
+  const spaced = (x: number, z: number, r: number) => {
+    for (let dx = -r; dx <= r; dx += 4) for (let dz = -r; dz <= r; dz += 4) if (taken.has(cell(x + dx, z + dz))) return false;
+    return true;
+  };
+  for (const p of placed) taken.add(cell(p.x, p.z));
+  // Rain-tree avenues along the campus roads.
+  const inCampus = (x: number, z: number) => map.campus.some((c) => pointInPoly(x, z, c));
+  for (const r of map.roads) {
+    if (r.kind === "trunk" || r.kind === "primary" || r.kind === "footway" || r.kind === "steps" || r.kind === "cycleway" || r.bridge) continue;
+    let carry = rand() * 18;
+    for (let i = 1; i < r.pts.length; i++) {
+      const [ax, az] = r.pts[i - 1];
+      const [bx, bz] = r.pts[i];
+      const l = Math.hypot(bx - ax, bz - az);
+      const ux = (bx - ax) / (l || 1);
+      const uz = (bz - az) / (l || 1);
+      for (let d = carry; d < l; d += 18) {
+        for (const side of [-1, 1]) {
+          const off = r.width / 2 + 4 + rand() * 1.5;
+          const x = ax + ux * d - uz * off * side;
+          const z = az + uz * d + ux * off * side;
+          if (!inCampus(x, z) || rand() < 0.3 || !free(x, z, 2.2) || !spaced(x, z, 8)) continue;
+          placed.push({ x, z, kind: "raintree", s: 0.85 + rand() * 0.35, r: rand() * 6.28, v: 0 });
+          taken.add(cell(x, z));
+        }
+      }
+      carry = ((carry - l) % 18 + 18) % 18;
+    }
+  }
+  // Ashoka lines down both sides of the Main Building's lawns, gate to entrance.
+  const axis = mainAxis(map);
+  if (axis) {
+    const [fx, fz] = axis.from;
+    const [tx, tz] = axis.to;
+    const l = Math.hypot(tx - fx, tz - fz);
+    const ux = (tx - fx) / l;
+    const uz = (tz - fz) / l;
+    for (let d = 30; d < l - 15; d += 7) {
+      for (const off of [-30, -16, 16, 30]) {
+        const x = fx + ux * d - uz * off;
+        const z = fz + uz * d + ux * off;
+        if (!free(x, z, 1.2) || !spaced(x, z, 0)) continue;
+        placed.push({ x, z, kind: "ashoka", s: 0.9 + rand() * 0.2, r: rand() * 6.28, v: 0 });
+        taken.add(cell(x, z));
+      }
     }
   }
 
@@ -231,6 +335,7 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
     placed.push({ x, z, kind: rand() < 0.6 ? "palm" : "broad", s: 0.9 + rand() * 0.5, r: rand() * 6.28, v: 0, far: true });
   }
 
+  for (let i = placed.length - 1; i >= 0; i--) if (!keep(placed[i].x, placed[i].z)) placed.splice(i, 1);
   for (const p of placed) if (p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ) grid.stampDisc(p.x, p.z, 0.45, SOLID, 8);
 
   /* ---- instancing by tile and kind ---- */
@@ -239,6 +344,8 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
     farbroad0: broadGeometry(0, true),
     palm: palmGeometry(),
     casuarina: casuarinaGeometry(),
+    ashoka: ashokaGeometry(),
+    raintree: raintreeGeometry(),
     broad0: broadGeometry(0),
     broad1: broadGeometry(1),
     broad2: broadGeometry(2),
@@ -275,6 +382,23 @@ export function buildTrees(map: CampusMap, grid: Grid, seed = 1729): TreeRig {
     inst.userData.far = far;
     inst.receiveShadow = true;
     group.add(inst);
+  }
+  // Bare red laterite under the big trees, where grass won't grow in the shade.
+  {
+    const under = placed.filter((p) => !p.far && (p.kind === "raintree" || (p.kind === "broad" && (Math.floor(p.x * 3 + p.z) & 1) === 0)));
+    if (under.length) {
+      const soil = new THREE.CircleGeometry(1, 12).rotateX(-Math.PI / 2);
+      const inst = new THREE.InstancedMesh(soil, toon(0x9a7556, { ramp: "soft", polygonOffset: 1 }), under.length);
+      const mm = new THREE.Matrix4();
+      under.forEach((p, i) => {
+        const r = (p.kind === "raintree" ? 4.6 : 2.6) * p.s;
+        mm.makeScale(r, 1, r * (0.8 + (i % 3) * 0.1)).setPosition(p.x, groundHeight(p.x, p.z) + 0.03, p.z);
+        inst.setMatrixAt(i, mm);
+      });
+      inst.computeBoundingSphere();
+      inst.receiveShadow = true;
+      group.add(inst);
+    }
   }
   // Summer flowers: gulmohar (flame red) and Indian laburnum (golden shower)
   // on a share of the broadleaf trees, shown only in season.

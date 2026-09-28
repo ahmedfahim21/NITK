@@ -26,29 +26,32 @@ npm run dev                            # dev: Story Mode on (VITE_STORY_MODE=fal
 
 ![Title](docs/title.png)
 
-## Seasons and the academic year
+## Seasons, days and the schedule
 
-The game runs on the real calendar: day 0 is Monday 3 August 2026, and NITK's odd semester runs August–December, the even semester January–May. Seasons follow the Karnataka coast:
+The story isn't pinned to calendar dates; you can wander for a week if you like. Days count up as you sleep ("Day 3, Wednesday"), and **the season follows the chapter**:
 
-| Season | Months | Semester / story | What changes |
-|---|---|---|---|
-| **Monsoon** | Jun–Sep | odd sem opens (Chapters 1–2) | frequent rain spells, lush green, grey skies, rough sea, umbrellas everywhere, frogs at night |
-| **Post-monsoon** | Oct–Nov | Engineer, Deepavali | "October heat", afternoon thunderstorms with lightning and thunder |
-| **Winter** | Dec–Feb | endsems, Crescendo | dry and clear, calm sea, drier grass, students in jackets |
-| **Summer** | Mar–May | Incident, even-sem endsems | hot haze, straw-yellow grass, gulmohar and laburnum in flower, cicadas, pre-monsoon storms |
+| Season | Chapter | What changes |
+|---|---|---|
+| **Monsoon** | 1, Srinivasnagar | frequent rain spells, lush green, grey skies, rough sea, umbrellas everywhere, frogs at night |
+| **Post-monsoon** | 2, Recruitments | "October heat", afternoon thunderstorms with lightning and thunder |
+| **Winter** | later chapters | dry and clear, calm sea, drier grass, students in jackets |
+| **Summer** | later chapters | hot haze, straw-yellow grass, gulmohar and laburnum in flower, cicadas, pre-monsoon storms |
+
+**A day, Bully-style** (`src/game/schedule.ts`):
+- A **morning class at 9** and an **afternoon class or lab at 2**, weekdays, once classes start.
+- **Curfew at 11 PM.** Be back in your hostel; after that the warden's patrol finds you, fines you and marches you back. A warning comes at 10:30.
+- **Pass out at 2 AM** if you're still up, and wake in your room, poorer.
+- **Missions have hours** (and some only weekends or weekdays). Their givers only show up then, and curfew waits while you're on a mission.
+- **Missions unlock in waves:** each needs certain missions done, and some only appear once enough of the chapter is done. The journal (J) shows which are open and when.
+
+The clock at the top of the screen shows the time, the day and the season, with a strip marking today's classes and curfew.
 
 **Across the year:**
-- Sunrise and sunset follow Surathkal's real times, so dusk comes around 6:05 PM in November and 6:55 PM in August.
+- Sunrise and sunset follow Surathkal's times for the season.
 - The weather is rolled every game hour from the season's odds. Missions that script the weather hold it until they end.
-- Festival decorations go up on the 2026–27 dates:
-  - tricolour bunting for Independence Day and Republic Day
-  - red-and-yellow Kannada flags for Rajyotsava
-  - marigold garlands for Ganesh Chaturthi
-  - glowing akash kandil lanterns and diyas for Deepavali
-  - paper stars for Christmas
-- The journal shows the semester and season.
+- Festival decorations go up when the story reaches them: marigold garlands for Ganesh Chaturthi, red-and-yellow Kannada flags for Rajyotsava, akash kandil lanterns and diyas for Deepavali, paper stars for Christmas, tricolour bunting for Republic Day.
 
-In Explore mode, a season picker jumps to Monsoon (15 Aug), Post-monsoon (8 Nov, Deepavali), Winter (25 Dec) or Summer (29 Mar), and a Rain button toggles the weather, so you can check assets across the year.
+In Explore mode, a season picker switches between the seasons (with Deepavali and Christmas decorations) and a Rain button toggles the weather.
 
 | | |
 |---|---|
@@ -68,7 +71,7 @@ Everything is synthesized in the browser; there are no audio files to download.
   - *Night Canteen* (night)
   - *Against the Clock* (timed missions and chases)
 
-  N or ⏭ skips a track, ♪ toggles the music, and 🔊 opens separate volume controls for master, music, effects and ambience. Add your own MP3s in `public/music/` (see [Music](#adding-music)).
+  N or Next skips a track, Music toggles it, and Mix opens separate volume controls for master, music, effects and ambience. Add your own MP3s in `public/music/` (see [Music](#adding-music)).
 - **Ambience:** mixed from where you are and when:
   - waves loudest on the real coastline
   - NH66 traffic rumble and horns
@@ -89,35 +92,115 @@ The OpenStreetMap extract **ships with the game** as `public/data/nitk-osm.json`
 
 The map square is set in `src/area.json`: 13.0005–13.0205 N, 74.7815–74.8060 E. It covers the whole campus on both sides of NH66, the beach and the lighthouse.
 
+**Terrain** ships the same way, as `public/data/nitk-dem.json`: a 30 m grid of heights, the mean of SRTM and ASTER via the public [OpenTopoData](https://www.opentopodata.org/) API. Refresh it with `npm run dem:fetch` (about 2.5 minutes, one request a second).
+
+## The world ends at the campus
+
+Like Bully's or GTA's maps, only the playable region exists (`src/world/region.ts`, shared by the world and the map):
+- the campus inside its OSM boundary
+- the coast: a band along the beach's shoreline, and the lighthouse knoll
+- narrow corridors for what joins them: NH66 along the campus wall, the two underpasses, the foot overbridge, the one road out to the beach, and the roads on from it to the sand and up to the lighthouse (found by a shortest walk over the OSM road network)
+
+Outside it there are no buildings or roads, just scrub and trees on the real terrain. You can't walk past the edge, and the map ignores clicks out there.
+
+## Terrain
+
+NITK sits on a laterite plateau. The beach is at sea level, the land climbs about 20 m to NH66 and the Main Building (~23 m), then falls east towards the lake.
+- **Heightfield:** `src/world/terrain.ts` smooths the elevation data to take out tree canopy, pins the sea and the beach, and bakes one 2 m heightfield. Every building, ground, car park and pond stands on a level pad blended into the slope.
+- **Lift:** the static world is built at height 0 and lifted onto the terrain in the vertex shader (`src/world/displace.ts`), shadows included. Buildings, landmarks and interiors rise as rigid blocks because their pads are flat. The ground is one 4 m lattice (1 m next to the underpasses) that bends with the slope.
+- **Matching heights:** `groundHeight()` reads the same field on the CPU, so the player, cast, crowd and trees stand exactly on what's drawn.
+- **Underpasses:** these come from OSM's `tunnel=yes` ways under NH66 (`src/world/underpass.ts`). Each ramps down about 5 m between laterite retaining walls with a concrete parapet, then runs under the highway in a box culvert with headwalls at each portal. A road crossing a ramp deep enough gets its own culvert. The first underpass is OSM's two tunnels, one per direction, built as one wide underpass; the second joins Fresher's Street to the beach road. Inside an underpass the player stands on the underpass's own floor profile. Under the deck, they stay on whichever of the floor and the road above is nearer.
+- **Foot overbridge:** the covered steel bridge over NH66 is walkable, up either stair flight and across the deck. Nothing on the ground below blocks you up there, and you can't step off the sides.
+- **One step at a time:** the player can't step up or drop more than a metre in one move, so there's no walking off a deck, out of a culvert's side or over a trench wall.
+
+## NH66 after the intro
+
+Once the arrival mission is done (outside Explore), the steel grille gates in the compound wall onto NH66 swing shut and become solid, the Main Gate included. You cross by an underpass or the footbridge, and the gate to the beach road stays open. The carriageways themselves are also closed at road level, but not in the culverts under them or on the bridge over them. So there's no walking onto NH66 from the beach-road side, where no wall stands. Bump into it and a toast points you to the crossings.
+
 ## The game
 
-Chapters 1 and 2 are playable. Chapter 1, **Srinivasnagar**, covers your first days as a fresher, in August, during the monsoon. It has six missions:
+Chapters 1 and 2 are playable. You're a first-year **B.Tech Computer Science & Engineering** student, section S7. Mission details come from NITK's own sites (nitk.ac.in, IRIS, WebClub) and its virtual tour.
 
-| Mission | Giver | What happens |
+Chapter 1, **Srinivasnagar**, follows the real first-year order: reporting, the induction programme, then classes. The monsoon.
+
+| Mission | Giver, hours | What happens |
 |---|---|---|
-| **Main Gate** | automatic | Get off the bus on NH66, cross by the overpass, collect your ID card from the Academic Section, and find Karavali (1st Block) |
-| **Three Messes** | Rohan (roommate) | Pick 1st block veg, 2nd block non-veg, or race 90 s for the last seats at Sahyadri (7th block) |
-| **Wheels** | Vikram (final year) | Buy his roadster for ₹300, or rush his lab record to LHC in 3 minutes. You get a cycle |
-| **Log in to IRIS** | Ananya (IRIS team) | A password minigame with escalating rules (the highway, the year KREC was founded, …) |
-| **Maggi in the Rain** | Rohan, after 3 PM | The monsoon hits. Beat the shutters to Nescafe |
-| **The Sunset Rule** | Prakash (senior), 4:30–6:30 PM | Reach the lighthouse hill before the sun hits the sea, and don't disturb the bees. Chapter finale |
+| **Main Gate** | automatic | Off the bus on NH66, your ID card and CSE section from the Academic Section, find Karavali (1st Block) |
+| **Three Messes** | Rohan | Pick 1st block veg, 2nd block non-veg, or race 90 s for the last seats at Sahyadri |
+| **Wheels** | Vikram | Buy his roadster for ₹300, or rush his lab record to LHC in 3 minutes |
+| **Log in to IRIS** | Ananya, 9 AM – 5:30 PM | The password minigame; IRIS's real modules and history; your Semester I registration |
+| **Induction Week** | Prakash, 7 – 10 AM | SJA: the Director and the anti-ragging committee, then a heritage walk (KREC 1960, the CCC 1995, the 2018 buildings, Friday films at SAC) and a quiz |
+| **Saturday Parade** | Divya (NCC), weekends 6 – 9 AM | 2 Kar Engr Coy's enrolment parade on the Main Ground; drill words of command |
+| **Library Card** | Mrs. Pai, 9 AM – 8 PM | Find K&R, a Chemistry text and Timoshenko in the stacks without running |
+| **Lab Kit** | Vikram, 9 AM – 7 PM | The Co-op on a ₹600 budget: lab coat, goggles, the allowed calculator |
+| **Scholarship Form** | Mrs. Shetty, weekdays 10 AM – 2:30 PM | Lobby, SBI before 4, back before 5:30; never during her lunch |
+| **Roll Call** | Prof. Hegde, weekdays 8 – 9:05 AM | The first WO110 lecture in LHC-C: a proxy for Rohan, or not; classes start |
+| **Maggi in the Rain** | Rohan, 3 – 8 PM | The monsoon hits. Beat the shutters to Nescafe |
+| **The Sunset Rule** | Prakash, 4:30 – 6:30 PM | The lighthouse hill before the sun hits the sea. Chapter finale |
+| **Monsoon Fever** | Rohan, weekdays 9 AM – 5 PM | Walk him to the Health Care Centre before the OPD shuts; Dr. Hebbar's verdict |
+| **The Reading Room** | Ravi, 6 – 10 PM, after 4 missions | Pick the block's extra daily (Deccan Herald, Udayavani, The Hindu); first word of Crescendo |
 
-Chapter 2, **Recruitments**, follows. It's a month later, in September, and recruitment week has club stalls in an arc in front of the real Students' Activity Centre amphitheatre:
+Chapter 2, **Recruitments**, is a few weeks later, in the post-monsoon. Club stalls stand in an arc in front of the Students' Activity Centre:
 
-| Mission | Giver | What happens |
+| Mission | Giver, hours | What happens |
 |---|---|---|
-| **Recruitment Week** | automatic | Visit the club stalls (WebClub, Star Gazing, LSD, Linux Users Group, Music, Photography, E-FOREA, SPICMACAY) and sign up for three |
-| **Come Back Next Year** | Ananya | Get politely rejected by IEEE, ACM, IE and IET; they go onto your "Next Year" list |
-| **Freshers Cup** | Phoenix captain, after 4 PM | A penalty-shootout minigame on Main Ground 1, Karavali vs Aravali |
-| **Flat Tyre** | Rohan | Kiran from Aravali let your tyres down on a Crescendo dare. Chase him across campus |
-| **sudo make me a coffee** | Sid (LUG), after 6 PM | A Linux terminal minigame: fix Rohan's dual-boot Wi-Fi, then get him out of vim |
-| **First Light** | Meera (Star Gazing), after 7:30 PM, no rain | Name constellations in the August sky (Saptarishi, Vrischika, Cassiopeia…) |
+| **Recruitment Week** | automatic | Visit the club stalls and sign up for three |
+| **Come Back Next Year** | Ananya | Get politely rejected by IEEE, ACM, IE and IET |
+| **Freshers Cup** | Phoenix captain, 4 – 7:30 PM | A penalty shootout on Main Ground 1, Karavali vs Aravali |
+| **Flat Tyre** | Rohan | Chase Kiran from Aravali across campus |
+| **sudo make me a coffee** | Sid (LUG), 6 – 11 PM | Fix Rohan's dual-boot Wi-Fi in a Linux terminal |
+| **First Light** | Meera, 7:30 – 11 PM, no rain | Name constellations |
+| **Ganapati Bappa** | Rohan, 4 – 6 PM | Garlands, modaks and serial lights for Karavali's Ganesh pandal before the 7 PM aarti |
+| **Raga at SJA** | Aditi (SPICMACAY), 4 – 6:25 PM | A veena and mridangam concert; the listening Q&A |
+| **Not Me But You** | Arjun (NSS), weekends 6 – 10 AM | The NSS/Rotaract clean-up on NITK Beach before the tide |
+| **CP League** | Ananya (WebClub), 5 – 9 PM | The Algorithms SIG's STL and complexity session at a CCC lab PC |
+| **Night Canteen Run** | Raju anna, 9 – 10:45 PM | Three hot orders to three blocks in four minutes |
+| **Quiz Night** | Farhan (LSD), 6 – 9 PM | The open quiz prelims in LHC-D: KREC, NH66, Engineer, Incident, Crescendo |
+| **Wright Flight** | Keerthi (FARC), 4 – 6:30 PM, no rain | Build a balsa glider, two throws on the Main Ground; the sea breeze helps |
+| **Expose** | Arnav (Photography), 4:30 – 6 PM, no rain | Four golden-hour frames before the light goes, for the SAC foyer wall |
+| **Pitch Deck** | Vikram, weekdays 10 AM – 5 PM, after 4 missions | Incub8 at NITK-STEP: one idea, three judges' questions, ₹500 seed money |
+| **Underpass** | Isha (Artists' Forum), weekends 7 – 11 AM, no rain | Paint from the Co-op, a mural on the NH66 underpass to the beach |
+| **Musical Night** | Dev (Music Club), 5 – 7 PM, after 3 missions | Roadie the amp, drums and mic stands from SJA to the SAC stage by 7:30 |
+
+### Campus jobs
+
+Like Bully's odd jobs: small paid errands, once a day each, in their hours. They never complete; the journal lists them with **Open**, **Later**, **Done** or **Locked**.
+
+| Job | Giver, hours | Pay | What happens |
+|---|---|---|---|
+| **News Wagon** | Nikhil (Press Club), weekdays 7 – 8:45 AM | ₹80 | Pin the wall magazine on four notice boards before class |
+| **Xerox Run** | Manju, 3 – 7 PM | ₹120 | Notes from LHC-C to the xerox counter, copies to all three blocks, in four minutes |
+| **Puncture Repair** | Babu, 8 AM – 8 PM | ₹60 + tips | Three flats: patch a thorn, pump a leaky valve |
+| **Mess Supply** | Mr. Kotian, 6 – 8:30 AM | ₹90 + breakfast | Two vegetable crates from the Main Gate to the Mega Mess kitchen |
+| **Library Shelving** | Mrs. Pai, 3 – 7 PM | ₹70 | Four returns back on the shelves; three shushes and you're out |
+| **Friday Films** | Tanvi (Films Club), Fridays 5:30 – 7 PM | ₹100 | Projector from SJA, set up the Friday screening at SAC |
+
+### Courses
+
+Your Semester I courses are NITK's real CSE plan. Turn up in the room when one is on and press E; each is its own minigame, and passing levels it up (to 5) and unlocks a perk, as in Bully:
+
+| Course | Room | Minigame | Perks |
+|---|---|---|---|
+| **CS110** C Programming | LHC-C | trace the output of C snippets | extra terminal time; seniors pay you to debug |
+| **CS111** C Programming Lab | Central Computer Centre | click the buggy line | extra terminal time; money fixing lab PCs |
+| **MA110** Engineering Mathematics I | LHC-D | a timed mental-maths sprint | energy and hunger drain slower |
+| **CY110** Chemistry | LHC-D | quiz | food fills you more |
+| **CY111** Chemistry Lab | Science Block | a titration: stop at the first faint pink | food fills you more |
+| **WO110** Engineering Mechanics | LHC-C | forces and moments quiz | a faster cycle |
+| **CV110** Environmental Studies | LHC-C | the Karnataka coast and environment | Clubs respect |
+
+The journal lists your courses, levels, perks and the timetable.
+
+### Journal and yearbook
+
+- **Journal (J):** the day at a glance (date, time, season, money, attendance), respect with each hostel and group in its colour, clubs, and the missions and campus jobs that have appeared so far, with their icons, state and hours. Nothing still locked is listed or counted, so it never spoils what's coming. On phones and narrow screens the journal becomes a near full-screen sheet with You / Missions / Studies tabs, one column at a time.
+- **Yearbook (Y, or from the journal):** everyone in the cast, grouped into friends and seniors, clubs, faculty and staff, and around campus. Each person unlocks when you walk up to them or they speak to you, and gets a portrait rendered from their own 3D model. Until then they are a silhouette with a hint of where to find them.
 
 The Bully-style systems:
 
 - **Missions and markers:** yellow "!" mission givers, a waypoint beam, an objective tracker with timers, and big MISSION PASSED / FAILED banners.
 - **Time and stats:** a game clock (one game minute per real second) with a daily routine, plus Energy, Food, ₹ and Attendance.
-- **Classes:** lectures at LHC at 9 AM and 2 PM on weekdays, each with a surprise quiz. Missing them drops your attendance below 75%.
+- **Classes:** see Courses above. Missing them drops your attendance; under 75% and IRIS tells your HoD.
 - **Daily life:**
   - meals at your mess at meal times
   - Maggi at Nescafe, Oreo shakes at Nandini, and the night canteen
@@ -146,27 +229,41 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 ## What's in the world
 
 - **OSM geometry, 1:1.** Every road (NH66 as a divided highway with a median), building footprint, landuse area, sports pitch, pool, barrier and mapped tree sits at its real position.
-- **Buildings.** Heights come from `height` or `building:levels` when OSM has them, otherwise from sensible defaults. Façades are matched to photographs of the campus (`src/world/archetypes.ts`, by OSM name):
-  - the Main Building and the old departments: pale-yellow render with continuous concrete sunshade ledges over recessed windows
-  - the old boys' blocks and girls' hostels: cream plaster, brick-red pilasters, Mangalore-tile roofs
-  - the Mega Hostel towers: tan frame, cream panels, small grilled windows, a blue-glass stair core
+- **Buildings.** Heights come from `height` or `building:levels` when OSM has them, otherwise from sensible defaults. Façades are matched to photographs of the campus and NITK's [virtual tour](https://vtour.nitk.ac.in/) (`src/world/archetypes.ts`, by OSM name):
+  - the Main Building and the old departments: khaki-yellow render with continuous concrete sunshade ledges over recessed windows; the Main Building's wings add vertical fins (an egg-crate front)
+  - the old hostel blocks: khaki render, sunshade ledges, louvred windows; tiled roofs only where OSM says pitched
+  - the Mega Hostel towers: four wings round a centre, tan frame, cream panels, small grilled windows, and a full-height blue-glass stair core in each of the four inner corners where the wings meet
   - LHC-A: exposed laterite; the Library, LHC-D, CRF, CIDS and SJA: white render with lavender-grey bands
   - pastel houses with Mangalore-tile hip roofs and black rooftop water tanks, and shopfronts with rolling shutters off campus
 
   Windows light up at night.
-- **Walk-in interiors.** The Main Building (enquiry desk, stair, office corridor), Central Library (stacks, reading tables, issue desk), SJA (stage and seating), Mega Mess (steel tables, serving counter), Night Canteen and LHC-A (classrooms round the courtyard) open up. Walk through the lit front door: the shell and roof cut away and the camera looks down into the room (`src/world/interiors.ts`).
+- **Walk-in interiors.** Fitted out from the virtual tour's inside shots where it has them:
+  - the Main Building lobby: square pillars with dark-wood capitals, teak wainscot, coloured-glass jali over the door, the "Think · Create · Engineer" display, enquiry desk, stair and office corridors
+  - LHC-A: classrooms round the courtyard with maroon pad chairs, whiteboard and projector screen, ceiling fans, grilled windows
+  - the Central Computer Centre, fitted like the Solve lab: workbenches with PCs and kits, maroon office chairs, glass partitions, blue posters, split ACs
+  - Central Library (stacks, reading tables, issue desk), SJA (stage and seating), Mega Mess (steel tables, serving counter) and the Night Canteen
+ Walk through the lit front door: the shell and roof cut away and the camera looks down into the room (`src/world/interiors.ts`).
 - **Landmarks.** These are matched by OSM name or tag, so they land wherever the real map puts them:
   - the lighthouse on its knoll, with a sweeping beam after dusk
   - the Main Building's olive entrance block: glass front between four yellow piers, three yellow arches over the porch, the blue fountains in front
-  - the main gate on NH66: stone piers, security cabin and the curved black-granite trilingual name wall
+  - the main gate on NH66: stone piers, security cabin and the curved black-granite trilingual name wall; inside it, two yellow pavilions with terracotta roofs and a balustrade with yellow ball finials
+  - the front lawns from the gate to the Main Building: red-brick walks, croton beds, Ashoka rows
+  - the SAC amphitheatre: green tiers, red stair flights, lavender stage under a canopy on yellow poles
+  - the U. Srinivas Mallya statue in the gate pavilion, and the institute's name in red on the NH66 frontage wall
+  - the EEE/IT blocks and International Hostel in saturated yellow, with glass stair strips and a green portal porch
+  - the grounds in bare laterite earth (the main grounds, the clay tennis court), grey concrete basketball courts with green-and-yellow seating, and floodlight masts on lit grounds and the pool
   - the square red-and-white lighthouse with its gallery, lantern and sweeping radar
   - Chemical Engineering's curved canopy
   - signage on the Central Library, SJA and Lecture Hall Complex
   - the fountain, the tricolour and water towers
 - **Coast.** The sea polygon is built from the OSM coastline. It has cel-banded shallows, swell lines, breakers and a surf line on the real shore, with sand and a casuarina belt behind it.
-- **Vegetation.** Coconut palms, broadleaf canopy and casuarinas, scattered by land use.
+- **Vegetation.** Coconut palms, broadleaf canopy and casuarinas, scattered by land use. On campus: columnar Ashoka trees, rain-tree avenues arching over the roads, and bare laterite soil in their shade.
+- **Street furniture.** Black-and-white painted kerbs and white globe lamps on campus roads; compound walls with a laterite plinth, jali screen and pillars.
 - **Time of day.** Morning, noon, Arabian-Sea sunset and night, with lit windows, street-lamp pools and stars.
-- **HUD.** A rotating minimap, a full map with click-to-teleport and place search, floating building labels, and a "you are near" banner.
+- **Compound wall.** OSM maps only a few stretches, so the rest follows the campus boundary in the jali-panel style. It opens where a road or path crosses into somewhere you can go (NH66, an underpass, the beach road), with a gate pillar on each side, and skips stretches OSM already walls and any that run through buildings. The map draws the walls as cream lines.
+- **HUD.** A rotating minimap, a full map, floating building labels, and a "you are near" banner.
+- **UI style.** Everything takes its look from NITK's alumni site: white translucent cards with thin navy-tinted borders, navy text, one fresh green accent, and Raleway throughout. Hierarchy comes from size and colour, not weight. The title and loading screens are navy. The full map stays dark in SADAK's style. The tokens live in `src/styles.css`.
+- **Map (M).** Styled after SADAK's map: a dark vector map of the campus only, plus the coast (a band following the beach's shoreline) and the lighthouse knoll, with NH66, its two underpasses, the foot overbridge and the beach road as connectors. Buildings are tinted by kind. Places carry Lucide icons in their category colours (hand-drawn where Lucide has none: hostel, thali, sea, Yakshagana crown). There is a key you can filter by, street names when zoomed in, gold story and teal job markers, and an "Open now" list. Drag to pan, scroll to zoom, click to teleport.
 
 ## Controls
 
@@ -176,6 +273,7 @@ The research behind it (hostels, clubs, fests, lore) and the plan for later chap
 | `E` | talk, interact, get on or off your cycle |
 | `B` | cycle bell (students jump aside) |
 | `J` | journal |
+| `Y` | yearbook |
 | `N` | next music track |
 | drag / double-click | look around / lock the mouse |
 | `←` `→` / wheel | turn / zoom |
@@ -196,8 +294,10 @@ src/
   world/             ground & sea, roads, buildings, landmarks, trees, props, grid
   fx/                toon materials, cel/ink pass, sky, time-of-day presets
   player.ts          walker, cyclist, drone, camera
-  ui/hud.ts          minimap, map, labels, objective blips
-  game/              the game: mission runner (index.ts), chapter1.ts, chapter2.ts,
+  ui/hud.ts          minimap, full map, labels, objective blips
+  ui/mapKit.ts       map style, place kinds
+  ui/icons.ts        Lucide + hand-drawn icons, for HTML and canvas
+  game/              the game: mission runner (index.ts), chapter1.ts, chapter2.ts, jobs.ts,
                      minigames, club stalls, journal, cast, crowd, cycles,
                      rain/beacon/bees, UI, save state,
                      audio (buses), music (sequencer + tracks), ambience
@@ -207,7 +307,16 @@ src/
   world/interiors.ts walk-in ground floors and the cutaway
   world/overrides.ts per-building overrides (public/data/overrides.json)
   world/models.ts    custom .glb models on OSM footprints
+  world/region.ts    the playable region (campus, coast, connectors)
+  world/terrain.ts   elevation, level pads, underpass cuts, the baked heightfield
+  world/displace.ts  lifts static meshes onto the terrain in the vertex shader
+  world/underpass.ts retaining walls, trench floors, culverts
+  world/walls.ts     the generated compound wall and its gates
+  styles.css         page shell: HUD panels, map, title card, loading
+  game/ui.css        game overlays: dialogue, banners, journal, yearbook, quizzes
 scripts/fetch-osm.mjs  snapshot the extract into public/data (also run by CI)
+scripts/fetch-dem.mjs  snapshot the terrain into public/data
+scripts/render-og.mjs  render the link-preview image public/og.png from public/og.svg
 ```
 
 ## Working on the campus
@@ -237,8 +346,12 @@ Drop tracks into `public/music/` and list them in `public/music/manifest.json`:
 
 Moods: `title`, `day`, `rain`, `sunset`, `night`, `mission`.
 
+## Link preview
+
+`public/og.svg` is the Open Graph image: a text-free illustration of the lighthouse beam over the sunset sea with the campus towers behind. `npm run og:render` rasterises it to `public/og.png` (1200 x 630) with headless Chrome; set `CHROME` if the browser isn't at the usual macOS path. `vite.config.ts` adds the Open Graph and Twitter tags pointing at https://nitk-world.vercel.app. Set `VITE_SITE_URL` to point them somewhere else, such as a preview deployment.
+
 ## Credits
 
-Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, ODbL 1.0.
+Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, ODbL 1.0. Elevation: SRTM (NASA/USGS, public domain) and ASTER GDEM (NASA/METI), via OpenTopoData.
 
 The cel pipeline (toon ramp patch, ink/grade pass, painted sky) is ported from SADAK. SADAK adapted it from [sakura-crossing](https://github.com/Kenton-GMI/sakura-crossing), MIT License, © 2026 Kenton Wang.

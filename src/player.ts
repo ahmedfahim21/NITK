@@ -1,13 +1,16 @@
 /**
- * The walker: a student with a backpack, a third-person orbit camera that
- * pulls in rather than clip through buildings, and a drone mode for seeing
- * the campus from above. Movement feel follows SADAK's movement.ts: speed
- * built up and bled off, turns that carve, a jump with hang time.
+ * The walker: you (hero.ts, a rigged first-year animated procedurally), a
+ * third-person orbit camera that pulls in rather than clip through
+ * buildings, and a drone mode for seeing the campus from above. Movement
+ * feel and the chase camera follow SADAK: speed built up and bled off, turns
+ * that carve, a jump with hang time and a landing squash; a camera that sits
+ * off the shoulder, leads the aim into the direction of travel, rolls a
+ * touch into turns and widens with speed.
  */
 import * as THREE from "three";
-import { toon } from "./fx/toon";
 import type { Grid } from "./world/grid";
-import { groundHeight } from "./world/terrain";
+import { bridgeHeight, groundHeight, surfaceAt } from "./world/terrain";
+import { HeroAnimator, makeHero } from "./hero";
 
 const WALK = 4.6;
 const RUN = 9.5;
@@ -139,83 +142,20 @@ export class Input {
   }
 }
 
-export type Look = {
-  skin: number;
-  shirt: number;
-  pants: number;
-  shoe: number;
-  hair: number;
-  /** Backpack colour, or null for none. */
-  bag: number | null;
-  longHair?: boolean;
-};
-
-export const PLAYER_LOOK: Look = { skin: 0xc68863, shirt: 0x2e86de, pants: 0x2d3436, shoe: 0xf5f6fa, hair: 0x1e1a18, bag: 0xd35400 };
-
-export function makeStudent(look: Look = PLAYER_LOOK): { root: THREE.Group; parts: Record<string, THREE.Object3D> } {
-  const root = new THREE.Group();
-  const skin = toon(look.skin);
-  const shirt = toon(look.shirt);
-  const pants = toon(look.pants);
-  const shoe = toon(look.shoe);
-  const hair = toon(look.hair);
-  const bag = toon(look.bag ?? 0);
-
-  const hips = new THREE.Group();
-  hips.position.y = 0.95;
-  root.add(hips);
-  const legs: THREE.Object3D[] = [];
-  for (const s of [-1, 1]) {
-    const hip = new THREE.Group();
-    hip.position.set(s * 0.12, 0, 0);
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.85, 0.18), pants);
-    leg.position.y = -0.43;
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.1, 0.3), shoe);
-    foot.position.set(0, -0.88, 0.05);
-    hip.add(leg, foot);
-    hips.add(hip);
-    legs.push(hip);
-  }
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.62, 0.26), shirt);
-  torso.position.y = 0.33;
-  hips.add(torso);
-  const arms: THREE.Object3D[] = [];
-  for (const s of [-1, 1]) {
-    const sh = new THREE.Group();
-    sh.position.set(s * 0.3, 0.6, 0);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.13), shirt);
-    arm.position.y = -0.24;
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.1), skin);
-    hand.position.y = -0.56;
-    sh.add(arm, hand);
-    hips.add(sh);
-    arms.push(sh);
-  }
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), skin);
-  head.position.y = 0.84;
-  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
-  hairCap.position.y = 0.87;
-  hairCap.rotation.x = -0.25;
-  hips.add(head, hairCap);
-  if (look.longHair) {
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.42, 0.09), hair);
-    tail.position.set(0, 0.66, -0.16);
-    hips.add(tail);
-  }
-  if (look.bag !== null) {
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.44, 0.18), bag);
-    pack.position.set(0, 0.36, -0.22);
-    hips.add(pack);
-  }
-  root.traverse((o) => {
-    if ((o as THREE.Mesh).isMesh) o.castShadow = true;
-  });
-  return { root, parts: { hips, legL: legs[0], legR: legs[1], armL: arms[0], armR: arms[1] } };
-}
-
 export class Player {
   readonly body: THREE.Group;
-  private parts: Record<string, THREE.Object3D>;
+  private anim: HeroAnimator;
+  /** Motion history for the animator and the camera. */
+  private lastSpeed = 0;
+  private lastFacing = 0;
+  private turnRate = 0;
+  private land = 0;
+  private air = 0;
+  private clockT = 0;
+  private lookAim = new THREE.Vector3();
+  private fov = 60;
+  /** Somewhere worth glancing at (a person you're walking up to), or null. */
+  lookAt: { x: number; z: number } | null = null;
   pos = new THREE.Vector3();
   vel = new THREE.Vector3();
   facing = 0;
@@ -227,6 +167,10 @@ export class Player {
   frozen = false;
   /** Extra obstacles (the crowd). */
   blockedExtra: ((x: number, z: number) => boolean) | null = null;
+  /** Somewhere you can't go at your current level (NH66 once it's closed); leaving it is always allowed. */
+  closedAt: ((x: number, z: number, y: number) => boolean) | null = null;
+  /** Set when a move was refused by closedAt, for the game to explain once. */
+  bumpedClosed = false;
   /** 0..1, slows the walker when exhausted. */
   tired = 0;
   /** The cycle being ridden, if any. */
@@ -237,6 +181,8 @@ export class Player {
   private phase = 0;
   private grounded = true;
   private camPos = new THREE.Vector3();
+  /** Cycle top-speed multiplier (the Engineering Mechanics perk, game/courses.ts). */
+  bikeBoost = 1;
   /** Lowest camera pitch on foot. Raised indoors so the camera looks down into the room. */
   minPitch = -0.25;
 
@@ -245,9 +191,9 @@ export class Player {
     private grid: Grid,
     private input: Input
   ) {
-    const s = makeStudent();
-    this.body = s.root;
-    this.parts = s.parts;
+    const hero = makeHero();
+    this.body = hero.root;
+    this.anim = new HeroAnimator(hero.rig);
   }
 
   place(x: number, z: number, facing: number) {
@@ -286,11 +232,6 @@ export class Player {
     this.body.add(cycle);
     this.bikeSpeed = 0;
     this.vel.set(0, 0, 0);
-    const p = this.parts;
-    p.hips.position.set(0, 1.02, -0.18);
-    p.armL.rotation.x = -1.15;
-    p.armR.rotation.x = -1.15;
-    p.hips.rotation.x = 0.28;
   }
 
   /** Steps off; returns the cycle so the caller can park it in the world. */
@@ -299,9 +240,6 @@ export class Player {
     if (!c) return null;
     this.body.remove(c);
     this.riding = null;
-    const p = this.parts;
-    p.hips.position.set(0, 0.95, 0);
-    p.hips.rotation.x = 0;
     // Step to the left of the cycle.
     const lx = this.pos.x + Math.cos(this.facing) * 0.9;
     const lz = this.pos.z - Math.sin(this.facing) * 0.9;
@@ -405,7 +343,8 @@ export class Player {
       }
 
       // Vertical.
-      const gy = groundHeight(this.pos.x, this.pos.z);
+      // The ground, or the culvert floor if you're down in an underpass.
+      const gy = surfaceAt(this.pos.x, this.pos.z, this.pos.y);
       if (this.grounded && inp.hit("Space") && !this.frozen) {
         this.vel.y = JUMP;
         this.grounded = false;
@@ -414,6 +353,8 @@ export class Player {
         this.vel.y -= GRAVITY * (this.vel.y < 0 ? 1.3 : inp.down("Space") ? 0.65 : 1) * dt;
         this.pos.y += this.vel.y * dt;
         if (this.pos.y <= gy) {
+          // The harder the fall, the deeper the knees go.
+          this.land = Math.min(1, Math.abs(this.vel.y) / 9);
           this.pos.y = gy;
           this.vel.y = 0;
           this.grounded = true;
@@ -429,7 +370,8 @@ export class Player {
         const max = (14 - 8 * Math.min(1, sp / RUN)) * dt;
         this.facing = wrap(this.facing + THREE.MathUtils.clamp(turn, -max, max));
       }
-      this.animate(dt, sp);
+      this.motion(dt, sp);
+      this.body.rotation.z *= Math.exp(-dt * 8);
     }
 
     this.body.position.copy(this.pos);
@@ -438,7 +380,7 @@ export class Player {
   }
 
   private ride(dt: number, dx: number, dz: number, l: number, run: boolean) {
-    const top = run ? 11.5 : 8;
+    const top = (run ? 11.5 : 8) * this.bikeBoost;
     // Steer toward the input direction at a rate that tightens with speed.
     if (l > 0.05) {
       const want = Math.atan2(dx, dz);
@@ -473,24 +415,40 @@ export class Player {
       this.bikeSpeed = 0;
     }
     this.vel.set(vx, 0, vz);
-    this.pos.y = groundHeight(this.pos.x, this.pos.z);
+    this.pos.y = surfaceAt(this.pos.x, this.pos.z, this.pos.y);
     // Pedal and wheel animation.
     const c = this.riding!;
     const spin = (this.bikeSpeed * dt) / 0.34;
     for (const w of (c.userData.wheels as THREE.Object3D[]) ?? []) w.rotation.x += spin;
-    this.phase += spin;
-    const p = this.parts;
-    const pedal = Math.sin(this.phase) * 0.55;
-    p.legL.rotation.x = -1.0 + pedal;
-    p.legR.rotation.x = -1.0 - pedal;
-    // Lean into turns.
-    c.rotation.z = 0;
-    this.body.rotation.z = 0;
+    // One crank turn per ~2 wheel turns; coasting leaves the pedals still.
+    this.phase += spin * 0.5;
+    this.motion(dt, Math.abs(this.bikeSpeed), this.phase);
+    // Lean the whole bike into turns, harder the faster you go.
+    const lean = THREE.MathUtils.clamp(-this.turnRate * Math.abs(this.bikeSpeed) * 0.035, -0.35, 0.35);
+    this.body.rotation.z += (lean - this.body.rotation.z) * Math.min(1, dt * 6);
   }
 
   private free(x: number, z: number, radius = RADIUS) {
     const g = this.grid;
+    // Up on an overbridge, what's on the ground below doesn't block you; the
+    // edges do (stepping off is a drop, refused below).
+    const here = this.drone ? null : bridgeHeight(this.pos.x, this.pos.z);
+    const aloft = here !== null && Math.abs(here - this.pos.y) < 0.6 && this.pos.y > groundHeight(this.pos.x, this.pos.z) + 0.6;
+    if (aloft) {
+      const b = bridgeHeight(x, z);
+      return b !== null && Math.abs(b - this.pos.y) <= 1;
+    }
     if (g.blocked(x, z)) return false;
+    if (!this.drone) {
+      // No stepping up or dropping more than a metre at once: off an overbridge,
+      // out of a culvert's side onto the road above, over a trench wall.
+      const next = surfaceAt(x, z, this.pos.y);
+      if (this.grounded && Math.abs(next - this.pos.y) > 1) return false;
+      if (this.closedAt?.(x, z, next) && !this.closedAt(this.pos.x, this.pos.z, this.pos.y)) {
+        this.bumpedClosed = true;
+        return false;
+      }
+    }
     // People only block if you're not already tangled up with them (never trap the player).
     if (this.blockedExtra?.(x, z) && !this.blockedExtra(this.pos.x, this.pos.z)) return false;
     for (let k = 0; k < 8; k++) {
@@ -500,23 +458,34 @@ export class Player {
     return true;
   }
 
-  private animate(dt: number, sp: number) {
-    const p = this.parts;
-    const amp = Math.min(1, sp / WALK) * (sp > WALK + 1 ? 0.9 : 0.6);
-    this.phase += dt * (3 + sp * 1.25);
-    const s = Math.sin(this.phase) * amp;
-    p.legL.rotation.x = s;
-    p.legR.rotation.x = -s;
-    p.armL.rotation.x = -s * 0.8;
-    p.armR.rotation.x = s * 0.8;
-    p.hips.position.y = 0.95 + Math.abs(Math.cos(this.phase)) * 0.06 * amp;
-    p.hips.rotation.x = sp > WALK + 1 ? 0.12 : 0.03 * amp;
-    if (!this.grounded) {
-      p.legL.rotation.x = 0.5;
-      p.legR.rotation.x = -0.3;
-      p.armL.rotation.x = -2.4;
-      p.armR.rotation.x = -2.4;
+  /** Feed the animator: speed, acceleration, turn rate, air, landing squash, what to glance at. */
+  private motion(dt: number, sp: number, pedal?: number) {
+    const d = Math.max(dt, 1e-4);
+    const accel = (sp - this.lastSpeed) / d;
+    this.lastSpeed = sp;
+    const turn = wrap(this.facing - this.lastFacing) / d;
+    this.lastFacing = this.facing;
+    this.turnRate += (turn - this.turnRate) * Math.min(1, dt * 10);
+    this.air += ((this.grounded ? 0 : 1) - this.air) * Math.min(1, dt * (this.grounded ? 9 : 18));
+    this.land = Math.max(0, this.land - dt * 3.5);
+    this.clockT += dt;
+    let look = 0;
+    if (this.lookAt) {
+      const bearing = wrap(Math.atan2(this.lookAt.x - this.pos.x, this.lookAt.z - this.pos.z) - this.facing);
+      if (Math.abs(bearing) < 1.6) look = THREE.MathUtils.clamp(bearing, -1.1, 1.1);
     }
+    this.anim.update({
+      dt,
+      t: this.clockT,
+      speed: sp,
+      accel: THREE.MathUtils.clamp(accel, -30, 30),
+      turn: this.turnRate,
+      air: this.air,
+      vy: this.vel.y,
+      crouch: this.land,
+      look,
+      pedal,
+    });
   }
 
   private updateCamera(dt: number) {
@@ -531,18 +500,44 @@ export class Player {
         const x = target.x + dir.x * s;
         const z = target.z + dir.z * s;
         const y = target.y + dir.y * s;
-        if (this.grid.topAt(x, z) > y - 0.3 || y < groundHeight(x, z) + 0.3) {
+        // Building tops in the grid are heights above their pad.
+        // Down in an underpass, the floor there (not the deck overhead) is the ground.
+        const g = surfaceAt(x, z, y);
+        const top = this.grid.topAt(x, z);
+        if ((top > 0 && g + top > y - 0.3) || y < g + 0.3) {
           dist = Math.max(1.2, s - 0.5);
           break;
         }
       }
     }
     const want = target.clone().addScaledVector(dir, dist);
-    if (this.camPos.lengthSq() === 0) this.camPos.copy(want);
+    // Off the right shoulder, so what you walk toward isn't hidden behind your head.
+    if (!this.drone && dist > 2.5) {
+      const shoulder = 0.55 * Math.min(1, dist / 7);
+      want.x += -Math.cos(this.yaw) * shoulder;
+      want.z += Math.sin(this.yaw) * shoulder;
+    }
+    const first = this.camPos.lengthSq() === 0;
+    if (first) this.camPos.copy(want);
     // Snap in fast, ease out slowly, so walls never show through.
-    const k = dist < this.camPos.distanceTo(target) ? 1 : 1 - Math.exp(-dt * 6);
+    const k = dist < this.camPos.distanceTo(target) ? 1 : 1 - Math.exp(-dt * 7);
     this.camPos.lerp(want, k);
     this.camera.position.copy(this.camPos);
-    this.camera.lookAt(target);
+    // Aim leads into the direction of travel and is damped too: a lagging
+    // body with an instant aim reads as swimmy but jerky.
+    const lead = this.drone ? 0 : 0.35;
+    const aim = target.clone().addScaledVector(this.vel, lead);
+    if (first) this.lookAim.copy(aim);
+    this.lookAim.lerp(aim, 1 - Math.exp(-dt * 8));
+    this.camera.lookAt(this.lookAim);
+    // Roll a touch into turns, and widen the view with speed: most of the sense of pace.
+    const speed01 = THREE.MathUtils.clamp(this.speed / RUN, 0, 1.2);
+    if (!this.drone) this.camera.rotateZ(THREE.MathUtils.clamp(-this.turnRate * 0.012 * speed01, -0.04, 0.04));
+    const fov = this.drone ? 60 : 60 + speed01 * 8;
+    if (Math.abs(fov - this.fov) > 0.01) {
+      this.fov += (fov - this.fov) * Math.min(1, dt * 4);
+      this.camera.fov = this.fov;
+      this.camera.updateProjectionMatrix();
+    }
   }
 }

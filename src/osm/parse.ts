@@ -231,7 +231,10 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
     const a: Area = { id, outer: clipped, holes: holes.map((h) => clipPolygon(h, bounds)).filter((h) => h.length >= 3), kind };
     if (t.name) a.name = t.name;
     if (t.sport) a.sport = t.sport;
-    if (t.amenity) a.tags = { amenity: t.amenity, ...(t["theatre:type"] ? { "theatre:type": t["theatre:type"] } : {}) };
+    // Keep the few raw tags the world reads: landmark matching, ground surfaces, floodlights.
+    const kept: Tags = {};
+    for (const k of ["amenity", "theatre:type", "surface", "lit"]) if (t[k]) kept[k] = t[k];
+    if (Object.keys(kept).length) a.tags = kept;
     if (/coconut|palm|areca/i.test(t.trees ?? "")) a.leaf = "palm";
     else if (t.leaf_type === "needleleaved") a.leaf = "needle";
     areas.push(a);
@@ -287,6 +290,7 @@ export function parseOsm(json: OsmJson, source: MapSource): CampusMap {
           oneway,
           rank: hw.rank,
           bridge: t.bridge === "yes",
+          tunnel: t.tunnel === "yes",
         });
       }
       return;

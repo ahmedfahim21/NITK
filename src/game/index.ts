@@ -17,23 +17,33 @@ import { Places, type PlaceKey, type Spot } from "./places";
 import { Crowd, CHATTER, BUMP_LINES } from "./crowd";
 import { Riders, buildRacks, makeCycle } from "./cycles";
 import { Beacon, Rain, Swarm } from "./fx";
-import { Cast, type CastId } from "./cast";
+import { Cast, CAST, type CastId } from "./cast";
 import { sfx, setRainSound, unlockAudio } from "./audio";
 import { CHAPTER1, type Mission } from "./chapter1";
 import { CHAPTER2 } from "./chapter2";
+import { JOBS } from "./jobs";
 import { buildStalls, CLUBS, type StallRig } from "./stalls";
 import { openJournal } from "./journal";
-import { QUIZ } from "./quiz";
+import { openYearbook } from "./yearbook";
+import { attend, classNow, closeMissed, nextClassText, perks } from "./courses";
+import { CURFEW_WARNING, PASS_OUT, WAKE, afterCurfew, openNow } from "./schedule";
 import { wait } from "./util";
 import { Ambience } from "./ambience";
 import { Festivals } from "./festivals";
 import type { Season } from "./seasons";
 import type { Music, Mood } from "./music";
 import { ROAD } from "../world/grid";
+import { groundHeight, onHighway } from "../world/terrain";
 
 type Target = Spot | PlaceKey | CastId;
 
-export const MISSIONS: Mission[] = [...CHAPTER1, ...CHAPTER2];
+export const MISSIONS: Mission[] = [...CHAPTER1, ...CHAPTER2, ...JOBS];
+
+const CAST_BY_NAME = new Map((Object.entries(CAST) as [CastId, (typeof CAST)[CastId]][]).map(([id, d]) => [d.name, id]));
+
+/** Story missions on the map are gold; campus jobs are teal. */
+export const STORY_COLOUR = "#f2b84b";
+export const JOB_COLOUR = "#3ec7b0";
 
 export const CHAPTERS: { name: string; next: string }[] = [
   { name: "Chapter 1 · Srinivasnagar", next: "Chapter 2: Recruitments" },
@@ -92,6 +102,7 @@ export class Game {
   private saveTimer = 0;
   private chatTimer = 3;
   private bumpCooldown = 0;
+  private highwayHintT = 0;
   private bubbles: { el: HTMLDivElement; i: number; x: number; z: number; ttl: number }[] = [];
   private beeTimer = 0;
   cutscene = false;
@@ -101,6 +112,10 @@ export class Game {
   readonly festivals: Festivals;
   private lastDay = -1;
   private lastHour = -1;
+  private lastQuarter = -1;
+  /** Real seconds spent outside the hostel after curfew; the patrol finds you. */
+  private curfewT = 0;
+  private curfewWarned = -1;
   private season: Season | null = null;
   /** Missions that script the weather hold it until they end. */
   private weatherLock = false;
@@ -123,14 +138,15 @@ export class Game {
     this.explore = hooks.mode === "explore";
     this.ambience = new Ambience(map);
     if (this.explore) this.ui.showStats(false);
-    if (hooks.music) hooks.music.onTrack = (title) => this.ui.toast(`♪ ${title}`, "#6c5ce7");
+    if (hooks.music) hooks.music.onTrack = (title) => this.ui.toast(`Now playing · ${title}`, "#9b8cff");
     this.places = new Places(map, world);
 
     const hangouts = (["nescafe", "nandini", "lhc", "megaMess", "library"] as PlaceKey[]).map((k) => {
       const s = this.places.get(k);
       return [s.x, s.z] as [number, number];
     });
-    this.crowd = new Crowd(map, world.grid, hangouts, 160);
+    // A campus, not a bazaar: a few dozen walkers plus the knots at the hangouts.
+    this.crowd = new Crowd(map, world.grid, hangouts, 70);
     this.riders = new Riders(map, 6);
     const racks = (["karavali", "aravali", "lhc", "library"] as PlaceKey[]).map((k) => {
       const s = this.places.get(k);
@@ -143,9 +159,18 @@ export class Game {
     );
     this.group.add(this.festivals.group);
     player.blockedExtra = (x, z) => this.crowd.blocked(x, z) || this.cast.blocked(x, z);
+    // After the bus drops you off, NH66 is off limits on foot: cross it by an
+    // underpass or the footbridge. (Closed at road level only: the culverts
+    // under it and the bridge over it stay open.)
+    player.closedAt = (x, z, y) => this.nh66Closed && onHighway(x, z) && Math.abs(y - groundHeight(x, z)) < 2;
     this.registerInteractables();
     window.addEventListener("pointerdown", unlockAudio);
     window.addEventListener("keydown", unlockAudio);
+  }
+
+  /** NH66 closes to walkers once the intro (getting off the bus) is done. */
+  get nh66Closed(): boolean {
+    return !this.explore && this.state.completed.has("ch1-arrival");
   }
 
   /* ================= mission API ================= */
@@ -173,7 +198,20 @@ export class Game {
   }
 
   say(lines: [string, string][]) {
+    // Whoever speaks to you (in person, on the phone, by text) goes in the yearbook.
+    for (const [who] of lines) {
+      const name = who.replace(/\s*\(.*\)\s*$/, "");
+      const id = CAST_BY_NAME.get(name);
+      if (id) this.meet(id);
+    }
     return this.ui.say(lines);
+  }
+
+  /** Adds someone to the yearbook, once. */
+  meet(id: CastId) {
+    if (this.explore || this.state.flags[`met:${id}`]) return;
+    this.state.flags[`met:${id}`] = this.state.day;
+    this.ui.toast(`Yearbook · ${CAST[id].name}`, "#1d3557");
   }
 
   choose(who: string, q: string, options: string[]) {
@@ -205,7 +243,7 @@ export class Game {
   }
 
   eat(food: number, energy = 0) {
-    this.state.food = Math.min(100, this.state.food + food);
+    this.state.food = Math.min(100, this.state.food + food * perks.food(this.state));
     this.state.energy = Math.min(100, this.state.energy + energy);
   }
 
@@ -273,6 +311,53 @@ export class Game {
     this.state.flags.cycleZ = z;
   }
 
+  /** A small pickup in the world for missions (litter, parcels, garlands). Remove with dropProp(). */
+  prop(x: number, z: number, kind: "bottle" | "wrapper" | "bag" | "parcel" | "garland" | "sweets" | "lights"): THREE.Object3D {
+    const o = new THREE.Group();
+    const mat = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+    if (kind === "bottle") {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.32, 8), mat(0x6fb7e8));
+      m.rotation.z = Math.PI / 2;
+      m.position.y = 0.1;
+      o.add(m);
+    } else if (kind === "wrapper") {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.18), mat(0xd6392b));
+      m.position.y = 0.03;
+      o.add(m);
+    } else if (kind === "bag") {
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 0), mat(0xf2f2f2));
+      m.position.y = 0.15;
+      o.add(m);
+    } else if (kind === "parcel" || kind === "sweets") {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.35), mat(kind === "parcel" ? 0xb08050 : 0xf2c418));
+      m.position.y = 0.15;
+      o.add(m);
+    } else if (kind === "garland") {
+      const m = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.08, 6, 16), mat(0xff9f1c));
+      m.rotation.x = Math.PI / 2;
+      m.position.y = 0.1;
+      o.add(m);
+    } else {
+      const m = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.04, 6, 14), mat(0x3d3d3d));
+      m.rotation.x = Math.PI / 2;
+      m.position.y = 0.06;
+      o.add(m);
+      for (let i = 0; i < 6; i++) {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), new THREE.MeshBasicMaterial({ color: [0xff4d4d, 0x4dff88, 0x4da6ff][i % 3] }));
+        b.position.set(Math.cos(i) * 0.22, 0.08, Math.sin(i) * 0.22);
+        o.add(b);
+      }
+    }
+    o.position.set(x, 0, z);
+    o.rotation.y = (x * 7 + z * 13) % 6.28;
+    this.group.add(o);
+    return o;
+  }
+
+  dropProp(o: THREE.Object3D) {
+    this.group.remove(o);
+  }
+
   /** Point the camera from behind the player toward a spot. */
   frame(face: number, pitch = 0.12, dist = 7) {
     this.player.facing = face;
@@ -283,17 +368,40 @@ export class Game {
 
   /* ================= missions ================= */
 
-  private available(): Mission[] {
+  /** Missions unlocked by what you've done (their `requires` and `needs`), whatever the time. */
+  available(): Mission[] {
     if (this.active || this.explore) return [];
-    return MISSIONS.filter((m) => !this.state.completed.has(m.id) && m.requires.every((r) => this.state.completed.has(r)));
+    const st = this.state;
+    const doneIn = (chapter: string) => MISSIONS.filter((q) => q.chapter === chapter && st.completed.has(q.id)).length;
+    return MISSIONS.filter(
+      (m) =>
+        !st.completed.has(m.id) &&
+        !(m.repeat && st.flags[`job:${m.id}`] === st.day) &&
+        m.requires.every((r) => st.completed.has(r)) &&
+        doneIn(m.chapter) >= (m.needs ?? 0)
+    );
   }
+
+  /** Unlocked and within the mission's hours: the giver is out. */
+  private openMissions(): Mission[] {
+    return this.available().filter((m) => openNow(this.state, m));
+  }
+
+  /** Which mission each giver out on campus is offering, for the map's markers. */
+  private offering = new Map<CastId, Mission>();
 
   /** Put givers of available missions in place with their "!" markers. */
   refreshGivers() {
     for (const c of this.cast.chars.values()) c.marker.visible = false;
+    this.offering.clear();
     if (this.active) return;
-    for (const m of this.available()) {
-      if (!m.giver) continue;
+    // A giver with several open missions stands where the first one is,
+    // which is also the one talking to them starts.
+    const placed = new Set<string>();
+    for (const m of this.openMissions()) {
+      if (!m.giver || placed.has(m.giver)) continue;
+      placed.add(m.giver);
+      this.offering.set(m.giver, m);
       const c = this.put(m.giver, m.where!, 1.5, 1.5);
       c.marker.visible = true;
     }
@@ -318,7 +426,16 @@ export class Game {
     this.cutscene = false;
     this.active = null;
     this.weatherLock = false;
-    if (ok) {
+    if (ok && m.repeat) {
+      // A job: paid, and back tomorrow.
+      this.state.flags[`job:${m.id}`] = this.state.day;
+      if (m.reward?.money) this.state.money += m.reward.money;
+      if (m.reward?.rep) for (const [f, n] of Object.entries(m.reward.rep)) this.state.addRep(f as Faction, n!);
+      sfx.missionPassed();
+      this.ui.showBanner("JOB DONE", m.reward?.money ? `+₹${m.reward.money}` : "", "pass", 2600);
+      await wait(2800);
+      await m.after?.(this);
+    } else if (ok) {
       this.state.completed.add(m.id);
       if (m.reward?.money) this.state.money += m.reward.money;
       if (m.reward?.rep) for (const [f, n] of Object.entries(m.reward.rep)) this.state.addRep(f as Faction, n!);
@@ -330,7 +447,7 @@ export class Game {
       this.ui.showBanner("MISSION PASSED", bits.join("  ·  "), "pass", 3600);
       await wait(3800);
       await m.after?.(this);
-      const chapter = MISSIONS.filter((q) => q.chapter === m.chapter);
+      const chapter = MISSIONS.filter((q) => q.chapter === m.chapter && !q.repeat);
       if (chapter.every((q) => this.state.completed.has(q.id))) {
         const meta = CHAPTERS.find((c) => c.name === m.chapter);
         sfx.chapter();
@@ -351,6 +468,7 @@ export class Game {
 
   /** New game or continue. `?skipto=<missionId>` starts a new game just before that mission (for development). */
   async begin(fresh: boolean, savedPos?: [number, number]) {
+    this.applyPerks();
     if (this.explore) {
       const g = this.places.get("mainGate");
       const [x, z] = this.world.grid.nearestFree(g.x + 8, g.z + 8);
@@ -503,24 +621,19 @@ export class Game {
       },
     });
 
-    // Classes at LHC, once IRIS is set up.
+    // Classes: be in the room when your course is on (courses.ts), once IRIS has you registered.
     this.interactables.push({
-      label: () => `Attend class (${this.currentClass()?.name ?? ""})`,
-      at: () => P.get("lhc"),
-      r: 5,
-      enabled: () => !!st.flags.iris && !!this.currentClass() && !this.active && st.flags.attended !== this.currentClass()!.key,
-      act: async () => {
-        const c = this.currentClass()!;
-        st.flags.attended = c.key;
-        await this.ui.fadeOut(500);
-        st.minutes = c.start + 55;
-        await this.ui.fadeIn(400);
-        const qs = pickQuiz(2);
-        const right = await this.ui.quiz(`${c.name} — surprise quiz`, qs);
-        st.classesAttended++;
-        st.flags.prep = Number(st.flags.prep ?? 0) + right;
-        this.ui.toast(`Attended ${c.name} · quiz ${right}/2`, "#1d3557");
+      label: () => {
+        const c = classNow(st);
+        return c ? `Attend ${c.course.id} ${c.course.title}` : "";
       },
+      at: () => {
+        const c = classNow(st);
+        return c ? P.get(c.course.room) : null;
+      },
+      r: 6,
+      enabled: () => !!st.flags.iris && !this.active && !!classNow(st) && st.flags.attended !== classNow(st)!.key,
+      act: () => attend(this, classNow(st)!),
     });
 
     // The founder's statue, from the real map.
@@ -573,47 +686,95 @@ export class Game {
     return null;
   }
 
-  private currentClass(): { key: string; start: number; name: string } | null {
-    const st = this.state;
-    if (st.weekday >= 5) return null;
-    const slots = [
-      { start: 9 * 60, name: "Engineering Mechanics" },
-      { start: 14 * 60, name: "Programming in C" },
-    ];
-    for (const s of slots) {
-      if (st.minutes >= s.start - 15 && st.minutes <= s.start + 10) return { key: `${st.day}-${s.start}`, ...s };
-    }
-    return null;
-  }
-
   private nextClassText(): string | undefined {
-    const st = this.state;
-    if (!st.flags.iris) return undefined;
-    const c = this.currentClass();
-    if (c && st.flags.attended !== c.key) return `▶ ${c.name} at LHC — now!`;
-    if (st.weekday >= 5) return "Weekend. No classes.";
-    const next = [9 * 60, 14 * 60].find((s) => s > st.minutes);
-    if (next === undefined) return "No more classes today.";
-    const hh = Math.floor(next / 60);
-    return `Next class ${((hh + 11) % 12) + 1}:00 ${hh < 12 ? "AM" : "PM"} at LHC`;
+    return this.state.flags.iris ? nextClassText(this.state) : undefined;
   }
 
-  /** Close attendance on a class window once it passes. */
+  /** Close attendance on class windows once they pass. */
   private tickClasses() {
     const st = this.state;
-    if (!st.flags.iris || st.weekday >= 5) return;
-    for (const start of [9 * 60, 14 * 60]) {
-      const key = `${st.day}-${start}`;
-      if (st.minutes > start + 10 && st.flags[`held-${key}`] === undefined && st.minutes < start + 180) {
-        st.flags[`held-${key}`] = true;
-        st.classesHeld++;
-        if (st.flags.attended !== key) {
-          this.ui.toast("Missed a class. Attendance drops.", "#c0392b");
-          if (st.attendance < 75) this.ui.toast("Attendance under 75%!", "#c0392b");
-        }
-      }
+    if (!st.flags.iris) return;
+    for (const c of closeMissed(st)) {
+      this.ui.toast(`Missed ${c.id} ${c.title}. Attendance drops.`, "#c0392b");
+      if (st.attendance < 75) this.ui.toast("Attendance under 75%!", "#c0392b");
     }
   }
+
+  /** Your own block: where curfew means you should be. */
+  private home() {
+    return this.places.get((this.state.flags.mess as PlaceKey | undefined) === "sahyadri" ? "sahyadri" : "karavali");
+  }
+
+  /**
+   * Curfew, Bully-style: a warning at 10:30, the warden's patrol after 11
+   * (stay out too long and you're fined and marched back), and at 2 AM you
+   * pass out wherever you are and wake up in your room, poorer.
+   */
+  private tickCurfew(dt: number) {
+    const st = this.state;
+    if (!st.completed.has("ch1-arrival")) return;
+    const home = this.home();
+    const inside = Math.hypot(this.player.pos.x - home.x, this.player.pos.z - home.z) < 30;
+    if (st.minutes >= CURFEW_WARNING && st.minutes < CURFEW_WARNING + 5 && this.curfewWarned !== st.day && !inside) {
+      this.curfewWarned = st.day;
+      this.ui.toast("Curfew at 11 PM. Head back to your hostel.", "#b85c3e");
+    }
+    if (st.minutes >= PASS_OUT && st.minutes < 5 * 60) {
+      void this.passOut(inside);
+      return;
+    }
+    if (!afterCurfew(st.minutes) || inside) {
+      this.curfewT = 0;
+      return;
+    }
+    this.curfewT += dt;
+    if (this.curfewT > 25) {
+      this.curfewT = 0;
+      void this.caughtAfterCurfew();
+    }
+  }
+
+  private async caughtAfterCurfew() {
+    this.cutscene = true;
+    const fine = Math.min(100, Math.max(0, Math.round(this.state.money)));
+    await this.say([
+      ["Warden Rao", "Torch in your face. 'Out after curfew? In a monsoon? Name, block, room.'"],
+      ["Warden Rao", fine ? `₹${fine} fine, and you walk back with me. Now.` : "No money either. Then you walk back with me, and you polish the NCC boots on Saturday."],
+    ]);
+    if (fine) this.money(-fine, "Curfew fine");
+    this.rep("Seniors", -2);
+    await this.ui.fadeOut(600);
+    const h = this.home();
+    this.player.place(h.x, h.z, 0);
+    await this.ui.fadeIn(600);
+    this.cutscene = false;
+  }
+
+  private passing = false;
+  private async passOut(inside: boolean) {
+    if (this.passing) return;
+    this.passing = true;
+    const st = this.state;
+    this.ui.showBanner("PASSED OUT", "It's 2 AM. Your body has opinions.", "fail", 2600);
+    await this.ui.fadeOut(1200);
+    const lost = inside ? 0 : Math.min(80, Math.round(st.money));
+    st.advanceTo(WAKE + 60);
+    st.energy = 60;
+    st.food = Math.max(10, st.food - 30);
+    const h = this.home();
+    this.player.place(h.x, h.z, 0);
+    this.save();
+    await this.ui.fadeIn(1000);
+    if (lost) this.money(-lost, "Lost somewhere last night");
+    this.ui.showBanner(st.dateText(), inside ? "You slept in your clothes." : "Someone from your block carried you back.", "chapter", 2600);
+    this.passing = false;
+  }
+
+  /** Course perks that live on other objects (the cycle). The rest are read live. */
+  applyPerks() {
+    this.player.bikeBoost = perks.cycle(this.state);
+  }
+
 
   /* ================= per frame ================= */
 
@@ -626,13 +787,18 @@ export class Game {
 
     // Clock.
     const holding = ui.busy || this.cutscene;
+    // Free roaming runs the clock at 2 game minutes a second (a day in about
+    // 12 minutes); a mission slows it to 1 so its deadlines stay fair.
+    st.timeScale = this.active ? 1 : 2;
     if (!holding) st.minutes += dt * st.timeScale;
     if (st.minutes >= 1440) {
       st.minutes -= 1440;
       st.day++;
     }
-    // A new day: the season, and whatever festival is on.
-    if (st.day !== this.lastDay) {
+    // Festivals the story has switched on (cheap when nothing changed).
+    for (const name of this.festivals.update(st.festivals)) this.ui.toast(`${name} on campus`, "#b85c3e");
+    // A new day, or a new season from the chapter.
+    if (st.day !== this.lastDay || st.season !== this.season) {
       this.lastDay = st.day;
       const season = st.season;
       if (season !== this.season) {
@@ -643,9 +809,29 @@ export class Game {
         this.period = null;
         if (changed || this.explore) this.ui.showBanner(season.name.toUpperCase(), season.blurb, "chapter", 4200);
       }
-      for (const name of this.festivals.update(st.day)) this.ui.toast(`🎉 ${name} on campus`, "#b85c3e");
+      // C programming pays: seniors send their segfaults your way.
+      const gigs = perks.income(st);
+      if (gigs && !this.explore && st.flags.lastGigDay !== st.day && st.flags.lastGigDay !== undefined) this.money(gigs, "Debugging gigs for seniors");
+      st.flags.lastGigDay = st.day;
     }
     // The weather, rolled every game hour from the season's odds.
+    // Givers come and go with their missions' hours: check every quarter hour.
+    const quarter = Math.floor(st.minutes / 15) + st.day * 96;
+    if (quarter !== this.lastQuarter) {
+      this.lastQuarter = quarter;
+      if (!this.active && !this.explore) this.refreshGivers();
+    }
+    if (!this.explore && !this.active && !this.cutscene) this.tickCurfew(dt);
+    // The NH66 gates stand open for the intro and swing shut once you're in.
+    this.world.setGatesClosed(this.nh66Closed);
+    this.highwayHintT -= dt;
+    if (this.player.bumpedClosed) {
+      this.player.bumpedClosed = false;
+      if (this.highwayHintT <= 0) {
+        this.highwayHintT = 12;
+        this.ui.toast("NH66 is no place to walk. Take an underpass or the footbridge.", "#c0392b");
+      }
+    }
     const hourNow = Math.floor(st.minutes / 60) + st.day * 24;
     if (hourNow !== this.lastHour) {
       const first = this.lastHour < 0;
@@ -691,8 +877,9 @@ export class Game {
     // Body.
     if (!holding && !this.explore) {
       const running = p.speed > 5 && !p.riding;
-      st.energy -= dt * (0.07 * st.timeScale + (running ? 0.35 : 0)) * (st.food < 10 ? 2 : 1);
-      st.food -= dt * 0.09 * st.timeScale;
+      const drain = perks.drain(st);
+      st.energy -= dt * (0.07 * st.timeScale + (running ? 0.35 : 0)) * (st.food < 10 ? 2 : 1) * drain;
+      st.food -= dt * 0.09 * st.timeScale * drain;
       st.energy = Math.max(0, Math.min(100, st.energy));
       st.food = Math.max(0, Math.min(100, st.food));
     }
@@ -719,7 +906,8 @@ export class Game {
       let timerShown = nav.timer;
       if (nav.clockBy !== undefined) timerShown = Math.max(0, nav.clockBy - st.minutes) / Math.max(0.01, st.timeScale);
       ui.setObjective(this.active?.title ?? "", `${nav.objective} <span style="opacity:.6">(${Math.round(bd)} m)</span>`, timerShown);
-      this.hud.markers = tgts.map((t) => ({ x: t.x, z: t.z, color: "#ffd23f" }));
+      const act = this.active;
+      this.hud.markers = tgts.map((t) => ({ x: t.x, z: t.z, color: act?.repeat ? JOB_COLOUR : STORY_COLOUR, icon: act?.icon ?? "pin", label: ("name" in t && typeof t.name === "string" && t.name) || nav.objective, objective: true }));
       const done = (hit: number) => {
         this.nav = null;
         this.beacon.set(null);
@@ -733,16 +921,37 @@ export class Game {
       this.beacon.set(null);
       if (!this.active) {
         ui.setObjective(null);
-        this.hud.markers = [...this.cast.chars.values()].filter((c) => c.marker.visible).map((c) => ({ x: c.x, z: c.z, color: "#ffd23f" }));
+        this.hud.markers = [...this.cast.chars.entries()]
+          .filter(([, c]) => c.marker.visible)
+          .map(([id, c]) => {
+            const m = this.offering.get(id);
+            return { x: c.x, z: c.z, color: m?.repeat ? JOB_COLOUR : STORY_COLOUR, icon: m?.icon ?? "star", label: m ? `${m.title} · ${CAST[id].name}` : CAST[id].name };
+          });
       } else this.hud.markers = [];
     }
+
+    // Glance at whoever you're walking up to.
+    let near: { x: number; z: number } | null = null;
+    let nd = 6;
+    for (const [id, c] of this.cast.chars) {
+      if (c.root.visible && !this.cutscene && Math.hypot(c.x - p.pos.x, c.z - p.pos.z) < 3.5) this.meet(id);
+    }
+    for (const c of [...this.cast.chars.values(), ...this.cast.extras]) {
+      if (!c.root.visible) continue;
+      const d = Math.hypot(c.x - p.pos.x, c.z - p.pos.z);
+      if (d < nd && d > 0.6) {
+        nd = d;
+        near = { x: c.x, z: c.z };
+      }
+    }
+    p.lookAt = near;
 
     // Interactions: mission givers first, then everything else.
     let prompt: string | null = null;
     let action: (() => void | Promise<void>) | null = null;
     if (!holding && !p.drone) {
       if (!this.active) {
-        for (const m of this.available()) {
+        for (const m of this.openMissions()) {
           if (!m.giver) continue;
           const c = this.cast.get(m.giver);
           if (!c.root.visible) continue;
@@ -775,6 +984,7 @@ export class Game {
     ui.setPrompt(prompt);
     if (action && inp.hit("KeyE") && performance.now() - ui.lastClosed > 350) void action();
     if (inp.hit("KeyJ") && !holding) void openJournal(this);
+    if (inp.hit("KeyY") && !holding) void openYearbook(this);
     if (p.riding && inp.hit("KeyB")) {
       sfx.bell();
       for (const n of this.crowd.near(p.pos.x, p.pos.z, 7)) this.crowd.startle(n.i, p.pos.x, p.pos.z);
@@ -893,10 +1103,3 @@ export class Game {
   }
 }
 
-
-function pickQuiz(n: number) {
-  const pool = [...QUIZ];
-  const out = [];
-  for (let i = 0; i < n && pool.length; i++) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-  return out;
-}

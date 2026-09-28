@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { loadCampus } from "./osm/load";
 import { buildWorld } from "./world";
+import { cuts, floorHeight, groundHeight, loadDem } from "./world/terrain";
 import { PRESETS, TIME_ORDER, type TimeOfDay } from "./fx/presets";
 import { shadowTint } from "./fx/toon";
 import { RenderPipeline, type Quality } from "./fx/render";
@@ -14,9 +15,11 @@ import { Music } from "./game/music";
 import { mix, setMix, unlockAudio } from "./game/audio";
 import { applyOverrides, loadOverrides } from "./world/overrides";
 import { applyArchetypes } from "./world/archetypes";
-import { SEASONS, SEASON_SAMPLE_DAY, seasonalPreset, type Season, type SeasonId } from "./game/seasons";
+import { SEASONS, seasonalPreset, type Season, type SeasonId } from "./game/seasons";
 import type { Preset } from "./fx/presets";
 import { STORY_MODE } from "./flags";
+import { afterCurfew, CURFEW } from "./game/schedule";
+import { AFTERNOON, MORNING, classesStarted } from "./game/courses";
 
 /** The monsoon version of a preset: grey sky, weak sun, thick haze. */
 function rainy(p: Preset): Preset {
@@ -51,6 +54,8 @@ async function main() {
   }
 
   const map = await loadCampus(progress);
+  progress("Reading the lie of the land…");
+  await loadDem();
   applyArchetypes(map);
   applyOverrides(map, await loadOverrides());
   progress(`Building ${map.buildings.length} buildings and ${map.roads.length} roads…`);
@@ -87,7 +92,7 @@ async function main() {
     player.place(fx, fz, player.facing);
     if (player.drone) player.toggleDrone();
   };
-  const hud = new Hud(map, world.places, player, camera, teleport);
+  const hud = new Hud(map, world.places, player, camera, teleport, world.region);
 
   /* ---- time of day: driven by the game clock ---- */
   let time: TimeOfDay = "morning";
@@ -96,7 +101,7 @@ async function main() {
   world.setSeason(season);
   let game: Game | null = null;
   const timesEl = document.getElementById("times")!;
-  const labels: Record<TimeOfDay, string> = { morning: "☀ AM", noon: "Noon", sunset: "Sunset", night: "Night" };
+  const labels: Record<TimeOfDay, string> = { morning: "Morning", noon: "Noon", sunset: "Sunset", night: "Night" };
   const buttons = new Map<TimeOfDay, HTMLButtonElement>();
   for (const t of TIME_ORDER) {
     const b = document.createElement("button");
@@ -164,7 +169,7 @@ async function main() {
   const soundRow = document.getElementById("sound")!;
   const musicBtn = document.createElement("button");
   const renderMusicBtn = () => {
-    musicBtn.textContent = mix.musicOn ? "♪ Music on" : "♪ Music off";
+    musicBtn.textContent = mix.musicOn ? "Music on" : "Music off";
     musicBtn.classList.toggle("on", mix.musicOn);
   };
   musicBtn.addEventListener("click", () => {
@@ -173,11 +178,11 @@ async function main() {
   });
   renderMusicBtn();
   const nextBtn = document.createElement("button");
-  nextBtn.textContent = "⏭";
+  nextBtn.textContent = "Next";
   nextBtn.title = "Next track (N)";
   nextBtn.addEventListener("click", () => music.next());
   const mixBtn = document.createElement("button");
-  mixBtn.textContent = "🔊";
+  mixBtn.textContent = "Mix";
   mixBtn.title = "Volume";
   const mixPanel = document.getElementById("mix")!;
   mixBtn.addEventListener("click", () => mixPanel.classList.toggle("open"));
@@ -228,10 +233,10 @@ async function main() {
       row.style.display = "flex";
       const sel = document.createElement("select");
       for (const [id, label] of [
-        ["monsoon", "Monsoon · 15 Aug"],
-        ["postmonsoon", "Post-monsoon · 8 Nov (Deepavali)"],
-        ["winter", "Winter · 25 Dec (Christmas)"],
-        ["summer", "Summer · 29 Mar (gulmohar)"],
+        ["monsoon", "Monsoon"],
+        ["postmonsoon", "Post-monsoon, Deepavali"],
+        ["winter", "Winter, Christmas"],
+        ["summer", "Summer, gulmohar"],
       ] as const) {
         const o = document.createElement("option");
         o.value = id;
@@ -240,7 +245,9 @@ async function main() {
       }
       sel.addEventListener("change", () => {
         const st = game!.state;
-        st.day = SEASON_SAMPLE_DAY[sel.value as SeasonId];
+        // The season and its headline festival, as the story would set them.
+        st.flags.season = sel.value as SeasonId;
+        st.flags.fest = ({ monsoon: "", postmonsoon: "deepavali", winter: "christmas", summer: "" } as Record<SeasonId, string>)[sel.value as SeasonId];
         st.raining = false;
       });
       const rainBtn = document.createElement("button");
@@ -251,11 +258,11 @@ async function main() {
       });
       row.append(sel, rainBtn);
     }
-    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music } });
+    Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music, terrain: { groundHeight, floorHeight, cuts } } });
   };
 
   // Expose for debugging and automated screenshots.
-  Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music } });
+  Object.assign(window, { nitk: { map, world, player, camera, setTime, teleport, hud, game, renderer, scene, music, terrain: { groundHeight, floorHeight, cuts } } });
 
   const clock = new THREE.Clock();
   const fpsEl = document.getElementById("fps")!;
@@ -277,6 +284,98 @@ async function main() {
     });
     startGame(choice);
   }
+
+  /* ---- the clock: time, day, and the shape of the day (classes, curfew) ---- */
+  const clockEl = document.getElementById("clock")!;
+  const clockTime = clockEl.querySelector(".time") as HTMLDivElement;
+  const clockDay = clockEl.querySelector(".day") as HTMLDivElement;
+  const strip = clockEl.querySelector(".strip") as HTMLDivElement;
+  const face = clockEl.querySelector(".face") as HTMLCanvasElement;
+  const faceCtx = face.getContext("2d")!;
+  /** The analog face: twelve ticks, hour and minute hands, curfew and class marks on the rim. */
+  const drawFace = (minutes: number, marks: [number, string][], late: boolean) => {
+    const ctx = faceCtx;
+    const S = face.width;
+    const c = S / 2;
+    const R = c - 4;
+    ctx.clearRect(0, 0, S, S);
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(22,41,78,0.18)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(c, c, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Today's marks on the rim (by hour on the 12-hour dial), in green.
+    for (const [t] of marks) {
+      const a = ((t / 60) % 12) / 12 * Math.PI * 2 - Math.PI / 2;
+      ctx.strokeStyle = "#50bd77";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(c, c, R - 3, a - 0.13, a + 0.13);
+      ctx.stroke();
+    }
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const long = k % 3 === 0;
+      ctx.strokeStyle = long ? "rgba(22,41,78,0.85)" : "rgba(22,41,78,0.35)";
+      ctx.lineWidth = long ? 4 : 2.5;
+      ctx.beginPath();
+      ctx.moveTo(c + Math.sin(a) * (R - (long ? 16 : 11)), c - Math.cos(a) * (R - (long ? 16 : 11)));
+      ctx.lineTo(c + Math.sin(a) * (R - 6), c - Math.cos(a) * (R - 6));
+      ctx.stroke();
+    }
+    const hand = (angle: number, len: number, width: number, colour: string) => {
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(c - Math.sin(angle) * 8, c + Math.cos(angle) * 8);
+      ctx.lineTo(c + Math.sin(angle) * len, c - Math.cos(angle) * len);
+      ctx.stroke();
+    };
+    const h = (minutes / 60) % 12;
+    hand((h / 12) * Math.PI * 2, R * 0.5, 7, late ? "#d64545" : "#16294e");
+    hand(((minutes % 60) / 60) * Math.PI * 2, R * 0.78, 4.5, "#16294e");
+    ctx.fillStyle = "#50bd77";
+    ctx.beginPath();
+    ctx.arc(c, c, 6, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  let stripKey: string | null = null;
+  let lastClock = "";
+  let lastFace = "";
+  const updateClock = () => {
+    const st = game?.state;
+    if (!st) {
+      clockEl.style.display = "none";
+      return;
+    }
+    clockEl.style.display = "";
+    const m = Math.floor(st.minutes);
+    const h = Math.floor(m / 60) % 24;
+    const text = `${((h + 11) % 12) + 1}:${String(m % 60).padStart(2, "0")}<span>${h < 12 ? "AM" : "PM"}</span>`;
+    if (text !== lastClock) {
+      lastClock = text;
+      clockTime.innerHTML = text;
+      clockDay.textContent = `${st.dateText()} · ${st.season.name}`;
+    }
+    const story = !game!.explore;
+    const marks: [number, string][] = [];
+    if (story && classesStarted(st) && st.weekday < 5) marks.push([MORNING, "Class"], [AFTERNOON, "Class"]);
+    if (story) marks.push([CURFEW, "Curfew"]);
+    const key = marks.map(([t, l]) => `${t}${l}${m >= t && m < t + 60 ? "*" : ""}`).join();
+    if (key !== stripKey) {
+      stripKey = key;
+      strip.innerHTML = `<i></i>${marks.map(([t, l]) => `<b class="${m >= t && m < t + 60 ? "now" : ""}" style="left:${(t / 1440) * 100}%" data-l="${l}"></b>`).join("")}`;
+    }
+    (strip.firstElementChild as HTMLElement).style.width = `${(st.minutes / 1440) * 100}%`;
+    if (text !== lastFace) {
+      lastFace = text;
+      drawFace(st.minutes, marks, story && afterCurfew(st.minutes));
+    }
+    clockEl.classList.toggle("curfew", story && afterCurfew(st.minutes));
+  };
 
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.05);
@@ -302,6 +401,7 @@ async function main() {
     pipeline.focusShadows(player.pos);
     pipeline.render();
     hud.update();
+    updateClock();
 
     frames++;
     fpsT += dt;

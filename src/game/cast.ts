@@ -3,7 +3,8 @@
  * of them is modelled on a real student or staff member.
  */
 import * as THREE from "three";
-import { makeStudent, type Look } from "../player";
+import { makePerson, type Look } from "../people";
+import type { HeroAnimator } from "../hero";
 import { groundHeight } from "../world/terrain";
 
 export type CastId =
@@ -17,7 +18,25 @@ export type CastId =
   | "kiran"
   | "meera"
   | "sid"
-  | "coach";
+  | "coach"
+  | "librarian"
+  | "hegde"
+  | "divya"
+  | "aditi"
+  | "arjun"
+  | "raju"
+  | "nikhil"
+  | "manju"
+  | "babu"
+  | "kotian"
+  | "tanvi"
+  | "ravi"
+  | "farhan"
+  | "keerthi"
+  | "arnav"
+  | "dev"
+  | "hebbar"
+  | "isha";
 
 export type Def = { name: string; role: string; look: Look; scale?: number };
 
@@ -77,6 +96,96 @@ export const CAST: Record<CastId, Def> = {
     role: "Runs the Freshers Cup. Whistle always ready",
     look: { skin: 0x8d5524, shirt: 0xf5b400, pants: 0x1e272e, shoe: 0xe8e8e8, hair: 0x1a1512, bag: null },
   },
+  librarian: {
+    name: "Mrs. Pai",
+    role: "Central Library issue desk. Hears a sandal squeak from forty metres",
+    look: { skin: 0xa0623a, shirt: 0x8e44ad, pants: 0x8e44ad, shoe: 0x6d5d4b, hair: 0x2b2b2b, bag: null, longHair: true },
+  },
+  hegde: {
+    name: "Prof. Hegde",
+    role: "Engineering Mechanics. Takes attendance by voice, never misses one",
+    look: { skin: 0x9c6a44, shirt: 0xdfe6e9, pants: 0x3d3d3d, shoe: 0x1b1f2a, hair: 0x9a9a9a, bag: 0x5b3a26 },
+  },
+  divya: {
+    name: "Divya",
+    role: "NCC senior under officer, 2nd year. Salutes like she means it",
+    look: { skin: 0xc68642, shirt: 0x8a7b4f, pants: 0x8a7b4f, shoe: 0x1b1f2a, hair: 0x1a1512, bag: null, longHair: true },
+  },
+  aditi: {
+    name: "Aditi",
+    role: "SPICMACAY coordinator. Carnatic vocalist, strict about phones in concerts",
+    look: { skin: 0xe0ac69, shirt: 0xd35400, pants: 0x6c3483, shoe: 0x6d5d4b, hair: 0x1a1512, bag: null, longHair: true },
+  },
+  arjun: {
+    name: "Arjun",
+    role: "NSS volunteer, 3rd-year Civil. Owns forty pairs of gloves",
+    look: { skin: 0x8d5524, shirt: 0x2e86c1, pants: 0x2d3436, shoe: 0xe8e8e8, hair: 0x1a1512, bag: 0x27ae60 },
+  },
+  nikhil: {
+    name: "Nikhil",
+    role: "Press Club. Edits News Wagon, the fortnightly wall magazine. Owns a lot of pins",
+    look: { skin: 0xc68642, shirt: 0x2d3436, pants: 0x485460, shoe: 0xe8e8e8, hair: 0x1a1512, bag: 0x6d5d4b },
+  },
+  manju: {
+    name: "Manju",
+    role: "Runs the xerox counter at the shopping centre. Can photocopy a textbook in four minutes",
+    look: { skin: 0x8d5524, shirt: 0x16a085, pants: 0x2d3436, shoe: 0x1b1f2a, hair: 0x1a1512, bag: null },
+  },
+  babu: {
+    name: "Babu",
+    role: "Fixes cycles under the tree by the shopping centre. Has seen every kind of puncture",
+    look: { skin: 0x7a4a2a, shirt: 0x7f8c8d, pants: 0x3d3d3d, shoe: 0x1b1f2a, hair: 0x3a3a3a, bag: null },
+  },
+  kotian: {
+    name: "Mr. Kotian",
+    role: "Mega Mess manager. Counts the vegetables. Counts them again",
+    look: { skin: 0x9c6a44, shirt: 0xecf0f1, pants: 0x2d3436, shoe: 0x1b1f2a, hair: 0x6f6f6f, bag: null },
+  },
+  tanvi: {
+    name: "Tanvi",
+    role: "NITK Films Club. Screens a film at SAC every Friday of the semester",
+    look: { skin: 0xe0ac69, shirt: 0xc0392b, pants: 0x1e272e, shoe: 0xe8e8e8, hair: 0x241c16, bag: 0x2d3436, longHair: true },
+  },
+  ravi: {
+    name: "Ravi",
+    role: "Hostel Reading Room Committee, which also runs Crescendo",
+    look: { skin: 0xb07040, shirt: 0xf1c40f, pants: 0x34495e, shoe: 0xe8e8e8, hair: 0x1a1512, bag: null },
+  },
+  farhan: {
+    name: "Farhan",
+    role: "Literary, Stage and Debating Society. Quizmaster. Knows too much",
+    look: { skin: 0xc68642, shirt: 0x6c5ce7, pants: 0x2d3436, shoe: 0x1b1f2a, hair: 0x0f0c0a, bag: 0x2d3436 },
+  },
+  keerthi: {
+    name: "Keerthi",
+    role: "Flying and Robotics Club. Runs Wright Flight. Has balsa dust on everything",
+    look: { skin: 0xa0623a, shirt: 0x27ae60, pants: 0x485460, shoe: 0xe8e8e8, hair: 0x1a1512, bag: 0xe17055, longHair: true },
+  },
+  arnav: {
+    name: "Arnav",
+    role: "Photography Club. Organises Expose. Has opinions about golden hour",
+    look: { skin: 0xe0ac69, shirt: 0x1d3557, pants: 0x6d5d4b, shoe: 0x1b1f2a, hair: 0x241c16, bag: 0x2d3436 },
+  },
+  dev: {
+    name: "Dev",
+    role: "NITK Music Club. Bass player. Needs roadies for Musical Night",
+    look: { skin: 0x8d5524, shirt: 0x2d3436, pants: 0x1e272e, shoe: 0xe8e8e8, hair: 0x0f0c0a, bag: null },
+  },
+  hebbar: {
+    name: "Dr. Hebbar",
+    role: "Institute Medical Officer at the Health Care Centre, opposite the main ground",
+    look: { skin: 0x9c6a44, shirt: 0xf4f4f0, pants: 0x485460, shoe: 0x1b1f2a, hair: 0x4a4a4a, bag: null },
+  },
+  isha: {
+    name: "Isha",
+    role: "Artists' Forum. Painted half the underpass. Paint on her sandals, always",
+    look: { skin: 0xa0623a, shirt: 0xf4f4f0, pants: 0x2c3e8f, shoe: 0x6d5d4b, hair: 0x1a1512, bag: 0xe17055, longHair: true },
+  },
+  raju: {
+    name: "Raju anna",
+    role: "Night Canteen. Egg maggi, egg roll, egg everything",
+    look: { skin: 0x7a4a2a, shirt: 0xf5f5f5, pants: 0x2d3436, shoe: 0x1b1f2a, hair: 0x1a1512, bag: null },
+  },
 };
 
 function markerTexture(): THREE.CanvasTexture {
@@ -87,7 +196,7 @@ function markerTexture(): THREE.CanvasTexture {
   ctx.beginPath();
   ctx.arc(64, 64, 60, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#ffd23f";
+  ctx.fillStyle = "#f2b84b";
   ctx.beginPath();
   ctx.arc(64, 64, 52, 0, Math.PI * 2);
   ctx.fill();
@@ -104,8 +213,8 @@ function markerTexture(): THREE.CanvasTexture {
 export class Character {
   readonly root: THREE.Group;
   readonly marker: THREE.Sprite;
-  private parts: Record<string, THREE.Object3D>;
-  private phase = Math.random() * 6;
+  private anim: HeroAnimator;
+  private t = Math.random() * 60;
   x = 0;
   z = 0;
   face = 0;
@@ -114,17 +223,15 @@ export class Character {
   /** When set, runs along these points at `runSpeed`. */
   path: [number, number][] | null = null;
   runSpeed = 6;
-  private legs: THREE.Object3D[];
-  private arms: THREE.Object3D[];
 
   constructor(
     readonly id: string,
     readonly def: Def,
     tex: THREE.Texture
   ) {
-    const s = makeStudent(def.look);
+    const s = makePerson(def.look);
     this.root = s.root;
-    this.parts = s.parts;
+    this.anim = s.anim;
     this.marker = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
     this.marker.scale.set(0.75, 0.75, 1);
     this.marker.position.y = 2.55;
@@ -132,8 +239,6 @@ export class Character {
     this.marker.visible = false;
     this.root.add(this.marker);
     this.root.visible = false;
-    this.legs = [s.parts.legL, s.parts.legR];
-    this.arms = [s.parts.armL, s.parts.armR];
   }
 
   get name() {
@@ -156,6 +261,8 @@ export class Character {
 
   update(dt: number, player: THREE.Vector3, t: number) {
     if (!this.root.visible) return;
+    this.t += dt;
+    let speed = 0;
     if (this.path && this.path.length) {
       // Run to the next waypoint.
       const [tx, tz] = this.path[0];
@@ -163,6 +270,7 @@ export class Character {
       const dz = tz - this.z;
       const d = Math.hypot(dx, dz);
       const step = this.runSpeed * dt;
+      speed = this.runSpeed;
       if (d <= step) {
         this.x = tx;
         this.z = tz;
@@ -174,29 +282,17 @@ export class Character {
       }
       this.root.position.set(this.x, groundHeight(this.x, this.z), this.z);
       this.root.rotation.y = this.face;
-      this.phase += dt * (3 + this.runSpeed * 1.3);
-      const sw = Math.sin(this.phase) * 0.9;
-      this.legs[0].rotation.x = sw;
-      this.legs[1].rotation.x = -sw;
-      this.arms[0].rotation.x = -sw;
-      this.arms[1].rotation.x = sw;
-      this.marker.position.y = 2.55 + Math.sin(t * 3) * 0.12;
-      return;
     }
-    this.phase += dt;
-    const p = this.parts;
-    // Idle: weight shift and a hand that talks.
-    p.hips.position.y = 0.95 + Math.sin(this.phase * 1.6) * 0.01;
-    p.armR.rotation.x = Math.sin(this.phase * 2.1) * 0.12;
-    p.armL.rotation.x = -Math.sin(this.phase * 1.7) * 0.08;
-    p.legL.rotation.x = 0;
-    p.legR.rotation.x = 0;
+    // Turn toward the player when they come close; glance with the head first.
     const d = Math.hypot(player.x - this.x, player.z - this.z);
-    if (this.watch && d < 9) {
+    let look = 0;
+    if (!speed && this.watch && d < 9) {
       const want = Math.atan2(player.x - this.x, player.z - this.z);
       const diff = Math.atan2(Math.sin(want - this.root.rotation.y), Math.cos(want - this.root.rotation.y));
-      this.root.rotation.y += diff * Math.min(1, dt * 5);
+      this.root.rotation.y += diff * Math.min(1, dt * 4);
+      look = Math.max(-1.1, Math.min(1.1, diff));
     }
+    this.anim.update({ dt, t: this.t, speed, accel: 0, turn: 0, air: 0, vy: 0, crouch: 0, look });
     this.marker.position.y = 2.55 + Math.sin(t * 3) * 0.12;
   }
 }

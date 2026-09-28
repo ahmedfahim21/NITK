@@ -99,14 +99,6 @@ export function dateOf(day: number): Date {
   return new Date(2026, 7, 3 + day);
 }
 
-export function seasonOf(day: number): Season {
-  const m = dateOf(day).getMonth();
-  if (m >= 5 && m <= 8) return SEASONS.monsoon;
-  if (m === 9 || m === 10) return SEASONS.postmonsoon;
-  if (m === 11 || m <= 1) return SEASONS.winter;
-  return SEASONS.summer;
-}
-
 /** Sunrise and sunset at Surathkal (13°N), decimal hours, by month. */
 const SUN: [number, number][] = [
   [6.97, 18.35], // Jan
@@ -132,29 +124,19 @@ export function sunTimes(day: number): { rise: number; set: number } {
   return { rise: r0 + (r1 - r0) * f, set: s0 + (s1 - s0) * f };
 }
 
-export type Festival = { id: string; name: string; from: [number, number]; to: [number, number] };
+export type Festival = { id: string; name: string };
 
-/** Dates for the 2026–27 academic year ([month 1-12, day]). */
+/** Festival decorations the story switches on (state.flags.fest), in chapter order. */
 export const FESTIVALS: Festival[] = [
-  { id: "independence", name: "Independence Day", from: [8, 13], to: [8, 16] },
-  { id: "ganesha", name: "Ganesh Chaturthi", from: [9, 13], to: [9, 16] },
-  { id: "rajyotsava", name: "Kannada Rajyotsava", from: [10, 30], to: [11, 2] },
-  { id: "deepavali", name: "Deepavali", from: [11, 5], to: [11, 11] },
-  { id: "christmas", name: "Christmas", from: [12, 18], to: [1, 1] },
-  { id: "republic", name: "Republic Day", from: [1, 24], to: [1, 27] },
+  { id: "independence", name: "Independence Day" },
+  { id: "ganesha", name: "Ganesh Chaturthi" },
+  { id: "rajyotsava", name: "Kannada Rajyotsava" },
+  { id: "deepavali", name: "Deepavali" },
+  { id: "christmas", name: "Christmas" },
+  { id: "republic", name: "Republic Day" },
 ];
 
-export function festivalsOn(day: number): Festival[] {
-  const d = dateOf(day);
-  const md = (d.getMonth() + 1) * 100 + d.getDate();
-  return FESTIVALS.filter((f) => {
-    const a = f.from[0] * 100 + f.from[1];
-    const b = f.to[0] * 100 + f.to[1];
-    return a <= b ? md >= a && md <= b : md >= a || md <= b;
-  });
-}
-
-/** A representative day in each season, for Explore mode's picker. */
+/** A representative day in each season: sets its sunrise and sunset. */
 export const SEASON_SAMPLE_DAY: Record<SeasonId, number> = {
   monsoon: 12, // 15 August
   postmonsoon: 97, // 8 November, Deepavali
@@ -214,10 +196,3 @@ function shade(a: string, k: number): string {
   return rgbToHex([r * (1 + k), g * (1 + k), b * (1 + k)]);
 }
 
-/** NITK's academic calendar: odd semester Aug–Dec, even Jan–May, break Jun–Jul. */
-export function semesterOf(day: number): string {
-  const m = dateOf(day).getMonth();
-  if (m >= 7 && m <= 11) return "Odd semester";
-  if (m <= 4) return "Even semester";
-  return "Summer break";
-}

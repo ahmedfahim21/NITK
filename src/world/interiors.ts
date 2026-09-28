@@ -7,8 +7,16 @@
  * Each room is laid out in its footprint's own frame (u along the long
  * side, v across it), so it follows the real OSM outline, and furniture is
  * only placed where it fits inside with a margin to spare.
+ *
+ * Fit-out follows NITK's virtual tour (vtour.nitk.ac.in): the Main
+ * Building's lobby (square pillars with dark-wood capitals, wood wainscot,
+ * coloured-glass jali over the door), the lecture rooms (maroon chairs with
+ * writing pads, whiteboard and screen, ceiling fans, white grilled windows)
+ * and the Solve lab (workbenches with PCs, maroon office chairs, aluminium
+ * glass partitions, blue posters, split ACs) for the computer centre.
  */
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { orientedBox, pointInPoly, distToSeg, type Pt } from "../geo";
 import type { Building, CampusMap } from "../osm/types";
 import { toon } from "../fx/toon";
@@ -17,7 +25,7 @@ import { flatPolygon } from "./ground";
 import { frontOf, mainEntrance, findByName, type Face } from "./landmarks";
 import { signTexture } from "./textures";
 
-export type InteriorKind = "lobby" | "library" | "auditorium" | "mess" | "canteen" | "lecture";
+export type InteriorKind = "lobby" | "library" | "auditorium" | "mess" | "canteen" | "lecture" | "lab" | "chemlab";
 
 /** Which buildings open up, by OSM name. */
 const ROOMS: [RegExp, InteriorKind, string][] = [
@@ -27,6 +35,12 @@ const ROOMS: [RegExp, InteriorKind, string][] = [
   [/^Mega Mess/i, "mess", "Mega Mess"],
   [/^Night Canteen$/i, "canteen", "Night Canteen"],
   [/^Lecture Hall Complex A$/i, "lecture", "Lecture Hall Complex A"],
+  // First-year lectures run in LHC-C and LHC-D (game/courses.ts).
+  [/^Lecture Hall Complex - ?C$/i, "lecture", "Lecture Hall Complex C"],
+  [/^Lecture Hall Complex D$/i, "lecture", "Lecture Hall Complex D"],
+  [/^Central Computer Center$/i, "lab", "Central Computer Centre"],
+  // The Science Block: first-year chemistry and physics labs.
+  [/^Departments of Chemistry and Physics$/i, "chemlab", "Science Block"],
 ];
 
 export function interiorBuildings(map: CampusMap): { b: Building; kind: InteriorKind; label: string }[] {
@@ -62,6 +76,7 @@ export type InteriorRig = {
 class Kit {
   readonly g = new THREE.Group();
   private mats = new Map<string, THREE.Material>();
+  private batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
   constructor(
     private frame: { cx: number; cz: number; angle: number },
     private grid: Grid,
@@ -89,15 +104,31 @@ class Kit {
     return [this.frame.cx + u * c - v * s, this.frame.cz + u * s + v * c];
   }
 
-  /** A box centred at (u, v) standing on the floor, w along u, d along v. */
-  box(u: number, v: number, w: number, h: number, d: number, m: THREE.Material, y = 0, solid = true): THREE.Mesh {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    mesh.position.set(u, y + h / 2, v);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    this.g.add(mesh);
+  /** A box centred at (u, v) standing on the floor, w along u, d along v. Batched by material. */
+  box(u: number, v: number, w: number, h: number, d: number, m: THREE.Material, y = 0, solid = true) {
+    this.piece(new THREE.BoxGeometry(w, h, d).translate(u, y + h / 2, v), m);
     if (solid) this.solid(u, v, w, d, y + h);
-    return mesh;
+  }
+
+  /** Any geometry already placed in the room frame, merged with others of its material. */
+  piece(g: THREE.BufferGeometry, m: THREE.Material) {
+    const geo = g.index ? g.toNonIndexed() : g;
+    let list = this.batches.get(m);
+    if (!list) this.batches.set(m, (list = []));
+    list.push(geo);
+  }
+
+  /** Merge each material's pieces into one mesh: hundreds of chairs, a handful of draw calls. */
+  finish() {
+    for (const [m, list] of this.batches) {
+      const merged = mergeGeometries(list);
+      if (!merged) throw new Error(`[interiors] could not merge ${list.length} pieces`);
+      const mesh = new THREE.Mesh(merged, m);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.g.add(mesh);
+    }
+    this.batches.clear();
   }
 
   solid(u: number, v: number, w: number, d: number, top: number) {
@@ -125,11 +156,12 @@ class Kit {
     return true;
   }
 
-  sign(lines: string[], u: number, v: number, w: number, h: number, y: number, faceU: number, bg = "#1d3557", fg = "#ffffff") {
+  /** A signboard at (u, v), its face turned toward the room-frame direction `face`. */
+  sign(lines: string[], u: number, v: number, w: number, h: number, y: number, face: [number, number], bg = "#1d3557", fg = "#ffffff") {
     const tex = signTexture(lines, { bg, fg, w: 1024, h: Math.round((1024 * h) / w) });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), this.mat(0xffffff, { map: tex, ramp: "soft", glow: 0x555555, emissiveMap: tex }));
     m.position.set(u, y, v);
-    m.rotation.y = faceU > 0 ? Math.PI / 2 : -Math.PI / 2;
+    m.rotation.y = Math.atan2(face[0], face[1]);
     this.g.add(m);
   }
 }
@@ -165,6 +197,108 @@ function bookTexture(): THREE.Texture {
   return books;
 }
 
+function canvasTex(w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  paint(c.getContext("2d")!);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** One 1.2 m square of floor: 60 cm vitrified tiles with pale grout, or carpet. */
+const FLOOR_TILE = 1.2;
+const floorTex = new Map<string, THREE.Texture>();
+function floorTexture(kind: InteriorKind): THREE.Texture {
+  const key = kind === "auditorium" ? "carpet" : kind === "mess" || kind === "canteen" ? "grey" : "tile";
+  const hit = floorTex.get(key);
+  if (hit) return hit;
+  const t = canvasTex(128, 128, (ctx) => {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 128, 128);
+    if (key === "carpet") {
+      ctx.fillStyle = "rgba(0,0,0,0.06)";
+      for (let i = 0; i < 128; i += 8) ctx.fillRect(i, 0, 4, 128);
+      return;
+    }
+    // A soft sheen, then the grout grid.
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.fillRect(6, 6, 40, 20);
+    ctx.fillRect(70, 70, 40, 20);
+    ctx.fillStyle = key === "grey" ? "rgba(0,0,0,0.22)" : "rgba(120,100,70,0.3)";
+    ctx.fillRect(0, 0, 128, 2);
+    ctx.fillRect(0, 64, 128, 2);
+    ctx.fillRect(0, 0, 2, 128);
+    ctx.fillRect(64, 0, 2, 128);
+  });
+  floorTex.set(key, t);
+  return t;
+}
+
+/** One 2 m run of inside wall, floor to WALL_H, per room. */
+const WALL_RUN = 2;
+const wallTex = new Map<InteriorKind, THREE.Texture>();
+function wallTexture(kind: InteriorKind): THREE.Texture {
+  const hit = wallTex.get(kind);
+  if (hit) return hit;
+  const W = 128;
+  const H = 230;
+  const y = (m: number) => H - (m / WALL_H) * H;
+  const t = canvasTex(W, H, (ctx) => {
+    ctx.fillStyle = kind === "lecture" || kind === "lab" ? "#fbfaf6" : "#f3ead6";
+    ctx.fillRect(0, 0, W, H);
+    if (kind === "lobby") {
+      // Dark teak wainscot to 1.3 m, panelled, with a moulding on top.
+      ctx.fillStyle = "#4a2e1e";
+      ctx.fillRect(0, y(1.3), W, H - y(1.3));
+      ctx.fillStyle = "#5b3a26";
+      for (let x = 6; x < W; x += 32) ctx.fillRect(x, y(1.2), 24, y(0.15) - y(1.2));
+      ctx.fillStyle = "#2e1c12";
+      ctx.fillRect(0, y(1.36), W, 5);
+    } else if (kind === "lecture") {
+      // A window with white horizontal grilles, as in the lecture rooms.
+      ctx.fillStyle = "#cfe0e8";
+      ctx.fillRect(24, y(2.6), 80, y(1.0) - y(2.6));
+      ctx.fillStyle = "#ffffff";
+      for (let k = y(2.6); k < y(1.0); k += 9) ctx.fillRect(24, k, 80, 4);
+      ctx.fillStyle = "#e3e0d8";
+      ctx.fillRect(20, y(1.0), 88, 4);
+    } else if (kind === "lab") {
+      // Blue information posters at eye height.
+      ctx.fillStyle = "#1f4fa3";
+      ctx.fillRect(40, y(2.3), 46, y(1.3) - y(2.3));
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      for (let k = 0; k < 5; k++) ctx.fillRect(46, y(2.2) + k * 9, 34 - (k % 2) * 10, 3);
+    }
+    ctx.fillStyle = kind === "lobby" ? "#2e1c12" : "#b9b2a2";
+    ctx.fillRect(0, H - 5, W, 5);
+  });
+  wallTex.set(kind, t);
+  return t;
+}
+
+let glassJali: THREE.Texture | null = null;
+/** The coloured-glass block screen over the Main Building's entrance. */
+function glassJaliTexture(): THREE.Texture {
+  if (glassJali) return glassJali;
+  const cols = ["#2b6cc4", "#3f9e5a", "#e2c23a", "#f4f1e8", "#5aa6d8"];
+  glassJali = canvasTex(128, 64, (ctx) => {
+    ctx.fillStyle = "#e8e2d2";
+    ctx.fillRect(0, 0, 128, 64);
+    let n = 0;
+    for (let y = 2; y < 64; y += 8) {
+      for (let x = 2; x < 128; x += 8) {
+        ctx.fillStyle = cols[(n++ * 7 + (y >> 3)) % cols.length];
+        ctx.fillRect(x, y, 6, 6);
+      }
+    }
+  });
+  return glassJali;
+}
+
 /* ---------------- furnishing, per kind ---------------- */
 
 type Layout = { len: number; wid: number; doorU: number; doorV: number; inU: number; inV: number };
@@ -194,7 +328,7 @@ function furnish(kind: InteriorKind, k: Kit, L: Layout) {
         }
       }
     }
-    k.sign(["CENTRAL LIBRARY · SILENCE PLEASE"], -len / 2 + 0.3, 0, Math.min(10, wid * 0.8), 0.9, 2.7, 1);
+    k.sign(["CENTRAL LIBRARY · SILENCE PLEASE"], -len / 2 + 0.3, 0, Math.min(10, wid * 0.8), 0.9, 2.7, [1, 0]);
     return;
   }
 
@@ -224,7 +358,7 @@ function furnish(kind: InteriorKind, k: Kit, L: Layout) {
       }
     }
     const [tu, tv] = P(dir * (span / 2 - 0.6), 0);
-    k.sign(["SILVER JUBILEE AUDITORIUM"], tu - (alongU ? dir * 0.1 : 0), tv, Math.min(12, across * 0.5), 1.1, 3.1, -dir);
+    k.sign(["SILVER JUBILEE AUDITORIUM"], tu - (alongU ? dir * 0.1 : 0), tv, Math.min(12, across * 0.5), 1.1, 3.1, alongU ? [-dir, 0] : [0, -dir]);
     return;
   }
 
@@ -246,7 +380,7 @@ function furnish(kind: InteriorKind, k: Kit, L: Layout) {
       vat.position.set(u, 1.25, vb);
       k.g.add(vat);
     }
-    k.sign(["MEGA MESS · CHAITANYA"], 0, vb + 0.9, Math.min(10, len * 0.5), 1, 2.8, 0);
+    k.sign(["MEGA MESS · CHAITANYA"], 0, vb + 0.9, Math.min(10, len * 0.5), 1, 2.8, [0, -1]);
     return;
   }
 
@@ -259,35 +393,63 @@ function furnish(kind: InteriorKind, k: Kit, L: Layout) {
       if (!clearOfDoor(u, v) || !k.room(u, v, 1, 1, 0.5)) continue;
       k.box(u, v, 1, 0.74, 1, k.mat(0xc0392b));
     }
-    k.sign(["NIGHT CANTEEN · MAGGI · EGG ROLL · CHAI"], 0, vb - 0.3, Math.min(9, len * 0.6), 0.8, 2.6, 0, "#c0392b");
+    k.sign(["NIGHT CANTEEN · MAGGI · EGG ROLL · CHAI"], 0, vb - 0.3, Math.min(9, len * 0.6), 0.8, 2.6, [0, 1], "#c0392b");
     return;
   }
 
   if (kind === "lecture") {
-    // Wooden desk rows facing a green board on the far wall.
-    const dir = L.inU !== 0 ? Math.sign(L.inU) : 1;
-    for (let u = -len / 2 + 4; u < len / 2 - 5; u += 1.8) {
-      for (let v = -wid / 2 + 3; v < wid / 2 - 2; v += 3.4) {
-        if (!clearOfDoor(u, v) || !k.room(u, v, 0.7, 2.8)) continue;
-        k.box(u, v, 0.7, 0.8, 2.8, wood);
-      }
-    }
-    const bu = dir * (len / 2 - 0.4);
-    if (k.room(bu - dir * 0.6, 0, 0.2, 6, 0.3)) {
-      const board = new THREE.Mesh(new THREE.PlaneGeometry(6, 2), k.mat(0x2e5a3f));
-      board.position.set(bu - dir * 0.6, 1.9, 0);
-      board.rotation.y = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
-      k.g.add(board);
-    }
+    classrooms(k, L, clearOfDoor);
+    return;
+  }
+
+  if (kind === "lab") {
+    computerLab(k, L, clearOfDoor);
+    return;
+  }
+
+  if (kind === "chemlab") {
+    chemistryLab(k, L, clearOfDoor);
     return;
   }
 
   // lobby: the Main Building's entrance hall and the corridors off it.
+  // Two square pillars flank the way in: stone base, cream shaft, a flared
+  // dark-wood capital. Coloured-glass jali over the door, and the Engineer
+  // fest's "Think Create Engineer" display.
+  const across: [number, number] = L.inU ? [0, 1] : [1, 0];
+  const teak = k.mat(0x4a2e1e);
+  for (const side of [-1, 1]) {
+    const pu = L.doorU + L.inU * 6 + across[0] * side * 4.5;
+    const pv = L.doorV + L.inV * 6 + across[1] * side * 4.5;
+    if (!k.room(pu, pv, 1.4, 1.4, 0.3)) continue;
+    k.box(pu, pv, 1.5, 0.5, 1.5, k.mat(0xb9a88a));
+    k.box(pu, pv, 1.2, WALL_H - 0.6, 1.2, k.mat(0xf1ead8), 0.5, false);
+    k.piece(new THREE.CylinderGeometry(1.25, 0.75, 0.8, 4, 1).rotateY(Math.PI / 4).translate(pu, WALL_H + 0.1, pv), teak);
+  }
+  {
+    const jali = new THREE.Mesh(
+      new THREE.PlaneGeometry(9, 1.6),
+      k.mat(0xffffff, { map: glassJaliTexture(), glow: 0xffffff, emissiveMap: glassJaliTexture(), side: THREE.DoubleSide })
+    );
+    jali.position.set(L.doorU + L.inU * 0.3, WALL_H - 0.3, L.doorV + L.inV * 0.3);
+    jali.rotation.y = L.inU ? Math.PI / 2 : 0;
+    k.g.add(jali);
+  }
+  {
+    const du = L.doorU + L.inU * 10 + across[0] * 8;
+    const dv = L.doorV + L.inV * 10 + across[1] * 8;
+    if (k.room(du, dv, 3, 3, 0.5)) {
+      k.box(du, dv, L.inU ? 1.4 : 3, 0.8, L.inU ? 3 : 1.4, k.mat(0x6b6f76));
+      // Student projects on the stand: little yellow robots.
+      for (let i = 0; i < 4; i++) k.box(du + across[0] * (i * 0.7 - 1.05), dv + across[1] * (i * 0.7 - 1.05), 0.25, 0.6, 0.25, k.mat(0xf2c418), 0.8, false);
+      k.sign(["THINK · CREATE · ENGINEER"], du + L.inU * 0.8, dv + L.inV * 0.8, 3, 0.7, 1.9, [-L.inU, -L.inV], "#2b2f36", "#e8553b");
+    }
+  }
   const fu = L.doorU + L.inU * 7;
   const fv = L.doorV + L.inV * 7;
   if (k.room(fu, fv, 1, 1, 0.5)) {
     k.box(fu, fv, L.inU ? 1.2 : 6, 1.1, L.inU ? 6 : 1.2, wood);
-    k.sign(["NATIONAL INSTITUTE OF TECHNOLOGY KARNATAKA", "ENQUIRY"], fu + L.inU * 3, fv + L.inV * 3, 5, 1.2, 2.8, L.inU ? -L.inU : 0, "#1d3f7a");
+    k.sign(["NATIONAL INSTITUTE OF TECHNOLOGY KARNATAKA", "ENQUIRY"], fu + L.inU * 3, fv + L.inV * 3, 5, 1.2, 2.8, [-L.inU, -L.inV], "#1d3f7a");
   }
   // A broad stair up to the first floor, behind the desk.
   const su = L.doorU + L.inU * 13;
@@ -326,6 +488,148 @@ function furnish(kind: InteriorKind, k: Kit, L: Layout) {
       const [ww, dd] = cross ? [2.4, 0.5] : [0.5, 2.4];
       if (k.room(bu, bv, ww, dd, 0.3)) k.box(bu, bv, ww, 0.45, dd, wood);
     }
+  }
+}
+
+/** A maroon chair with a writing pad on its right arm, facing -u when face is -1. */
+function padChair(k: Kit, u: number, v: number, face: number) {
+  const maroon = k.mat(0x7a2a2a);
+  k.box(u, v, 0.45, 0.45, 0.45, maroon, 0, false);
+  k.box(u - face * 0.2, v, 0.08, 0.5, 0.45, maroon, 0.45, false);
+  k.box(u + face * 0.05, v + 0.22, 0.4, 0.04, 0.3, k.mat(0xd8c7a4), 0.7, false);
+}
+
+/** A three-blade ceiling fan, seen from above in the cutaway. */
+function fan(k: Kit, u: number, v: number) {
+  const white = k.mat(0xf2f2ee);
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    k.piece(new THREE.BoxGeometry(0.75, 0.03, 0.12).translate(0.45, 0, 0).rotateY(a).translate(u, WALL_H - 0.35, v), white);
+  }
+  k.piece(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 8).translate(u, WALL_H - 0.35, v), white);
+}
+
+/**
+ * Lecture rooms, from the tour: partitions every 11 m across the block with a
+ * doorway each, and in every room rows of maroon pad chairs facing a
+ * whiteboard and projector screen, a teacher's table, fans overhead.
+ */
+function classrooms(k: Kit, L: Layout, clearOfDoor: (u: number, v: number) => boolean) {
+  const { len, wid } = L;
+  const partition = k.mat(0xf6f3ea);
+  const bay = 11;
+  for (let i = 0, u0 = -len / 2; u0 < len / 2 - 4; i++, u0 += bay) {
+    // The partition at u0, in 1 m pieces so it follows courtyards; a 2 m
+    // doorway in each, alternating sides.
+    if (i > 0) {
+      for (let v = -wid / 2 + 0.5; v < wid / 2; v += 1) {
+        const doorway = Math.abs(v - (i % 2 ? wid / 4 : -wid / 4)) < 1;
+        if (doorway || !k.room(u0, v, 0.2, 1, 0.1)) continue;
+        k.box(u0, v, 0.2, WALL_H, 1, partition);
+      }
+    }
+    // Whiteboard and projector screen on the partition, the teacher's table.
+    const front = u0 + 0.4;
+    if (k.room(front + 0.2, 0, 0.1, 5, 0.3)) {
+      k.box(front, -1.6, 0.06, 1.3, 3, k.mat(0xf7f7f4), 1, false);
+      k.box(front, 1.8, 0.06, 1.6, 2.6, k.mat(0xe9edf2, { glow: 0xb8c8e0 }), 1, false);
+      k.box(front + 1.2, -2.5, 1.2, 0.75, 0.6, k.mat(0x8a5a32));
+    }
+    for (let u = front + 3; u < Math.min(u0 + bay - 1, len / 2 - 1); u += 1.2) {
+      for (let v = -wid / 2 + 1.5; v < wid / 2 - 1.2; v += 0.9) {
+        if (!clearOfDoor(u, v) || !k.room(u, v, 0.5, 0.5, 0.6)) continue;
+        padChair(k, u, v, -1);
+        k.solid(u, v, 0.5, 0.5, 0.9);
+      }
+    }
+    for (const fv of [-wid / 4, wid / 4]) {
+      const fu = u0 + bay / 2;
+      if (k.room(fu, fv, 0.5, 0.5, 0.5)) fan(k, fu, fv);
+    }
+  }
+}
+
+/**
+ * The Solve lab, from the tour: wooden workbenches with PCs and circuit kits,
+ * maroon office chairs, aluminium-framed glass partitions, split ACs.
+ */
+function computerLab(k: Kit, L: Layout, clearOfDoor: (u: number, v: number) => boolean) {
+  const { len, wid } = L;
+  const bench = k.mat(0x9a6a3e);
+  const screen = k.mat(0x22262c, { glow: 0x5f86b8 });
+  const chair = k.mat(0x6e2430);
+  const kits = [k.mat(0x2f7a3a), k.mat(0x2b5fb3), k.mat(0xd9d2c0)];
+  let n = 0;
+  for (let u = -len / 2 + 3; u < len / 2 - 2.5; u += 3.2) {
+    for (let v = -wid / 2 + 2.5; v < wid / 2 - 2; v += 3.6) {
+      if (!clearOfDoor(u, v) || !k.room(u, v, 1, 2.8, 0.8)) continue;
+      k.box(u, v, 1, 0.78, 2.8, bench);
+      for (const dv of [-0.8, 0.8]) {
+        k.box(u + 0.2, v + dv, 0.08, 0.42, 0.62, screen, 0.78, false);
+        k.box(u - 0.15, v + dv, 0.18, 0.02, 0.45, k.mat(0x3a3d42), 0.78, false);
+        k.box(u - 0.95, v + dv, 0.45, 0.45, 0.45, chair, 0, false);
+        k.box(u - 1.2, v + dv, 0.08, 0.55, 0.45, chair, 0.45, false);
+      }
+      k.box(u - 0.1, v, 0.3, 0.08, 0.25, kits[n++ % kits.length], 0.78, false);
+    }
+  }
+  // Glass partitions with aluminium frames, splitting the hall in thirds.
+  const glass = k.mat(0xbcd6e0, { transparent: true, opacity: 0.35 });
+  const alu = k.mat(0xc4c8cc);
+  for (const pu of [-len / 6, len / 6]) {
+    for (let v = -wid / 2 + 0.5; v < wid / 2; v += 1) {
+      if (Math.abs(v) < 1.2 || !k.room(pu, v, 0.1, 1, 0.1)) continue;
+      k.box(pu, v, 0.06, 2.7, 1, glass);
+      k.box(pu, v - 0.48, 0.1, 2.7, 0.05, alu, 0, false);
+    }
+  }
+  // Split ACs high on the long walls.
+  for (let u = -len / 2 + 4; u < len / 2 - 3; u += 8) {
+    for (const side of [-1, 1]) {
+      const v = side * (wid / 2 - 0.45);
+      if (k.room(u, v - side * 0.2, 0.2, 0.2, 0.05)) k.box(u, v, 1, 0.3, 0.25, k.mat(0xf4f4f2), 2.8, false);
+    }
+  }
+}
+
+/**
+ * The first-year chemistry lab in the Science Block: island benches with a
+ * reagent shelf down the middle, sinks at the ends, a burette stand at each
+ * place, fume hoods along the wall.
+ */
+function chemistryLab(k: Kit, L: Layout, clearOfDoor: (u: number, v: number) => boolean) {
+  const { len, wid } = L;
+  const top = k.mat(0x2f3a3f);
+  const cabinet = k.mat(0xd9d4c4);
+  const shelf = k.mat(0x8a5a32);
+  const rod = k.mat(0x9aa1a6);
+  const glass = k.mat(0xcfe8f2, { transparent: true, opacity: 0.6 });
+  const bottles = [k.mat(0x6b3a1e), k.mat(0x2b6cc4), k.mat(0xe8e2d2), k.mat(0x3f9e5a)];
+  let n = 0;
+  for (let u = -len / 2 + 4; u < len / 2 - 3; u += 4.2) {
+    for (let v = -wid / 2 + 3.5; v < wid / 2 - 3; v += 5) {
+      if (!clearOfDoor(u, v) || !k.room(u, v, 1.6, 3.6, 0.8)) continue;
+      k.box(u, v, 1.6, 0.85, 3.6, cabinet);
+      k.box(u, v, 1.7, 0.05, 3.7, top, 0.85, false);
+      k.box(u, v, 0.25, 0.5, 3.2, shelf, 0.9, false);
+      for (let b = -1.3; b <= 1.3; b += 0.43) k.box(u, v + b, 0.1, 0.2, 0.1, bottles[n++ % bottles.length], 1.4, false);
+      for (const side of [-1, 1]) {
+        for (const dv of [-1, 1]) {
+          const su = u + side * 0.55;
+          const sv = v + dv * 1.1;
+          k.box(su, sv, 0.04, 0.9, 0.04, rod, 0.9, false);
+          k.box(su, sv, 0.06, 0.55, 0.06, glass, 1.2, false);
+          k.box(su, sv, 0.18, 0.02, 0.18, k.mat(0x7a4a2a), 0.9, false);
+        }
+      }
+      k.box(u, v + 1.95, 1.2, 0.1, 0.5, k.mat(0xb9c0c6), 0.85, false);
+    }
+  }
+  for (let u = -len / 2 + 3; u < len / 2 - 3; u += 5) {
+    const v = wid / 2 - 0.8;
+    if (!k.room(u, v - 0.3, 1.8, 0.2, 0.05)) continue;
+    k.box(u, v, 1.8, 2.2, 0.9, k.mat(0xe8e5dc));
+    k.box(u, v - 0.46, 1.5, 0.8, 0.02, glass, 1, false);
   }
 }
 
@@ -371,16 +675,23 @@ export function buildInteriors(
     grid.fillPolygon([b.outer, ...b.holes], CLEAR, 0);
     const inside = new THREE.Group();
     inside.name = `interior-${label}`;
-    const floorColour = { lobby: 0xe4ddd0, library: 0xd6cfbf, auditorium: 0x7a2e2e, mess: 0xcfcac0, canteen: 0xc9c3b6, lecture: 0xc8bfae }[kind];
+    const floorColour = { lobby: 0xefe9dc, library: 0xd6cfbf, auditorium: 0x7a2e2e, mess: 0xcfcac0, canteen: 0xc9c3b6, lecture: 0xefeae0, lab: 0xf1ede4, chemlab: 0xe9e6de }[kind];
     const fg = flatPolygon(b.outer, b.holes, 0.07);
     if (fg) {
-      const floor = new THREE.Mesh(fg, toon(floorColour, { ramp: "soft", glow: new THREE.Color(floorColour).multiplyScalar(0.6) }));
+      // Tile UVs in world metres, so tiles line up across the room.
+      const p = fg.attributes.position;
+      const uv = new Float32Array(p.count * 2);
+      for (let i = 0; i < p.count; i++) uv.set([p.getX(i) / FLOOR_TILE, p.getZ(i) / FLOOR_TILE], i * 2);
+      fg.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      const ft = floorTexture(kind);
+      const floor = new THREE.Mesh(fg, toon(floorColour, { ramp: "soft", map: ft, glow: new THREE.Color(floorColour).multiplyScalar(0.6), emissiveMap: ft }));
       floor.receiveShadow = true;
       inside.add(floor);
     }
 
     // Low walls round every ring, with a gap at the door.
-    const wallMat = toon(0xf3ead6, { glow: 0x7a7060 });
+    const wt = wallTexture(kind);
+    const wallMat = toon(0xffffff, { map: wt, glow: 0x8a8272, emissiveMap: wt });
     const walls = new THREE.Group();
     for (const r of rings) {
       for (let i = 0; i < r.length; i++) {
@@ -401,7 +712,11 @@ export function buildInteriors(
           : [[0, l]];
         for (const [t0, t1] of pieces) {
           if (t1 - t0 < 0.2) continue;
-          const w = new THREE.Mesh(new THREE.BoxGeometry(t1 - t0, WALL_H, 0.3), wallMat);
+          const wg = new THREE.BoxGeometry(t1 - t0, WALL_H, 0.3);
+          // Long faces (+z, -z) repeat the wall texture every WALL_RUN metres.
+          const wuv = wg.attributes.uv as THREE.BufferAttribute;
+          for (let v = 16; v < 24; v++) wuv.setX(v, (wuv.getX(v) * (t1 - t0)) / WALL_RUN);
+          const w = new THREE.Mesh(wg, wallMat);
           const m = (t0 + t1) / 2;
           w.position.set(a[0] + ux * m, WALL_H / 2, a[1] + uz * m);
           w.rotation.y = -Math.atan2(uz, ux);
@@ -440,6 +755,7 @@ export function buildInteriors(
 
     const kit = new Kit(box, grid, fits);
     furnish(kind, kit, { len: box.len, wid: box.wid, doorU: du, doorV: dv, inU, inV });
+    kit.finish();
     inside.add(kit.g);
     inside.visible = false;
     group.add(inside);

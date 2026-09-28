@@ -37,6 +37,8 @@ export type Road = {
   /** Higher draws on top where roads overlap. */
   rank: number;
   bridge: boolean;
+  /** Runs under something (the NH66 underpasses are tunnel=yes under the highway). */
+  tunnel: boolean;
 };
 
 export type AreaKind =
@@ -67,7 +69,7 @@ export type Area = {
   kind: AreaKind;
   name?: string;
   sport?: string;
-  /** Selected raw tags (amenity, theatre:type) for landmark matching. */
+  /** Selected raw tags: amenity and theatre:type (landmarks), surface and lit (grounds). */
   tags?: Tags;
   /** What grows there, for wooded areas. */
   leaf?: "palm" | "needle" | "broad";
@@ -93,6 +95,8 @@ export type Building = {
   campus: boolean;
   /** Façade style forced by an override (see world/overrides.ts). */
   style?: string;
+  /** Vertical fins between window bays, with the sunshade ledges making an egg-crate front. */
+  fins?: boolean;
   /** Hidden by an override (e.g. replaced by a custom model). */
   hidden?: boolean;
   area: number;
