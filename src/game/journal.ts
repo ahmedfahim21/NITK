@@ -40,7 +40,7 @@ export function openJournal(g: Game): Promise<void> {
   return new Promise((resolve) => {
     const st = g.state;
     const H = (ic: IconId, t: string, extra = "") => `<div class="jr-h">${icon(ic, 15)}<span>${t}</span>${extra}</div>`;
-    const card = g.ui.openOverlay(820);
+    const card = g.ui.openOverlay(1240);
     card.classList.add("jr");
     const unlocked = new Set(g.available().map((m) => m.id));
 
@@ -126,16 +126,18 @@ export function openJournal(g: Game): Promise<void> {
       </div>
       <div class="jr-tiles">${tiles}</div>
       <div class="jr-cols">
-        <div>
+        <div class="jr-col">
           <div class="jr-sec">${H("users", "Respect")}${respect}</div>
           <div class="jr-sec">${H("flag", "Clubs")}<div class="jr-pills">${clubPills}</div></div>
           <div class="jr-sec">${H("calendar", "Next year")}${next.length ? `<div class="jr-pills">${next.map((n) => `<span class="jr-pill ghost">${n}</span>`).join("")}</div>` : `<span class="jr-muted">Nothing yet</span>`}</div>
           <div class="jr-sec">${H("thali", "Mess")}<span>${st.flags.mess ? String(st.flags.mess).replace(/^./, (c) => c.toUpperCase()) : `<span class="jr-muted">Not registered</span>`}</span> <span class="jr-muted">· ${Number(st.flags.prep ?? 0)} quiz answers right</span></div>
         </div>
-        <div>${chapters || `<div class="jr-sec">${H("scroll", "Missions")}<span class="jr-muted">Nothing yet. Look for a gold marker.</span></div>`}${jobList.length ? `<div class="jr-sec">${H("briefcase", "Campus jobs", `<span class="jr-muted small">once a day</span>`)}${jobs}</div>` : ""}</div>
-      </div>
-      <div class="jr-sec">${H("grad", "Courses")}<div class="jr-courses">${courses}</div></div>
-      <div class="jr-sec">${H("clock", "Timetable", `<span class="jr-muted small">weekdays, once classes start</span>`)}${week}</div>`;
+        <div class="jr-col">${chapters || `<div class="jr-sec">${H("scroll", "Missions")}<span class="jr-muted">Nothing yet. Look for a gold marker.</span></div>`}${jobList.length ? `<div class="jr-sec">${H("briefcase", "Campus jobs", `<span class="jr-muted small">once a day</span>`)}${jobs}</div>` : ""}</div>
+        <div class="jr-col">
+          <div class="jr-sec">${H("grad", "Courses")}<div class="jr-courses">${courses}</div></div>
+          <div class="jr-sec">${H("clock", "Timetable", `<span class="jr-muted small">weekdays</span>`)}${week}</div>
+        </div>
+      </div>`;
 
     let closed = false;
     const close = (then?: () => void) => {

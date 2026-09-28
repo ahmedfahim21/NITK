@@ -39,7 +39,7 @@ function whereToFind(g: Game, id: CastId): string {
 export function openYearbook(g: Game): Promise<void> {
   return new Promise((resolve) => {
     const st = g.state;
-    const card = g.ui.openOverlay(860);
+    const card = g.ui.openOverlay(1240);
     card.classList.add("jr", "yb");
     const { met, total } = metCount(st);
     card.innerHTML = `
