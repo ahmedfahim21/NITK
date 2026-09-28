@@ -13,7 +13,11 @@ import { buildBuildings } from "./buildings";
 import { buildLandmarks } from "./landmarks";
 import { buildTrees } from "./trees";
 import { buildProps } from "./props";
-import { clearMounds } from "./terrain";
+import { bakeTerrain, clearMounds, groundHeight, inCut } from "./terrain";
+import { displaceTree } from "./displace";
+import { campusRegion, type Region } from "./region";
+import { insideRuns, resample } from "./ground";
+import { buildUnderpasses } from "./underpass";
 import { ModelLayer } from "./models";
 import { buildInteriors, interiorBuildings } from "./interiors";
 
@@ -22,6 +26,8 @@ export type Place = { name: string; x: number; z: number; y: number; kind: strin
 export type World = {
   group: THREE.Group;
   grid: Grid;
+  /** The campus and what joins it; nothing outside exists. */
+  region: Region;
   places: Place[];
   spawn: { x: number; z: number; facing: number };
   stats: { buildings: number; roads: number; trees: number };
@@ -33,8 +39,31 @@ export type World = {
   update(t: number, cam?: THREE.Vector3): void;
 };
 
-export function buildWorld(map: CampusMap): World {
+/**
+ * The map cut down to the region: buildings, areas and places inside it,
+ * roads, walls and streams split to the runs inside it (resampled to 3 m so
+ * they bend with the terrain).
+ */
+function clipToRegion(map: CampusMap, region: Region): CampusMap {
+  const inside = (p: Pt) => region.contains(p[0], p[1]);
+  const runs = (pts: Pt[]) => insideRuns(resample(pts, 3), region).filter((r) => r.length >= 2);
+  return {
+    ...map,
+    buildings: map.buildings.filter((b) => inside(centroid(b.outer))),
+    // Land use that only brushes the region still colours the ground inside it;
+    // grounds, car parks and the like belong to the region only if they're in it.
+    areas: map.areas.filter((a) => inside(centroid(a.outer)) || (!["pitch", "track", "parking", "plaza", "water", "pool"].includes(a.kind) && a.outer.some(inside))),
+    roads: map.roads.flatMap((r) => runs(r.pts).map((pts) => ({ ...r, pts }))),
+    barriers: map.barriers.flatMap((b) => runs(b.pts).map((pts) => ({ ...b, pts }))),
+    waterways: map.waterways.flatMap((w) => runs(w.pts).map((pts) => ({ ...w, pts }))),
+    pois: map.pois.filter((p) => inside([p.x, p.z])),
+  };
+}
+
+export function buildWorld(fullMap: CampusMap): World {
   clearMounds();
+  const region = campusRegion(fullMap);
+  const map = clipToRegion(fullMap, region);
   const b = map.bounds;
   const grid = new Grid(b.minX, b.minZ, b.maxX, b.maxZ, 1);
   const group = new THREE.Group();
@@ -84,8 +113,29 @@ export function buildWorld(map: CampusMap): World {
     grid.fillPolygon([bl.outer, ...bl.holes], SOLID, bl.height);
   }
 
-  const ground = buildGround(map);
-  const roads = buildRoads(map);
+  // The terrain: after the landmarks (the lighthouse knoll), before anything is placed on it.
+  bakeTerrain(map);
+
+  const ground = buildGround(map, region);
+  // Underpass roads stop at the trench mouth; its own floor carries them down and under the highway.
+  const roads = buildRoads({
+    ...map,
+    roads: map.roads.flatMap((r) => {
+      if (r.kind === "trunk") return [r];
+      // The tunnel itself is the culvert's floor.
+      if (r.tunnel) return [];
+      const out: typeof map.roads = [];
+      let run: Pt[] = [];
+      for (const p of r.pts) {
+        if (inCut(p[0], p[1])) {
+          if (run.length >= 2) out.push({ ...r, pts: run });
+          run = [];
+        } else run.push(p);
+      }
+      if (run.length >= 2) out.push({ ...r, pts: run });
+      return out;
+    }),
+  });
   const buildings = buildBuildings(map, new Set([...skip, ...roomIds]));
   // Each walk-in building's shell is its own mesh so the cutaway can hide it.
   const shells = new Map<number, THREE.Object3D>();
@@ -98,9 +148,20 @@ export function buildWorld(map: CampusMap): World {
   const interiors = buildInteriors(map, grid, shells, landmarks.attached);
   const models = new ModelLayer(map);
   void models.sync((k, err) => console.warn(`[models] ${k}:`, err));
-  const trees = buildTrees(map, grid);
-  const props = buildProps(map, roads.lamps, grid);
-  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, models.group, interiors.group);
+  // Trees from the whole map: beyond the wall they're the scrub forest the world ends in.
+  const trees = buildTrees(fullMap, grid);
+  const props = buildProps(map, roads.lamps, grid, region);
+  const underpasses = buildUnderpasses(grid);
+  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, models.group, interiors.group, underpasses);
+
+  // Everything built at ground level 0 goes up onto the terrain.
+  for (const g of [ground.group, roads.group, buildings.group, landmarks.group, interiors.group, props.walls]) displaceTree(g);
+
+  // The edge of the world: nothing past the region is walkable.
+  for (let j = 0; j < grid.h; j++) {
+    const z = grid.minZ + (j + 0.5) * grid.cell;
+    for (let i = 0; i < grid.w; i++) if (!region.contains(grid.minX + (i + 0.5) * grid.cell, z)) grid.flags[j * grid.w + i] |= SOLID;
+  }
 
   let glow = 0;
 
@@ -113,7 +174,8 @@ export function buildWorld(map: CampusMap): World {
     // "NITK Main Building" next to the "Main Building" landmark is one place.
     if (places.some((p) => Math.hypot(p.x - x, p.z - z) < 80 && (key.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(key)))) return;
     seen.add(key);
-    places.push({ name: name.trim(), x, z, y, kind });
+    if (!region.contains(x, z)) return;
+    places.push({ name: name.trim(), x, z, y: y + groundHeight(x, z), kind });
   };
   for (const s of landmarks.spots) add(s.name, s.x, s.z, 12, "landmark");
   const named = map.buildings.filter((bl) => bl.name).sort((p, q) => q.area - p.area);
@@ -141,6 +203,7 @@ export function buildWorld(map: CampusMap): World {
   return {
     group,
     grid,
+    region,
     places,
     spawn: { x: sx, z: sz, facing },
     stats: { buildings: map.buildings.length, roads: map.roads.length, trees: trees.count },

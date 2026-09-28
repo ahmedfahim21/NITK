@@ -9,7 +9,7 @@
  */
 import * as THREE from "three";
 import type { Grid } from "./world/grid";
-import { groundHeight } from "./world/terrain";
+import { groundHeight, surfaceAt } from "./world/terrain";
 import { HeroAnimator, makeHero } from "./hero";
 
 const WALK = 4.6;
@@ -339,7 +339,8 @@ export class Player {
       }
 
       // Vertical.
-      const gy = groundHeight(this.pos.x, this.pos.z);
+      // The ground, or the culvert floor if you're down in an underpass.
+      const gy = surfaceAt(this.pos.x, this.pos.z, this.pos.y);
       if (this.grounded && inp.hit("Space") && !this.frozen) {
         this.vel.y = JUMP;
         this.grounded = false;
@@ -477,7 +478,11 @@ export class Player {
         const x = target.x + dir.x * s;
         const z = target.z + dir.z * s;
         const y = target.y + dir.y * s;
-        if (this.grid.topAt(x, z) > y - 0.3 || y < groundHeight(x, z) + 0.3) {
+        // Building tops in the grid are heights above their pad.
+        // Down in an underpass, the floor there (not the deck overhead) is the ground.
+        const g = surfaceAt(x, z, y);
+        const top = this.grid.topAt(x, z);
+        if ((top > 0 && g + top > y - 0.3) || y < g + 0.3) {
           dist = Math.max(1.2, s - 0.5);
           break;
         }

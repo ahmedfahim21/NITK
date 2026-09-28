@@ -13,7 +13,7 @@ import { toon } from "../fx/toon";
 import type { Grid } from "./grid";
 import { PATH, ROAD, SOLID, WATER } from "./grid";
 import { FLOOR_H, curtainWall, signTexture } from "./textures";
-import { addMound, groundHeight } from "./terrain";
+import { addMound } from "./terrain";
 
 export type LandmarkRig = {
   group: THREE.Group;
@@ -142,7 +142,8 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
   if (map.lighthouse) {
     const [lx, lz] = map.lighthouse;
     addMound({ x: lx, z: lz, r: 48, h: 10 });
-    const base = groundHeight(lx, lz);
+    // Built at 0: the terrain (knoll included) lifts it like everything else.
+    const base = 0;
     const lh = new THREE.Group();
     lh.position.set(lx, base, lz);
     // A square concrete tower (OSM: height 30.3 m, lit 1972) in red and
@@ -855,7 +856,7 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
       const heads = new THREE.InstancedMesh(headGeo, toon(0xe8ecef, { glow: 0xfff4d0 }), masts.length);
       const m = new THREE.Matrix4();
       masts.forEach(([x, z, yaw], i) => {
-        m.makeRotationY(yaw).setPosition(x, groundHeight(x, z), z);
+        m.makeRotationY(yaw).setPosition(x, 0, z);
         poles.setMatrixAt(i, m);
         heads.setMatrixAt(i, m);
         grid.stampDisc(x, z, 0.4, SOLID, 19);
