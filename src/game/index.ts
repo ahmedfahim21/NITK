@@ -15,6 +15,7 @@ import { GameState, type Faction } from "./state";
 import { GameUI } from "./ui";
 import { Places, type PlaceKey, type Spot } from "./places";
 import { Crowd, CHATTER, BUMP_LINES } from "./crowd";
+import { Animals } from "./animals";
 import { Riders, buildRacks, makeCycle } from "./cycles";
 import { Beacon, Rain, Swarm } from "./fx";
 import { Cast, CAST, type CastId } from "./cast";
@@ -86,6 +87,7 @@ export class Game {
   readonly ui: GameUI;
   readonly places: Places;
   readonly crowd: Crowd;
+  readonly animals: Animals;
   readonly riders: Riders;
   readonly cast = new Cast();
   readonly rain = new Rain();
@@ -147,13 +149,20 @@ export class Game {
     });
     // A campus, not a bazaar: a few dozen walkers plus the knots at the hangouts.
     this.crowd = new Crowd(map, world.grid, hangouts, 70);
+    // A few strays keep to their corners; a peacock is rarely about on the lawns.
+    const at = (k: PlaceKey): [number, number] => {
+      const s = this.places.get(k);
+      return [s.x, s.z];
+    };
+    this.animals = new Animals(world.grid, (["nescafe", "megaMess", "karavali", "library", "mainGate"] as PlaceKey[]).map(at), (["mainGround", "sac", "library", "lighthouseView"] as PlaceKey[]).map(at));
+    this.animals.onPeacock = () => this.ui.toast("A peacock has wandered onto the lawn. You don't see one every day.", "#1b6fb0");
     this.riders = new Riders(map, 6);
     const racks = (["karavali", "aravali", "lhc", "library"] as PlaceKey[]).map((k) => {
       const s = this.places.get(k);
       const [x, z] = world.grid.nearestFree(s.x + 5, s.z + 3);
       return { x, z, face: s.face ?? 0 };
     });
-    this.group.add(this.crowd.group, this.riders.group, this.cast.group, this.rain.mesh, this.beacon.group, this.swarm.points, buildRacks(racks));
+    this.group.add(this.crowd.group, this.animals.group, this.riders.group, this.cast.group, this.rain.mesh, this.beacon.group, this.swarm.points, buildRacks(racks));
     this.festivals = new Festivals(
       (["mainGate", "academicSection", "karavali", "aravali", "sahyadri", "sac", "lhc", "nescafe"] as PlaceKey[]).map((k) => this.places.get(k))
     );
@@ -1031,6 +1040,7 @@ export class Game {
     // World.
     this.crowd.update(dt, this.camera.position, p.pos);
     this.riders.update(dt, p.pos, period === "night");
+    this.animals.update(dt, this.camera.position, p.pos, { night: period === "night", raining: st.raining, loud: !!p.riding || p.speed > 5, ambient: !this.cutscene });
     this.cast.update(dt, p.pos, this.t);
     this.rain.update(dt, this.camera.position);
     this.beacon.update(this.t);
