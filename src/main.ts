@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { inject } from "@vercel/analytics";
 import { loadCampus } from "./osm/load";
 import { buildWorld } from "./world";
 import { cuts, floorHeight, groundHeight, loadDem } from "./world/terrain";
@@ -20,6 +21,8 @@ import type { Preset } from "./fx/presets";
 import { STORY_MODE } from "./flags";
 import { afterCurfew, CURFEW } from "./game/schedule";
 import { AFTERNOON, MORNING, classesStarted } from "./game/courses";
+
+inject();
 
 /** The monsoon version of a preset: grey sky, weak sun, thick haze. */
 function rainy(p: Preset): Preset {

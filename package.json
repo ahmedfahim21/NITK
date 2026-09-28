@@ -14,6 +14,7 @@
     "og:render": "node scripts/render-og.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "lucide": "^1.48.0",
     "three": "^0.180.0"
   },
