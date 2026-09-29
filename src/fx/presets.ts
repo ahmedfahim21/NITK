@@ -1,7 +1,7 @@
 /**
  * Time of day. Each preset sets the lights, sky, and the cel grade.
  * Storybook grade: soft coloured-pencil lines, teal-leaning shadows, lifted
- * clean blacks and bright colour. Structure follows SADAK's fx/presets.ts,
+ * clean blacks and natural colour. Structure follows SADAK's fx/presets.ts,
  * but the look is deliberately lighter than SADAK's dark ink and violet.
  */
 export type RGB = [number, number, number];
@@ -48,8 +48,8 @@ export const PRESETS: Record<TimeOfDay, Preset> = {
     grade: {
       lift: [0.0, 0.0, 0.004],
       gamma: [1.0, 1.0, 0.99],
-      gain: [1.1, 1.08, 1.02],
-      saturation: 1.32,
+      gain: [1.05, 1.05, 1.03],
+      saturation: 1.16,
       temperature: 0.03,
       vignette: { strength: 0.1, radius: 0.85 },
     },
@@ -68,8 +68,8 @@ export const PRESETS: Record<TimeOfDay, Preset> = {
     grade: {
       lift: [0.0, 0.0, 0.004],
       gamma: [1.0, 1.0, 0.99],
-      gain: [1.08, 1.07, 1.03],
-      saturation: 1.3,
+      gain: [1.04, 1.04, 1.03],
+      saturation: 1.14,
       temperature: 0.0,
       vignette: { strength: 0.1, radius: 0.85 },
     },
@@ -90,7 +90,7 @@ export const PRESETS: Record<TimeOfDay, Preset> = {
       lift: [0.014, 0.006, 0.014],
       gamma: [1.0, 1.0, 1.0],
       gain: [1.08, 1.02, 1.02],
-      saturation: 1.35,
+      saturation: 1.22,
       temperature: 0.18,
       vignette: { strength: 0.16, radius: 0.78 },
     },
@@ -110,7 +110,7 @@ export const PRESETS: Record<TimeOfDay, Preset> = {
       lift: [0.006, 0.01, 0.03],
       gamma: [1.0, 1.0, 1.02],
       gain: [1.02, 1.04, 1.1],
-      saturation: 1.15,
+      saturation: 1.06,
       temperature: -0.1,
       vignette: { strength: 0.2, radius: 0.75 },
     },

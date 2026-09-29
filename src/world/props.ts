@@ -30,17 +30,12 @@ export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid, region: Re
   group.name = "props";
 
   /* ---- lamps ---- */
-  // Highway arm lamps, and on campus the white globe on a short black pole
-  // (as in the virtual tour, round the hostels and departments).
+  // Arm lamps along the highway and main roads.
   const kept = lamps.filter((l) => !grid.blocked(l.x, l.z));
-  const arms = kept.filter((l) => !l.globe);
-  const globes = kept.filter((l) => l.globe);
   const pole = new THREE.CylinderGeometry(0.07, 0.11, 8, 6).translate(0, 4, 0);
   const arm = new THREE.BoxGeometry(1.6, 0.08, 0.08).translate(0.75, 7.9, 0);
   const armPoleGeo = mergeGeometries([pole.toNonIndexed(), arm.toNonIndexed()])!;
   const armHeadGeo = new THREE.BoxGeometry(0.7, 0.18, 0.32).translate(1.45, 7.8, 0);
-  const globePoleGeo = new THREE.CylinderGeometry(0.06, 0.1, 4.2, 6).translate(0, 2.1, 0);
-  const globeHeadGeo = new THREE.SphereGeometry(0.34, 10, 8).translate(0, 4.5, 0);
   const poolMat = new THREE.MeshBasicMaterial({
     color: 0xffd9a0,
     transparent: true,
@@ -54,25 +49,19 @@ export function buildProps(map: CampusMap, lamps: Lamp[], grid: Grid, region: Re
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const one = new THREE.Vector3(1, 1, 1);
-  let pools = 0;
-  for (const [list, poleGeo, headGeo, poleColour, reach] of [
-    [arms, armPoleGeo, armHeadGeo, 0x8a9399, 1.45],
-    [globes, globePoleGeo, globeHeadGeo, 0x1f2226, 0],
-  ] as const) {
-    if (!list.length) continue;
-    const poleMesh = new THREE.InstancedMesh(poleGeo, toon(poleColour), list.length);
-    const headMesh = new THREE.InstancedMesh(headGeo, toon(0xf4f4ee, { glow: 0xfff0c0 }), list.length);
-    list.forEach(({ x, z, ang: k }, i) => {
+  if (kept.length) {
+    const poleMesh = new THREE.InstancedMesh(armPoleGeo, toon(0x8a9399), kept.length);
+    const headMesh = new THREE.InstancedMesh(armHeadGeo, toon(0xf4f4ee, { glow: 0xfff0c0 }), kept.length);
+    kept.forEach(({ x, z, ang: k }, i) => {
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), k);
       const y = groundHeight(x, z);
       m.compose(new THREE.Vector3(x, y, z), q, one);
       poleMesh.setMatrixAt(i, m);
       headMesh.setMatrixAt(i, m);
-      const hx = x + Math.cos(-k) * reach;
-      const hz = z + Math.sin(-k) * reach;
-      m.compose(new THREE.Vector3(hx, y + 0.3, hz), new THREE.Quaternion(), reach ? one : new THREE.Vector3(0.7, 1, 0.7));
-      poolMesh.setMatrixAt(pools++, m);
-      grid.stampDisc(x, z, 0.25, SOLID, reach ? 8 : 4.8);
+      // The light pool falls under the head, at the end of the arm.
+      m.compose(new THREE.Vector3(x + Math.cos(-k) * 1.45, y + 0.3, z + Math.sin(-k) * 1.45), new THREE.Quaternion(), one);
+      poolMesh.setMatrixAt(i, m);
+      grid.stampDisc(x, z, 0.25, SOLID, 8);
     });
     poleMesh.castShadow = true;
     poleMesh.computeBoundingSphere();

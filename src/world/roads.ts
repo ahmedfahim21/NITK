@@ -24,8 +24,6 @@ const ROAD_COLOUR: Record<RoadKind, number> = {
 
 const MARK_WHITE = new THREE.Color(0xf2f2ea);
 const MARK_YELLOW = new THREE.Color(0xf0c93c);
-const KERB_BLACK = new THREE.Color(0x26282b);
-const KERB_WHITE = new THREE.Color(0xeeeeea);
 
 type Buf = { pos: number[]; col: number[]; idx: number[] };
 
@@ -68,30 +66,6 @@ function toMesh(buf: Buf, mat: THREE.Material): THREE.Mesh {
   return m;
 }
 
-/** Cuts a polyline into consecutive pieces about `size` metres long. */
-function chunks(pts: Pt[], size: number): Pt[][] {
-  const out: Pt[][] = [];
-  let cur: Pt[] = [pts[0]];
-  let run = 0;
-  for (let i = 1; i < pts.length; i++) {
-    const [a, b] = [pts[i - 1], pts[i]];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const n = Math.max(1, Math.ceil(len / size));
-    for (let k = 1; k <= n; k++) {
-      const p: Pt = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
-      cur.push(p);
-      run += len / n;
-      if (run >= size) {
-        out.push(cur);
-        cur = [p];
-        run = 0;
-      }
-    }
-  }
-  if (cur.length > 1) out.push(cur);
-  return out;
-}
-
 /** Splits a polyline into dashes of `on` metres every `period`. */
 function dashes(pts: Pt[], on: number, period: number): Pt[][] {
   const out: Pt[][] = [];
@@ -124,8 +98,8 @@ function dashes(pts: Pt[], on: number, period: number): Pt[][] {
   return out;
 }
 
-/** globe: a campus lamp, white globe on a short black pole; otherwise a highway arm lamp. */
-export type Lamp = { x: number; z: number; ang: number; globe?: boolean };
+/** An arm lamp: pole at (x, z), the arm reaching over the road at angle ang. */
+export type Lamp = { x: number; z: number; ang: number };
 export type RoadRig = { group: THREE.Group; lamps: Lamp[]; overbridges: Road[] };
 
 export function buildRoads(map: CampusMap): RoadRig {
@@ -135,13 +109,8 @@ export function buildRoads(map: CampusMap): RoadRig {
   const marks: Buf = { pos: [], col: [], idx: [] };
   const lamps: Lamp[] = [];
   const overbridges: Road[] = [];
-  const kerbs: Buf = { pos: [], col: [], idx: [] };
   const inCampus = (p: Pt) => map.campus.some((c) => pointInPoly(p[0], p[1], c));
-  // Where vehicle roads meet: kerbs stop short of these so junction mouths stay open.
   const vehicle = (r: Road) => !["footway", "steps", "cycleway", "pedestrian", "track"].includes(r.kind) && !r.bridge;
-  const junctions: Pt[] = [];
-  for (const r of map.roads) if (vehicle(r)) junctions.push(r.pts[0], r.pts[r.pts.length - 1]);
-  const nearJunction = (p: Pt, r: number) => junctions.some((j) => Math.abs(j[0] - p[0]) < r && Math.abs(j[1] - p[1]) < r && Math.hypot(j[0] - p[0], j[1] - p[1]) < r);
 
   for (const r of map.roads) {
     if (r.bridge && (r.kind === "footway" || r.kind === "steps" || r.kind === "cycleway")) {
@@ -171,22 +140,11 @@ export function buildRoads(map: CampusMap): RoadRig {
       for (const d of dashes(r.pts, 2.5, 7)) pushGeo(marks, ribbon(d, -0.07, 0.07, my), MARK_YELLOW);
     }
 
-    // Campus roads have the kerbstones painted in black and white, a metre each.
     const campusRoad = vehicle(r) && r.kind !== "trunk" && r.kind !== "primary" && inCampus(r.pts[Math.floor(r.pts.length / 2)]);
-    if (campusRoad) {
-      const ky = y + 0.1;
-      for (const side of [-1, 1]) {
-        const k0 = side < 0 ? -hw - 0.3 : hw;
-        const k1 = side < 0 ? -hw : hw + 0.3;
-        // A black course in 3 m pieces (so each can stop at a junction), white dashes on top.
-        for (const d of chunks(r.pts, 3)) if (!nearJunction(d[0], hw + 5)) pushGeo(kerbs, ribbon(d, k0, k1, ky), KERB_BLACK);
-        for (const d of dashes(r.pts, 1, 2)) if (!nearJunction(d[0], hw + 5)) pushGeo(kerbs, ribbon(d, k0, k1, ky + 0.004), KERB_WHITE);
-      }
-    }
 
-    // Lamps along real roads.
-    if ((r.rank >= 4 || campusRoad) && len > 25) {
-      const spacing = r.kind === "trunk" ? 32 : campusRoad ? 22 : 28;
+    // Arm lamps along the highway and main roads; campus roads have none.
+    if (r.rank >= 4 && !campusRoad && len > 25) {
+      const spacing = r.kind === "trunk" ? 32 : 28;
       let acc = hash(r.id) % 10;
       for (let i = 1; i < r.pts.length; i++) {
         const [a, b] = [r.pts[i - 1], r.pts[i]];
@@ -202,7 +160,6 @@ export function buildRoads(map: CampusMap): RoadRig {
             x: a[0] + dx * acc + dz * off * side,
             z: a[1] + dz * acc - dx * off * side,
             ang: -Math.atan2(dx * side, -dz * side),
-            globe: campusRoad,
           });
           acc += spacing;
         }
@@ -215,7 +172,6 @@ export function buildRoads(map: CampusMap): RoadRig {
   group.add(toMesh(surface, roadMat));
   const markMat = toon(0xffffff, { vertexColors: true, ramp: "soft", polygonOffset: 2 });
   group.add(toMesh(marks, markMat));
-  if (kerbs.idx.length) group.add(toMesh(kerbs, toon(0xffffff, { vertexColors: true, ramp: "soft", polygonOffset: 3 })));
 
   // OSM maps the stair landings as their own tiny bridges; the span's own flights stand for them.
   const spans = overbridges.filter((b) => Math.hypot(b.pts[b.pts.length - 1][0] - b.pts[0][0], b.pts[b.pts.length - 1][1] - b.pts[0][1]) > 10);

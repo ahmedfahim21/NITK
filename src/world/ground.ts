@@ -36,21 +36,21 @@ export function insideRuns(pts: Pt[], region: Region): Pt[][] {
 }
 
 const AREA_COLOUR: Record<AreaKind, number> = {
-  campus: 0x9dbb63,
+  campus: 0x86a95a,
   residential: 0xadb070,
   commercial: 0xc0b793,
-  grass: 0x8cc257,
-  park: 0x86be52,
-  garden: 0x7fbb4e,
-  forest: 0x66a047,
-  scrub: 0x8aa655,
+  grass: 0x74a44c,
+  park: 0x70a24a,
+  garden: 0x6c9f47,
+  forest: 0x5a8f42,
+  scrub: 0x869c55,
   farmland: 0xb5cf68,
   wetland: 0x7da77c,
   water: 0x3f8fbf,
   pool: 0x4fc0de,
   sand: 0xecd9a8,
   rock: 0xa0664c,
-  pitch: 0x6fb44d,
+  pitch: 0x64a046,
   track: 0xb9573d,
   parking: 0x9c9c98,
   plaza: 0xd3c9b5,
@@ -247,7 +247,7 @@ export function buildGround(map: CampusMap, region: Region): GroundRig {
     }
     return null;
   };
-  const LAND = 0xa6b56c;
+  const LAND = 0x8fa762;
   const rb = region.bounds;
   const lattice = (
     step: number,
