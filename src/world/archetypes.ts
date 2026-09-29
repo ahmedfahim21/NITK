@@ -16,10 +16,12 @@
  * - LHC-A: exposed laterite with white window frames.
  * - Library, LHC-D, CRF, CIDS, SJA: white render with lavender-grey bands.
  * - Chemical Engineering: cream and mauve, curved entrance canopy.
- * - Other departments (UG Programmes page photos): cream render, CSE terracotta,
+ * - Other departments (UG Programmes page photos): cream render (CSE's red tiled
+ *   panels and portico are a landmark),
  *   Metallurgy and Civil khaki.
- * - EEE/IT and the International Hostel: saturated yellow, blue-glass stair
- *   strips, green portal porch.
+ * - EEE/IT: weathered grey-khaki render, a light-blue glass core up the
+ *   front, a green portal porch with blue nameboards.
+ * - International Hostel: saturated yellow.
  */
 import type { Building, CampusMap } from "../osm/types";
 import type { FacadeStyle } from "./textures";
@@ -33,17 +35,19 @@ const LOOKS: [RegExp, Look][] = [
   [/^Department of Chemical Engineering$/i, { style: "modern", colour: "#f4e7d2" }],
   [/Central Library|E-Library|Central Research Facility|Lecture Hall Complex D|Inter-Disciplinary/i, { style: "modern", colour: "#ffffff" }],
   [/^Silver Jubilee Auditorium$/i, { style: "modern", colour: "#f4f2ee" }],
-  // The tour's EEE/IT blocks and the International Hostel: saturated yellow.
-  [/Electrical and Electronics|Information Technology/i, { style: "academic", colour: "#e4cf55" }],
+  // EEE/IT (from a photo of its front): weathered pale grey-khaki render.
+  [/Electrical and Electronics|Information Technology/i, { style: "academic", colour: "#cbc9ae" }],
   // The other departments, from the UG Programmes page photos (nitk.ac.in/UG_Programmes):
   // mostly cream render, CSE the terracotta block, Metallurgy and Civil the warmer khaki.
-  [/^Department of Computer Science/i, { style: "academic", colour: "#d99a78" }],
+  [/^Department of Computer Science/i, { style: "modern", colour: "#efe6d4", roofShape: "flat", roofColour: "#b8b6af" }],
   [/^Department of Civil Engineering$/i, { style: "academic", colour: "#e3d6a2" }],
   [/^Department of Electronics and Communication/i, { style: "academic", colour: "#e6dcc0" }],
   [/^Department of Mathematics and Computing$/i, { style: "academic", colour: "#ddd0b0" }],
   [/^Department of Mechanical Engineering$/i, { style: "academic", colour: "#f1ece0" }],
   [/^Department of Metallurg/i, { style: "academic", colour: "#e2cf8a" }],
   [/^Department of Mining Engineering$/i, { style: "academic", colour: "#eeeae0" }],
+  // The new PG hostel is whitish grey, not the old blocks' khaki.
+  [/Braahmagiri|Brahmagiri|Bramhagiri/i, { style: "hostel", colour: "#dcdcd6", roofColour: "#b9b8b2" }],
   [/^International Students Hostel$/i, { style: "hostel", colour: "#e8d35e" }],
 ];
 
@@ -51,7 +55,7 @@ const LOOKS: [RegExp, Look][] = [
 const HOSTEL_PAINT = ["#e2d39a", "#e6d9a8", "#dccb8c"];
 
 function isOldHostel(b: Building): boolean {
-  if (!b.name || /mega hostel|international/i.test(b.name)) return false;
+  if (!b.name || /mega hostel|international|shiwalik|shivalik/i.test(b.name)) return false;
   return b.type === "dormitory" || /\bblock\b|^GH-\d|hostel/i.test(b.name);
 }
 
@@ -88,8 +92,43 @@ function addWroe(map: CampusMap) {
   });
 }
 
+/**
+ * The pavilion behind the Main Building is mapped in OSM as a blue
+ * building=shed, so it would render as a closed blue box. It's an open
+ * shed: a vaulted roof on posts over a paved floor (landmarks.ts builds it),
+ * so it's renamed and typed here, and the building and grid passes skip it.
+ */
+const PAVILION_OSM_ID = 1363785291;
+
 export function applyArchetypes(map: CampusMap) {
   addWroe(map);
+  // Shivalik (11th Block, "Shiwalik" in OSM): seven storeys of white render
+  // (from a photo); landmarks.ts adds its balconies, entrance box and fin wall.
+  const shiv = map.buildings.find((b) => b.name && /Shiwalik|Shivalik/i.test(b.name));
+  if (shiv) {
+    shiv.levels = 7;
+    shiv.height = 7 * 3.4 + 0.6;
+    shiv.style = "modern";
+    shiv.colour = "#f1f0ea";
+    shiv.roofShape = "flat";
+    shiv.roofColour = "#d9d8d2";
+  }
+  // LHC-C (from a photo): four storeys of off-white render, the yellow only
+  // a faint cream; landmarks.ts adds the bladed portico, glass drum and louvres.
+  const lhcC = map.buildings.find((b) => b.name && /^Lecture Hall Complex - ?C$/i.test(b.name));
+  if (lhcC) {
+    lhcC.levels = 4;
+    lhcC.height = 4 * 3.4 + 0.6;
+    lhcC.style = "modern";
+    lhcC.colour = "#f3efe3";
+    lhcC.roofShape = "flat";
+    lhcC.roofColour = "#d6d2c4";
+  }
+  const pav = map.buildings.find((b) => b.id === PAVILION_OSM_ID);
+  if (pav) {
+    pav.name = "Pavilion";
+    pav.type = "pavilion";
+  }
   for (const b of map.buildings) {
     if (!b.name) continue;
     const hit = LOOKS.find(([re]) => re.test(b.name!));

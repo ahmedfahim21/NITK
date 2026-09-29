@@ -310,7 +310,8 @@ export function buildBuildings(map: CampusMap, skip: Set<number>): BuildingRig {
   const tankGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.4, 10);
 
   for (const b of map.buildings) {
-    if (skip.has(b.id) || b.hidden) continue;
+    // The pavilion is open: landmarks.ts builds its roof on posts.
+    if (skip.has(b.id) || b.hidden || b.type === "pavilion") continue;
     const h = hash(b.id);
     const style = styleFor(b);
     const f = facade(style);

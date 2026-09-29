@@ -14,6 +14,7 @@ import { buildLandmarks } from "./landmarks";
 import { buildTrees } from "./trees";
 import { buildProps } from "./props";
 import { buildStreetLife } from "./streetlife";
+import { buildShops } from "./shops";
 import { bakeTerrain, clearMounds, cuts, groundHeight, inCut, setOverbridges } from "./terrain";
 import { displaceTree } from "./displace";
 import { campusRegion, type Region } from "./region";
@@ -111,7 +112,7 @@ export function buildWorld(fullMap: CampusMap): World {
   const rooms = interiorBuildings(map);
   const roomIds = new Set(rooms.map((r) => r.b.id));
   for (const bl of map.buildings) {
-    if (skip.has(bl.id) || roomIds.has(bl.id)) continue;
+    if (skip.has(bl.id) || roomIds.has(bl.id) || bl.type === "pavilion") continue;
     if (bl.minHeight >= 2.5) {
       grid.fillPolygon([bl.outer, ...bl.holes], 0, bl.height);
       continue;
@@ -177,8 +178,9 @@ export function buildWorld(fullMap: CampusMap): World {
   const trees = buildTrees(fullMap, grid, (x, z) => clearOfBridges(x, z, 4));
   const props = buildProps(map, roads.lamps.filter((l) => clearOfBridges(l.x, l.z)), grid, region);
   const streetlife = buildStreetLife(map, grid);
+  const shops = buildShops(map, grid);
   const underpasses = buildUnderpasses(grid);
-  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, streetlife, models.group, interiors.group, underpasses);
+  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, streetlife, shops, models.group, interiors.group, underpasses);
 
   // Nothing stands in the way of the overbridge's stair flights (lamps and
   // trees are placed before the flights claim their ground).
@@ -193,7 +195,7 @@ export function buildWorld(fullMap: CampusMap): World {
   }
 
   // Everything built at ground level 0 goes up onto the terrain.
-  for (const g of [ground.group, roads.group, buildings.group, landmarks.group, interiors.group, props.walls]) displaceTree(g);
+  for (const g of [ground.group, roads.group, buildings.group, landmarks.group, interiors.group, props.walls, shops]) displaceTree(g);
 
   // The edge of the world: nothing past the region is walkable.
   for (let j = 0; j < grid.h; j++) {
