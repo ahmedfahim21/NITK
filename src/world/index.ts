@@ -13,6 +13,7 @@ import { buildBuildings } from "./buildings";
 import { buildLandmarks } from "./landmarks";
 import { buildTrees } from "./trees";
 import { buildProps } from "./props";
+import { buildStreetLife } from "./streetlife";
 import { bakeTerrain, clearMounds, cuts, groundHeight, inCut, setOverbridges } from "./terrain";
 import { displaceTree } from "./displace";
 import { campusRegion, type Region } from "./region";
@@ -175,8 +176,9 @@ export function buildWorld(fullMap: CampusMap): World {
   // Trees from the whole map: beyond the wall they're the scrub forest the world ends in.
   const trees = buildTrees(fullMap, grid, (x, z) => clearOfBridges(x, z, 4));
   const props = buildProps(map, roads.lamps.filter((l) => clearOfBridges(l.x, l.z)), grid, region);
+  const streetlife = buildStreetLife(map, grid);
   const underpasses = buildUnderpasses(grid);
-  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, models.group, interiors.group, underpasses);
+  group.add(ground.group, roads.group, buildings.group, landmarks.group, trees.group, props.group, streetlife, models.group, interiors.group, underpasses);
 
   // Nothing stands in the way of the overbridge's stair flights (lamps and
   // trees are placed before the flights claim their ground).
