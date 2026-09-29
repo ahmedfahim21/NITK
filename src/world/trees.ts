@@ -83,10 +83,20 @@ function palmGeometry(lite = false): THREE.BufferGeometry {
   return mergeGeometries(parts)!;
 }
 
+/** A tapered limb from a to b (both inside the geometry's own frame), ends sunk into what they join. */
+function limbBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number): THREE.BufferGeometry {
+  const dir = b.clone().sub(a);
+  const len = dir.length();
+  const g = new THREE.CylinderGeometry(r1, r0, len, 5);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize()));
+  g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+  return g;
+}
+
 function broadGeometry(variant: number, lite = false): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
-  const trunk = new THREE.CylinderGeometry(0.22, 0.34, 3.2, 6);
-  trunk.translate(0, 1.6, 0);
+  const trunk = new THREE.CylinderGeometry(0.22, 0.34, 4.4, 6);
+  trunk.translate(0, 2.2, 0);
   parts.push(colourise(trunk, 0x6b4f3a));
   const rand = mulberry32(variant * 97 + 3);
   const blobs = lite ? 2 : 4;
@@ -97,8 +107,11 @@ function broadGeometry(variant: number, lite = false): THREE.BufferGeometry {
     const a = rand() * Math.PI * 2;
     const d = i === 0 ? 0 : 1.3 + rand() * 0.6;
     b.scale(1, 0.8, 1);
-    b.translate(Math.cos(a) * d, 4 + rand() * 1.4 + (i === 0 ? 0.8 : 0), Math.sin(a) * d);
+    const cy = 4 + rand() * 1.4 + (i === 0 ? 0.8 : 0);
+    b.translate(Math.cos(a) * d, cy, Math.sin(a) * d);
     parts.push(colourise(b, greens[(i + variant) % greens.length]));
+    // A branch forks off the trunk and runs into the heart of this clump.
+    if (i > 0) parts.push(colourise(limbBetween(new THREE.Vector3(0, 3.1, 0), new THREE.Vector3(Math.cos(a) * d * 0.8, cy - 0.2, Math.sin(a) * d * 0.8), 0.15, 0.08), 0x6b4f3a));
   }
   return mergeGeometries(parts)!;
 }
@@ -135,16 +148,13 @@ function ashokaGeometry(): THREE.BufferGeometry {
 /** Samanea saman: a short thick trunk under a wide, flat umbrella of canopy. */
 function raintreeGeometry(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
-  const trunk = new THREE.CylinderGeometry(0.38, 0.6, 4.2, 7);
-  trunk.translate(0, 2.1, 0);
+  const trunk = new THREE.CylinderGeometry(0.34, 0.6, 4.6, 7);
+  trunk.translate(0, 2.3, 0);
   parts.push(colourise(trunk, 0x5b4636));
-  for (let k = 0; k < 3; k++) {
-    const a = (k / 3) * Math.PI * 2;
-    const limb = new THREE.CylinderGeometry(0.1, 0.22, 3.4, 5);
-    limb.rotateZ(0.65);
-    limb.rotateY(a);
-    limb.translate(Math.cos(a) * 1, 5.6, -Math.sin(a) * 1);
-    parts.push(colourise(limb, 0x5b4636));
+  // Limbs leave the top of the trunk, sloping outward, and end inside the umbrella.
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * Math.PI * 2 + 0.4;
+    parts.push(colourise(limbBetween(new THREE.Vector3(0, 3.9, 0), new THREE.Vector3(Math.cos(a) * 2.6, 7.3, Math.sin(a) * 2.6), 0.24, 0.1), 0x5b4636));
   }
   const rand = mulberry32(41);
   const greens = [0x5a9a3e, 0x4f8c38, 0x66a647];
