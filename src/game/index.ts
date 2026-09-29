@@ -314,7 +314,8 @@ export class Game {
   private parkCycle(x: number, z: number, face: number) {
     if (!this.cycle) return;
     this.group.add(this.cycle);
-    this.cycle.position.set(x, 0, z);
+    // Stand it on the ground, which the terrain has lifted well above y = 0.
+    this.cycle.position.set(x, groundHeight(x, z), z);
     this.cycle.rotation.set(0, face, 0.12);
     this.state.flags.cycleX = x;
     this.state.flags.cycleZ = z;
@@ -357,7 +358,7 @@ export class Game {
         o.add(b);
       }
     }
-    o.position.set(x, 0, z);
+    o.position.set(x, groundHeight(x, z), z);
     o.rotation.y = (x * 7 + z * 13) % 6.28;
     this.group.add(o);
     return o;
@@ -680,7 +681,7 @@ export class Game {
         } else if (this.cycle) {
           this.group.remove(this.cycle);
           this.player.facing = this.cycle.rotation.y;
-          this.player.pos.set(this.cycle.position.x, 0, this.cycle.position.z);
+          this.player.pos.set(this.cycle.position.x, this.cycle.position.y, this.cycle.position.z);
           this.player.mount(this.cycle);
         }
       },

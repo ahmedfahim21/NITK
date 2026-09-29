@@ -244,7 +244,7 @@ export class Player {
     const lx = this.pos.x + Math.cos(this.facing) * 0.9;
     const lz = this.pos.z - Math.sin(this.facing) * 0.9;
     const [fx, fz] = this.grid.nearestFree(lx, lz);
-    c.position.set(this.pos.x, 0, this.pos.z);
+    c.position.set(this.pos.x, groundHeight(this.pos.x, this.pos.z), this.pos.z);
     c.rotation.set(0, this.facing, 0.12);
     this.pos.set(fx, groundHeight(fx, fz), fz);
     this.vel.set(0, 0, 0);
