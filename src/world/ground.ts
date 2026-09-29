@@ -436,6 +436,8 @@ export function buildGround(map: CampusMap, region: Region): GroundRig {
   const lineGeos: THREE.BufferGeometry[] = [];
   for (const a of map.areas) {
     if (a.kind !== "pitch" && a.kind !== "track") continue;
+    // Courts and Main Ground 2's track are laid out in full in sports.ts.
+    if (a.kind === "pitch" && (/basketball|^volleyball$|tennis/.test(a.sport ?? "") || /^Main Ground 2$/i.test(a.name ?? ""))) continue;
     const box = orientedBox(a.outer);
     if (box.len < 8 || box.wid < 5) continue;
     const c = Math.cos(box.angle);

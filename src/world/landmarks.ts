@@ -1701,18 +1701,11 @@ export function buildLandmarks(map: CampusMap, grid: Grid): LandmarkRig {
     }
   }
 
-  // Pool: bright water with lane ropes.
+  // The pool's name for the map (its deck, lanes and fence are in sports.ts).
   for (const a of map.areas) {
-    if (a.kind !== "pool") continue;
+    if (a.kind !== "pool" || !a.name) continue;
     const box = orientedBox(a.outer);
-    for (let k = 1; k < 6; k++) {
-      const v = -box.wid / 2 + (k * box.wid) / 6;
-      const rope = new THREE.Mesh(new THREE.BoxGeometry(box.len * 0.95, 0.08, 0.12), toon(k % 2 ? 0xe74c3c : 0xf1c40f));
-      rope.position.set(box.cx - Math.sin(box.angle) * v, 0.2, box.cz + Math.cos(box.angle) * v);
-      rope.rotation.y = -box.angle;
-      group.add(rope);
-    }
-    if (a.name) spots.push({ name: a.name, x: box.cx, z: box.cz + box.wid });
+    spots.push({ name: a.name, x: box.cx, z: box.cz + box.wid });
   }
 
   return {
